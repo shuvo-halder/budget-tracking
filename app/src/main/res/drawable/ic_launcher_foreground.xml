@@ -4,33 +4,73 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Drop shadow underneath wallet -->
-    <path
-        android:fillColor="#26000000"
-        android:pathData="M30,72h48c3.3,0 6,-2.7 6,-6v2c0,3.3 -2.7,6 -6,6H30c-3.3,0 -6,-2.7 -6,-6v-2C24,69.3 26.7,72 30,72z" />
-    
-    <!-- Wallet Main Body -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M78,38H30c-3.31,0 -6,2.69 -6,6v24c0,3.31 2.69,6 6,6h48c3.31,0 6,-2.69 6,-6V44C84,40.69 81.31,38 78,38z" />
-    
-    <!-- Wallet Top Flap / Pocket curve -->
-    <path
-        android:fillColor="#E6F4EA"
-        android:pathData="M30,38h48c3.31,0 6,2.69 6,6v6H24v-6C24,40.69 26.7,38 30,38z" />
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.82"
+        android:scaleY="0.82"
+        android:translateX="10"
+        android:translateY="10">
 
-    <!-- Wallet Clasp / Tab -->
-    <path
-        android:fillColor="#047857"
-        android:pathData="M66,48h18v14H66c-3.87,0 -7,-3.13 -7,-7v0C59,51.13 62.13,48 66,48z" />
-    
-    <!-- Golden Coin Badge / Clasp Button -->
-    <path
-        android:fillColor="#FBBF24"
-        android:pathData="M67,55m-3.5,0a3.5,3.5 0 1,0 7,0a3.5,3.5 0 1,0 -7,0" />
-        
-    <!-- Taka / Currency symbol or upward trend arrow above wallet -->
-    <path
-        android:fillColor="#34D399"
-        android:pathData="M52,28l-8,8h5v6h6v-6h5z" />
+        <!-- Money Bag Top Flake / Neck Ties -->
+        <!-- Bag Top Ruffle -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M27,24 C25,20 28,15 32,15 C36,15 38,18 39,21 C40,18 43,15 47,15 C51,15 54,20 52,24 Z" />
+
+        <!-- Bag Neck Band -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M26,25 C26,24 53,24 53,25 C53,27 26,27 26,25 Z" />
+
+        <!-- Bag Sparkle / Motion Accent on top left -->
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="2.5"
+            android:strokeLineCap="round"
+            android:pathData="M18,22 L14,26 M18,30 L14,26" />
+
+        <!-- Money Bag Body -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M39,27 C34,27 20,40 18,55 C16,68 25,78 39,78 C53,78 58,68 56,55 C54,40 44,27 39,27 Z" />
+
+        <!-- Dollar Sign Symbol on Money Bag ($ cutout in gradient/deep color) -->
+        <!-- Vertical Bar -->
+        <path
+            android:fillColor="#7C3AED"
+            android:pathData="M38,40 h2 v24 h-2 z" />
+        <!-- S-Curve Outline -->
+        <path
+            android:strokeColor="#7C3AED"
+            android:strokeWidth="2.8"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M43,45 C43,42 41,41.5 39,41.5 C36.5,41.5 35,43 35,45.5 C35,49 43,51 43,55 C43,58 41,59.5 39,59.5 C36.5,59.5 34.5,58 34.5,55" />
+
+        <!-- Calculator Outline (Right side) -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M56,35 h32 a3,3 0 0,1 3,3 v40 a3,3 0 0,1 -3,3 h-32 a3,3 0 0,1 -3,-3 v-40 a3,3 0 0,1 3,-3 z" />
+
+        <!-- Calculator Screen Display Cutout -->
+        <path
+            android:fillColor="#7C3AED"
+            android:pathData="M59,39 h26 a1.5,1.5 0 0,1 1.5,1.5 v6 a1.5,1.5 0 0,1 -1.5,1.5 h-26 a1.5,1.5 0 0,1 -1.5,-1.5 v-6 a1.5,1.5 0 0,1 1.5,-1.5 z" />
+
+        <!-- Calculator Button Row 1 -->
+        <path
+            android:fillColor="#7C3AED"
+            android:pathData="M59,51 h6 v5 h-6 z M69,51 h6 v5 h-6 z M79,51 h6 v5 h-6 z" />
+
+        <!-- Calculator Button Row 2 -->
+        <path
+            android:fillColor="#7C3AED"
+            android:pathData="M59,59 h6 v5 h-6 z M69,59 h6 v5 h-6 z M79,59 h6 v5 h-6 z" />
+
+        <!-- Calculator Button Row 3 -->
+        <path
+            android:fillColor="#7C3AED"
+            android:pathData="M59,67 h6 v7 h-6 z M69,67 h6 v7 h-6 z M79,67 h6 v7 h-6 z" />
+    </group>
 </vector>

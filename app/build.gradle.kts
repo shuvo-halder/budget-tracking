@@ -9,11 +9,11 @@ plugins {
 }
 
 android {
-  namespace = "com.example"
+  namespace = "com.engrshuvo.financemanager"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.aistudio.dailybudget.txqkm"
+    applicationId = "com.engshuvo.financemanager"
     minSdk = 24
     targetSdk = 36
     versionCode = 1
