@@ -1,40 +1,23 @@
-# Performance Optimization Plan: Compose Recompositions & Background Dispatching
+# Remove signingConfigs Block for Unsigned Release APK
 
-Comprehensive performance optimization to eliminate UI frame drops, optimize Compose recompositions, and ensure all Room I/O is executed strictly off the main thread.
-
----
-
-## 1. Strict Dispatchers.IO for Room Database & Dispatchers.Default for Heavy Calculations
-- **`FinanceRepository.kt`**: Wrap all Room operations (inserts, updates, deletes, query Flow transformations) inside `withContext(Dispatchers.IO)`.
-- **`FinanceViewModel.kt`**:
-  - Run the 42-day calendar grid generation, transaction date-range mapping, and category spend percentage calculations using `flowOn(Dispatchers.Default)` inside Kotlin Flow combinations so the Main (UI) thread remains completely unblocked for smooth 60/120 fps rendering.
+Update `app/build.gradle.kts` to remove the hardcoded keystore signing configuration, enabling CI to build an unsigned release APK (`app-release-unsigned.apk`) for signing via GitHub Actions.
 
 ---
 
-## 2. Stability & Skippability for Compose
-- Add `@androidx.compose.runtime.Immutable` and `@androidx.compose.runtime.Stable` annotations to:
-  - `FinanceUiState`
-  - `CalendarDayCell`
-  - `DaySummaryStats`
-  - `CategorySpending`
-  - `TransactionEntity`
-  - `LoanEntity`
-  - `TransactionCategory`
-- Replace mutable collections or ensure all list parameters are immutable and stable for the Compose compiler.
+## 1. Edit `app/build.gradle.kts`
+- Remove the `signingConfigs` block:
+  ```kotlin
+  signingConfigs {
+    create("release") { ... }
+    create("debugConfig") { ... }
+  }
+  ```
+- Update `buildTypes`:
+  - In `release`, remove `signingConfig = signingConfigs.getByName("release")`.
+  - In `debug`, remove `signingConfig = signingConfigs.getByName("debugConfig")`.
+  - Retain `isCrunchPngs = false`, `isMinifyEnabled = false`, and `proguardFiles(...)`.
 
 ---
 
-## 3. `LazyColumn` Optimization & Unique Stable Keys
-- Ensure every `LazyColumn` item across:
-  - `MainFinanceScreen.kt` (Calendar day logs: `"day_${item.id}"`)
-  - `DashboardOverviewView.kt` (Filtered transaction list: `key = { "tx_${it.id}" }`)
-  - `LoansScreen.kt` (Loan cards: `key = { "loan_${it.id}" }`)
-  - `DaySummarySheet.kt` (Day transactions: `key = { "sheet_tx_${it.id}" }`)
-  has a strictly unique, stable `key` parameter.
-- Add `contentType` parameter to `LazyColumn` items to enable efficient item recycling.
-
----
-
-## 4. `derivedStateOf` & `remember` Fine-Grained Scoping
-- In Composables (e.g. `ComprehensiveDashboardCard`, `CategorySpendChart`, `FilterChipsBar`, `InteractiveCalendarView`), wrap state computations in `remember` and `derivedStateOf` so child components only recompose when their specific sub-properties change.
-- Pass lambda callbacks (e.g. `onEditClick`, `onDeleteClick`, `onDateClick`) as stable function references or `remember`ed closures.
+## 2. Verification
+- Run `compile_applet` to ensure the project compiles and builds successfully without signing errors.

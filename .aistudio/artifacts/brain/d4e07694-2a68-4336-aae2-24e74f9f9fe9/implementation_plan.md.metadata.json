@@ -1,6 +1,6 @@
 {
-  "summary":  "Implementation plan for performance optimization: offloading Room operations strictly to Dispatchers.IO, moving calendar/summary aggregations off the main thread to Dispatchers.Default, adding @Immutable/@Stable annotations to data classes, optimizing LazyColumn item keys with stable lambda callbacks, and leveraging remember & derivedStateOf to prevent unnecessary recompositions.",
-  "updatedAt":  "2026-10-02T20:12:08.649660386Z",
+  "summary":  "Remove the signingConfigs block and signingConfig assignment from app/build.gradle.kts to produce an unsigned release APK for GitHub Actions CI.",
+  "updatedAt":  "2026-10-02T20:51:47.341385069Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
