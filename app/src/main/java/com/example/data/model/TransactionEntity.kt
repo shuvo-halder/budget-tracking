@@ -12,5 +12,6 @@ data class TransactionEntity(
     val categoryId: String,
     val categoryName: String,
     val note: String,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val loanId: Long? = null
 )

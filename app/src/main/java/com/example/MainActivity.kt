@@ -9,21 +9,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import com.example.data.local.AppDatabase
-import com.example.data.repository.BudgetRepository
-import com.example.ui.screens.MainBudgetScreen
+import com.example.data.repository.FinanceRepository
+import com.example.ui.screens.MainFinanceScreen
 import com.example.ui.theme.DailyBudgetTheme
-import com.example.ui.viewmodel.BudgetViewModel
-import com.example.ui.viewmodel.BudgetViewModelFactory
+import com.example.ui.viewmodel.FinanceViewModel
+import com.example.ui.viewmodel.FinanceViewModelFactory
 
 class MainActivity : ComponentActivity() {
 
-    private val viewModel: BudgetViewModel by viewModels {
+    private val viewModel: FinanceViewModel by viewModels {
         val database = AppDatabase.getDatabase(applicationContext)
-        val repository = BudgetRepository(
+        val repository = FinanceRepository(
             transactionDao = database.transactionDao(),
-            budgetSettingDao = database.budgetSettingDao()
+            budgetSettingDao = database.budgetSettingDao(),
+            loanDao = database.loanDao()
         )
-        BudgetViewModelFactory(repository)
+        FinanceViewModelFactory(repository)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,7 +35,7 @@ class MainActivity : ComponentActivity() {
                 Surface(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    MainBudgetScreen(viewModel = viewModel)
+                    MainFinanceScreen(viewModel = viewModel)
                 }
             }
         }

@@ -1,156 +1,119 @@
-# Daily Budget Tracker (SpendWise)
+# Daily Finance & Loan Tracker
 
-A clean, modern, and intuitive personal finance tracker built with Kotlin, Jetpack Compose, and Room Database to seamlessly manage daily income, expenses, monthly budget limits, and spending breakdowns.
+A comprehensive personal finance and debt management application built with Kotlin, Jetpack Compose, and Room Database. Features an interactive monthly calendar with daily financial breakdowns, multi-type transaction logging (Income, Expense, Loans), and dedicated loan tracking with partial repayments and due dates.
+
+---
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The following user preferences were confirmed and incorporated into the architecture:
+> The following product specifications were confirmed and incorporated into the design:
 
-- **Confirmed Currency**: Bangladeshi Taka (BDT / ৳) formatted with clear numeric localization.
-- **Confirmed Key Features**:
-  - Top Dashboard showing Current Balance, Total Income (green), and Total Expense (red/coral).
-  - Prominent Add Income and Add Expense actions opening a sleek entry sheet/dialog.
-  - Category and Date range filtering for transaction history.
-  - Delete and Edit transaction support with swipe-to-delete and edit dialogs.
-  - Monthly spending limit with dynamic progress bar and budget health warnings.
-  - Visual category spending breakdown donut & bar chart.
-- **Initial Data State**: Clean slate on first launch with rich default category catalog (Food, Transport, Groceries, Salary, Freelance, Bills, Entertainment, Health, Shopping, Investment, Education, Utilities, Other).
+- **Loan Categorization**: Both **Lent (Receivable / Money Given)** and **Borrowed (Payable / Money Taken)** with complete settlement lifecycle (Active, Partially Paid, Settled, Overdue).
+- **Calendar Visualization**: Dynamic dot indicators on date cells showing daily presence of **Income (Green)**, **Expense (Red)**, and **Loans (Amber/Blue)**.
+- **Loan Management**: Dedicated **Loans tab** with one-tap settlement, partial repayment records, due date tracking, and debtor/creditor summaries.
+- **Daily Financial Drilldown**: Tapping any calendar day triggers a detailed view/sheet showing exact daily **Total Income**, **Total Expense**, **Total Loan**, and the individual transaction entries with swipe-to-delete.
 
 ---
 
 ## 1. Overview & Core Concept
 
-- **What It Does**: Provides real-time financial clarity by logging daily earnings and expenditures, computing net balance, tracking monthly budget utilization, and displaying visual spending distribution.
-- **Target Audience**: Anyone wanting effortless, offline-first personal budget tracking without complicated spreadsheets or mandatory cloud accounts.
-- **Key Value**: Instant offline persistence, zero latency, Material 3 visual polish, and informative budget insights.
+- **What It Does**: Unifies daily personal expense tracking and interpersonal loan management into a seamless calendar-driven interface.
+- **Target Audience**: Individuals needing full visibility over daily spending, earnings, and who owes what (or who they owe) with offline persistence.
+- **Key Value**: Real-time calendar financial heatmaps, zero-friction loan repayment tracking, and instant local Room storage.
 
 ---
 
 ## 2. User Experience & Visual Design
 
-### Key User Flows
+### Key Views & Navigation (M3 Navigation Bar)
 
-1. **Dashboard & Summary View**:
-   - High-contrast Hero Card with Total Balance, Total Income badge (soft emerald), and Total Expense badge (soft crimson).
-   - Monthly Budget Limit indicator (e.g. `৳14,500 / ৳30,000 spent • 48% used`) with an animated progress bar changing to warning colors as limit approaches.
-2. **Adding & Editing Transactions**:
-   - Tap **+ Add Income** or **- Add Expense** (or the floating action button).
-   - Dynamic modal bottom sheet opens with pre-selected transaction type.
-   - Quick amount suggestions (`+৳100`, `+৳500`, `+৳1,000`, `+৳5,000`) and numeric input field.
-   - Visual category picker with colored icons.
-   - Note/Title field and customizable date picker.
-3. **Transaction History & Analytics**:
-   - Search & Filter bar by category (All, Food, Bills, etc.) and type (All, Income, Expense).
-   - Grouped transaction list by date (e.g., *Today*, *Yesterday*, *October 1, 2026*).
-   - Tap any item to edit; swipe or use item menu to delete with instant confirmation and undo snackbar.
-4. **Category Breakdown & Charts**:
-   - Visual interactive donut/arc chart and category distribution list showing exact spending percentages.
-
-### Visual Identity & Theme
-
-- **Palette**: Modern FinTech Emerald & Slate
-  - Primary: Deep Emerald Slate (`#006C4C` / `#47DDA0`)
-  - Income Accent: Vibrant Mint (`#10B981`)
-  - Expense Accent: Coral Rose (`#F43F5E`)
-  - Surface Background: Warm Alabaster (`#F8FAF9`) in Light mode / Deep Slate Obsidian (`#0F172A`) in Dark mode.
-- **Typography**: Clean Material 3 typography with bold tabular figures for financial amounts.
-- **Micro-interactions**: Spring animations on progress updates, smooth category selection pills, and fluid bottom sheet transitions.
+1. **Calendar View (Main Screen)**:
+   - **Monthly Header**: Month and Year navigation (prev/next month + jump to Today).
+   - **Interactive Calendar Grid**: 7-column day grid with day headers (Sun–Sat). Days display multi-colored status dots for recorded Income, Expense, or Loans.
+   - **Selected Day Card / Bottom Sheet**: Highlights selected date, displays day aggregates (Income, Expense, Loan), and lists that specific day's records with swipe-to-delete and edit triggers.
+2. **Dashboard Overview**:
+   - Top Summary Banner: **Current Balance**, **Total Income** (Mint `#10B981`), **Total Expense** (Coral `#EF4444`), and **Total Active Loans** (Amber `#F59E0B` & Blue `#3B82F6`).
+   - Category spending breakdown donut chart.
+   - Searchable, filterable transaction history with date range and category chips.
+3. **Loans & Debts Hub**:
+   - Summary cards: **You are Owed (Lent)** vs **You Owe (Borrowed)**.
+   - Loan list filterable by Status (*Active*, *Settled*) and Type (*Lent*, *Borrowed*).
+   - Card displays person's name, total amount, remaining balance, due date status (Overdue badge if applicable), and progress bar.
+   - **Repayment Action**: Modal to record partial or full repayments or mark settled.
+4. **Universal Multi-Type FAB Entry**:
+   - Floating Action Button opening bottom sheet with 3 tabs: **Income**, **Expense**, **Loan**.
+   - For **Income & Expense**: Numeric amount input, quick chips (+৳100, +৳500, +৳1,000, +৳5,000), visual category picker, note, and date picker.
+   - For **Loan**: Amount, Loan direction (Lent to / Borrowed from), Person's name, Phone number (optional), Due date selector, and note.
 
 ---
 
 ## 3. Key Product Decisions & Trade-Offs
 
-- **Local Storage via Room**:
-  - *Chosen Approach*: Android Room ORM with SQLite, reactive Kotlin Coroutines `Flow`, and DAO repository layer.
-  - *Why*: Reliable, offline-first data guarantee, instant search/filtering, and seamless schema migrations.
-- **Custom Compose Canvas Charts vs External Heavy Library**:
-  - *Chosen Approach*: Pure Jetpack Compose custom canvas-rendered Donut and Bar charts with animated transitions.
-  - *Why*: Eliminates bloated third-party chart library dependencies, allows full dark/light theme alignment, and guarantees 60fps animations.
-- **State Architecture**:
-  - *Chosen Approach*: Single unidirectional data flow `BudgetViewModel` with `BudgetUiState` combining balance aggregates, filtered transaction flows, and category summaries.
+- **Relational Room Schema**:
+  - `transactions`: Stores general income, expense, and loan initiation records.
+  - `loans`: Stores loan specifics (person name, direction, total amount, remaining amount, due date, status).
+  - `loan_repayments`: Relational table linked by `loanId` tracking individual repayments with timestamps and notes.
+- **Efficient Monthly Aggregations in SQLite**:
+  - DAO queries compute daily calendar dots and monthly totals directly using timestamps, avoiding heavy in-memory processing.
 
 ---
 
-## 4. Technical Architecture & Data Strategy
+## 4. Technical Architecture & Component Structure
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      Jetpack Compose UI                     │
-│  ┌───────────────┐ ┌───────────────┐ ┌───────────────────┐  │
-│  │ DashboardCard │ │ BudgetBarView │ │ CategoryChartCard │  │
-│  └───────┬───────┘ └───────┬───────┘ └─────────┬─────────┘  │
-│          │                 │                   │            │
-│  ┌───────┴─────────────────┴───────────────────┴─────────┐  │
-│  │               TransactionHistoryList                  │  │
-│  └─────────────────────────┬─────────────────────────────┘  │
-│                            │                                │
-│  ┌─────────────────────────┴─────────────────────────────┐  │
-│  │               AddEditTransactionSheet                 │  │
-│  └─────────────────────────┬─────────────────────────────┘  │
-└────────────────────────────┼────────────────────────────────┘
-                             │ Events & StateFlow
-┌────────────────────────────▼────────────────────────────────┐
-│                      BudgetViewModel                        │
-│   • MutableStateFlow<BudgetUiState>                         │
-│   • Transaction filtering & aggregation                     │
-│   • Budget limits & Monthly calculations                    │
-└────────────────────────────┬────────────────────────────────┘
-                             │ Suspend / Flow
-┌────────────────────────────▼────────────────────────────────┐
-│                    TransactionRepository                    │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────┐
-│                     Room Database (SQLite)                  │
-│   • TransactionEntity (id, type, amount, category, note, ts)│
-│   • BudgetPreferenceDao / Setting Store                     │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Data Entities & Models
-
-```kotlin
-enum class TransactionType { INCOME, EXPENSE }
-
-@Entity(tableName = "transactions")
-data class TransactionEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val type: TransactionType,
-    val amount: Double,
-    val categoryId: String,
-    val categoryName: String,
-    val note: String,
-    val timestamp: Long = System.currentTimeMillis()
-)
-
-@Entity(tableName = "budget_settings")
-data class BudgetSettingEntity(
-    @PrimaryKey val id: String = "default_monthly_budget",
-    val monthlyLimit: Double = 25000.0
-)
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Jetpack Compose Navigation                      │
+│                                                                        │
+│   ┌───────────────────┐  ┌────────────────────┐  ┌─────────────────┐   │
+│   │ 📅 Calendar Screen│  │ 📊 Dashboard Screen│  │ 🤝 Loans Screen │   │
+│   │   • Monthly Grid  │  │   • Balance Hero   │  │   • Lent Cards  │   │
+│   │   • Activity Dots │  │   • Category Chart │  │   • Debt Cards  │   │
+│   │   • Day Sheet     │  │   • Filter History │  │   • Repay Modal │   │
+│   └─────────┬─────────┘  └─────────┬──────────┘  └────────┬────────┘   │
+│             │                      │                      │            │
+│   ┌─────────┴──────────────────────┴──────────────────────┴────────┐   │
+│   │           Universal Entry Modal Bottom Sheet (FAB)             │   │
+│   │               (Income • Expense • Loan tabs)                   │   │
+│   └────────────────────────────────┬───────────────────────────────┘   │
+└────────────────────────────────────┼───────────────────────────────────┘
+                                     │ StateFlow & UI Events
+┌────────────────────────────────────▼───────────────────────────────────┐
+│                        FinanceViewModel                                │
+│   • Combines transactions, loan registries, calendar day summaries     │
+│   • Manages selected calendar date, filter states, and repayment flow  │
+└────────────────────────────────────┬───────────────────────────────────┘
+                                     │ Reactive Repositories
+┌────────────────────────────────────▼───────────────────────────────────┐
+│              FinanceRepository  &  LoanRepository                      │
+└────────────────────────────────────┬───────────────────────────────────┘
+                                     │
+┌────────────────────────────────────▼───────────────────────────────────┐
+│                     Room Database (SQLite)                             │
+│   • transactions (id, type, amount, categoryId, note, timestamp)       │
+│   • loans (id, type, personName, phone, amount, remaining, dueDate)    │
+│   • loan_repayments (id, loanId, amount, note, timestamp)              │
+│   • budget_settings (monthly limit, currency preferences)              │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 5. Implementation Roadmap & Verification
+## 5. Implementation Steps & Verification
 
-1. **Database Layer**:
-   - Room Entities (`TransactionEntity`, `BudgetSettingEntity`), TypeConverters, and `TransactionDao`.
-   - `AppDatabase` singleton builder.
-   - `BudgetRepository` handling data aggregation and CRUD operations.
-2. **ViewModel & State Management**:
-   - `BudgetViewModel` computing balance, income/expense totals, filtered lists, category distribution, and monthly progress.
-3. **UI Components & Screens**:
-   - Modern Theme palette (`Color.kt`, `Theme.kt`, `Type.kt`).
-   - `DashboardHeader`: Balance card, quick stats, monthly budget progress bar.
-   - `ActionButtons`: Quick Add Income / Add Expense triggers.
-   - `CategoryBreakdownCard`: Interactive visual spend chart.
-   - `TransactionHistory`: Grouped by date, search filter, category filter chips, swipe-to-delete, edit action.
-   - `AddEditTransactionSheet`: Form validation, category selector with icons, quick amount pills.
-   - `SetBudgetDialog`: Allows setting custom monthly spending limits.
-4. **App Metadata & Resources**:
-   - Sync `metadata.json` and `res/values/strings.xml` with app name "Daily Budget Tracker".
-   - Vector drawables for categories (Food, Transport, Bills, Shopping, Salary, etc.).
-5. **Compilation & Verification**:
-   - Compile and verify build with `compile_applet`.
+1. **Database Schema & DAOs**:
+   - Define `LoanEntity`, `LoanType` (`LENT`, `BORROWED`), `LoanStatus` (`ACTIVE`, `SETTLED`), and `LoanRepaymentEntity`.
+   - Update `TransactionEntity` to support `TransactionType.LOAN`.
+   - Implement `LoanDao` and updated `TransactionDao`.
+   - Update `AppDatabase` version with migration strategy.
+2. **Repositories & ViewModel**:
+   - `FinanceRepository` and `LoanRepository`.
+   - `FinanceViewModel` providing unified `FinanceUiState` (Calendar monthly matrix with activity dots, daily selected stats, dashboard totals, active loan aggregates).
+3. **UI Components**:
+   - `InteractiveCalendarView`: Custom monthly calendar matrix with week header, day cells, activity dots (Green/Red/Amber), and month navigation.
+   - `DaySummarySheet`: Bottom sheet / detailed card showing specific day's totals and transaction list.
+   - `LoansScreen`: Lent & Borrowed overview, loan item cards, settlement buttons, and `AddRepaymentDialog`.
+   - `AddEditTransactionSheet`: 3-tab selector (Income, Expense, Loan) with person name & due date fields for loans.
+   - `MainNavigationScaffold`: Modern bottom navigation bar switching between Calendar, Dashboard, and Loans.
+4. **Verification**:
+   - Run `compile_applet` and test all UI flows.

@@ -156,6 +156,7 @@ fun FilterChipsBar(
                     TransactionTypeFilter.ALL -> MaterialTheme.colorScheme.primary
                     TransactionTypeFilter.INCOME -> IncomeGreen
                     TransactionTypeFilter.EXPENSE -> ExpenseRed
+                    TransactionTypeFilter.LOAN -> Color(0xFF3B82F6)
                 }
 
                 FilterChip(
@@ -167,6 +168,7 @@ fun FilterChipsBar(
                                 TransactionTypeFilter.ALL -> "All Types"
                                 TransactionTypeFilter.INCOME -> "Income only"
                                 TransactionTypeFilter.EXPENSE -> "Expense only"
+                                TransactionTypeFilter.LOAN -> "Loans only"
                             },
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                             fontSize = 12.sp
@@ -227,7 +229,7 @@ fun FilterChipsBar(
 
             // Dynamic categories based on catalog
             val categoriesToShow = when (selectedType) {
-                TransactionTypeFilter.ALL -> CategoryCatalog.getAllCategories()
+                TransactionTypeFilter.ALL, TransactionTypeFilter.LOAN -> CategoryCatalog.getAllCategories()
                 TransactionTypeFilter.INCOME -> CategoryCatalog.incomeCategories
                 TransactionTypeFilter.EXPENSE -> CategoryCatalog.expenseCategories
             }

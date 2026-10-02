@@ -1,6 +1,6 @@
 {
   "name": "Daily Budget",
-  "description": "A modern daily budget and expense tracker with local Room persistence, analytics, and spending limits",
+  "description": "A comprehensive daily finance, expense, and loan tracking app with an interactive calendar and Room local persistence",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

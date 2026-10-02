@@ -68,7 +68,12 @@ fun TransactionItemCard(
     }
 
     val isIncome = transaction.type == TransactionType.INCOME
-    val amountColor = if (isIncome) IncomeGreen else ExpenseRed
+    val isLoan = transaction.type == TransactionType.LOAN
+    val amountColor = when {
+        isIncome -> IncomeGreen
+        isLoan -> Color(0xFF3B82F6)
+        else -> ExpenseRed
+    }
 
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { dismissValue ->
@@ -192,7 +197,7 @@ fun TransactionItemCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = CurrencyUtils.formatBDTWithSign(transaction.amount, isIncome),
+                        text = if (isLoan) CurrencyUtils.formatBDT(transaction.amount) else CurrencyUtils.formatBDTWithSign(transaction.amount, isIncome),
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp
