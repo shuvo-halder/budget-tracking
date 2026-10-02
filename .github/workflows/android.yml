@@ -8,7 +8,6 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
@@ -19,13 +18,16 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
-        cache: gradle
 
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-      
+    # Ei step-ti GitHub-ke nijei Gradle install korte bolbe
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: '8.6'
+
+    # Ekhane amra ./gradlew er bodole shudhu gradle bebohar korchi
     - name: Build Release APK
-      run: ./gradlew assembleRelease
+      run: gradle assembleRelease
       
     - name: Rename APK to Budget
       run: mv app/build/outputs/apk/release/app-release-unsigned.apk "app/build/outputs/apk/release/Budget.apk"
