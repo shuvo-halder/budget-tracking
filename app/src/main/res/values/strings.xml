@@ -1,0 +1,24 @@
+<resources>
+    <string name="app_name">Daily Budget</string>
+    <string name="dashboard_title">Dashboard</string>
+    <string name="current_balance">Current Balance</string>
+    <string name="total_income">Total Income</string>
+    <string name="total_expense">Total Expense</string>
+    <string name="add_income">Add Income</string>
+    <string name="add_expense">Add Expense</string>
+    <string name="recent_transactions">Recent Transactions</string>
+    <string name="monthly_budget">Monthly Budget</string>
+    <string name="category_breakdown">Spending Breakdown</string>
+    <string name="all_categories">All</string>
+    <string name="no_transactions_title">No transactions yet</string>
+    <string name="no_transactions_subtitle">Tap + Add Income or - Add Expense to start tracking your budget</string>
+    <string name="amount_label">Amount (৳)</string>
+    <string name="category_label">Category</string>
+    <string name="note_label">Note / Description</string>
+    <string name="save_transaction">Save Transaction</string>
+    <string name="edit_transaction">Edit Transaction</string>
+    <string name="delete">Delete</string>
+    <string name="cancel">Cancel</string>
+    <string name="filter">Filter</string>
+    <string name="search_transactions">Search notes &amp; categories…</string>
+</resources>
