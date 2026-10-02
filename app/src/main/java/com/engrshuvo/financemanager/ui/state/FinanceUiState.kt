@@ -1,5 +1,6 @@
 package com.engrshuvo.financemanager.ui.state
 
+import androidx.compose.runtime.Immutable
 import com.engrshuvo.financemanager.data.model.LoanEntity
 import com.engrshuvo.financemanager.data.model.LoanStatus
 import com.engrshuvo.financemanager.data.model.LoanType
@@ -42,6 +43,7 @@ enum class LoanStatusFilter {
     ALL
 }
 
+@Immutable
 data class CategorySpending(
     val category: TransactionCategory,
     val totalAmount: Double,
@@ -49,6 +51,7 @@ data class CategorySpending(
     val transactionCount: Int
 )
 
+@Immutable
 data class FinanceUiState(
     val activeTab: FinanceTab = FinanceTab.CALENDAR,
 
@@ -64,8 +67,8 @@ data class FinanceUiState(
     val balance: Double = 0.0,
     val totalIncome: Double = 0.0,
     val totalExpense: Double = 0.0,
-    val totalActiveLent: Double = 0.0,       // Money you gave (Receivable)
-    val totalActiveBorrowed: Double = 0.0,   // Money you took (Payable)
+    val totalActiveLent: Double = 0.0,
+    val totalActiveBorrowed: Double = 0.0,
     val monthlyLimit: Double = 30000.0,
     val monthlySpent: Double = 0.0,
     val budgetProgress: Float = 0.0f,

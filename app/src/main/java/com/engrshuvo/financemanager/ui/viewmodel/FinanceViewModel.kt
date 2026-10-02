@@ -20,11 +20,13 @@ import com.engrshuvo.financemanager.ui.state.LoanStatusFilter
 import com.engrshuvo.financemanager.ui.state.LoanTypeFilter
 import com.engrshuvo.financemanager.ui.state.TransactionTypeFilter
 import com.engrshuvo.financemanager.ui.util.DateUtils
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -60,14 +62,30 @@ class FinanceViewModel(
         val isSheetOpen: Boolean
     )
 
-    private data class FilterState(
+    private data class FilterParams(
         val search: String,
         val type: TransactionTypeFilter,
-        val category: String?,
-        val date: DateFilterOption,
+        val categoryId: String?,
+        val dateOption: DateFilterOption,
         val loanType: LoanTypeFilter,
         val loanStatus: LoanStatusFilter
     )
+
+    private data class CoreData(
+        val activeTab: FinanceTab,
+        val allTransactions: List<TransactionEntity>,
+        val allLoans: List<LoanEntity>,
+        val monthlyLimit: Double
+    )
+
+    private val coreDataFlow: Flow<CoreData> = combine(
+        _activeTab,
+        repository.allTransactions,
+        repository.allLoans,
+        repository.monthlyBudgetLimit
+    ) { activeTab, transactions, loans, budgetLimit ->
+        CoreData(activeTab, transactions, loans, budgetLimit)
+    }.flowOn(Dispatchers.Default)
 
     private val calendarParamsFlow: Flow<CalendarParams> = combine(
         _displayedMonth,
@@ -75,15 +93,37 @@ class FinanceViewModel(
         _isDayDetailSheetOpen
     ) { month, date, isSheetOpen ->
         CalendarParams(month, date, isSheetOpen)
-    }
+    }.flowOn(Dispatchers.Default)
+
+    private val filterParamsFlow: Flow<FilterParams> = combine(
+        _searchQuery,
+        _selectedTypeFilter,
+        _selectedCategoryFilterId,
+        _selectedDateFilter,
+        _selectedLoanFilter
+    ) { search, type, catId, dateOpt, loanType ->
+        FilterParams(
+            search = search,
+            type = type,
+            categoryId = catId,
+            dateOption = dateOpt,
+            loanType = loanType,
+            loanStatus = _selectedLoanStatusFilter.value
+        )
+    }.combine(_selectedLoanStatusFilter) { params, loanStatus ->
+        params.copy(loanStatus = loanStatus)
+    }.flowOn(Dispatchers.Default)
 
     val uiState: StateFlow<FinanceUiState> = combine(
-        _activeTab,
-        repository.allTransactions,
-        repository.allLoans,
-        repository.monthlyBudgetLimit,
-        calendarParamsFlow
-    ) { activeTab, allTransactions, allLoans, monthlyLimit, calendarParams ->
+        coreDataFlow,
+        calendarParamsFlow,
+        filterParamsFlow
+    ) { coreData, calendarParams, filterParams ->
+        val allTransactions = coreData.allTransactions
+        val allLoans = coreData.allLoans
+        val monthlyLimit = coreData.monthlyLimit
+        val activeTab = coreData.activeTab
+
         val totalIncome = allTransactions.filter { it.type == TransactionType.INCOME }.sumOf { it.amount }
         val totalExpense = allTransactions.filter { it.type == TransactionType.EXPENSE }.sumOf { it.amount }
         val balance = totalIncome - totalExpense
@@ -144,10 +184,10 @@ class FinanceViewModel(
             netBalance = dayIncome - dayExpense
         )
 
-        val search = _searchQuery.value
-        val typeFilter = _selectedTypeFilter.value
-        val categoryFilter = _selectedCategoryFilterId.value
-        val dateFilter = _selectedDateFilter.value
+        val search = filterParams.search
+        val typeFilter = filterParams.type
+        val categoryFilter = filterParams.categoryId
+        val dateFilter = filterParams.dateOption
 
         val filteredTransactions = allTransactions.filter { item ->
             val matchesType = when (typeFilter) {
@@ -172,8 +212,8 @@ class FinanceViewModel(
             matchesType && matchesCategory && matchesDate && matchesSearch
         }
 
-        val loanTypeFilter = _selectedLoanFilter.value
-        val loanStatusFilter = _selectedLoanStatusFilter.value
+        val loanTypeFilter = filterParams.loanType
+        val loanStatusFilter = filterParams.loanStatus
 
         val filteredLoans = allLoans.filter { loan ->
             val matchesType = when (loanTypeFilter) {
@@ -226,7 +266,8 @@ class FinanceViewModel(
             isBudgetLimitDialogOpen = _isBudgetLimitDialogOpen.value,
             currencySymbol = "৳"
         )
-    }.stateIn(
+    }.flowOn(Dispatchers.Default)
+    .stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = FinanceUiState()
@@ -237,7 +278,7 @@ class FinanceViewModel(
         selectedDateTs: Long,
         transactions: List<TransactionEntity>
     ): List<CalendarDayCell> {
-        val cells = mutableListOf<CalendarDayCell>()
+        val cells = ArrayList<CalendarDayCell>(42)
         val cal = (calendarMonth.clone() as Calendar).apply {
             set(Calendar.DAY_OF_MONTH, 1)
             set(Calendar.HOUR_OF_DAY, 0)
@@ -266,14 +307,33 @@ class FinanceViewModel(
             val dayStart = cellTs
             val dayEnd = cellTs + (24 * 60 * 60 * 1000) - 1
 
-            val dayItems = transactions.filter { it.timestamp in dayStart..dayEnd }
-            val hasIncome = dayItems.any { it.type == TransactionType.INCOME }
-            val hasExpense = dayItems.any { it.type == TransactionType.EXPENSE }
-            val hasLoan = dayItems.any { it.type == TransactionType.LOAN }
+            var hasIncome = false
+            var hasExpense = false
+            var hasLoan = false
+            var incomeSum = 0.0
+            var expenseSum = 0.0
+            var loanSum = 0.0
+            var count = 0
 
-            val incomeSum = dayItems.filter { it.type == TransactionType.INCOME }.sumOf { it.amount }
-            val expenseSum = dayItems.filter { it.type == TransactionType.EXPENSE }.sumOf { it.amount }
-            val loanSum = dayItems.filter { it.type == TransactionType.LOAN }.sumOf { it.amount }
+            for (tx in transactions) {
+                if (tx.timestamp in dayStart..dayEnd) {
+                    count++
+                    when (tx.type) {
+                        TransactionType.INCOME -> {
+                            hasIncome = true
+                            incomeSum += tx.amount
+                        }
+                        TransactionType.EXPENSE -> {
+                            hasExpense = true
+                            expenseSum += tx.amount
+                        }
+                        TransactionType.LOAN -> {
+                            hasLoan = true
+                            loanSum += tx.amount
+                        }
+                    }
+                }
+            }
 
             cells.add(
                 CalendarDayCell(
@@ -288,7 +348,7 @@ class FinanceViewModel(
                     dayIncomeTotal = incomeSum,
                     dayExpenseTotal = expenseSum,
                     dayLoanTotal = loanSum,
-                    transactionCount = dayItems.size
+                    transactionCount = count
                 )
             )
             cal.add(Calendar.DAY_OF_MONTH, 1)

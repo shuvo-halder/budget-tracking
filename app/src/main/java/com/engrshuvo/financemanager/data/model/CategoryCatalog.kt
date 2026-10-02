@@ -17,9 +17,11 @@ import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Work
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 
+@Immutable
 data class TransactionCategory(
     val id: String,
     val name: String,

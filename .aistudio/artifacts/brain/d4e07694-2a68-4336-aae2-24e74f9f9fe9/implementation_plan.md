@@ -1,43 +1,40 @@
-# Daily Finance & Loan Tracking App (com.engshuvo.financemanager)
+# Performance Optimization Plan: Compose Recompositions & Background Dispatching
 
-A comprehensive personal finance and loan management Android application built with Kotlin, Jetpack Compose, and Room Database. Configured specifically under application ID `com.engshuvo.financemanager` and namespace directory structure `java/com/engrshuvo/financemanager/`, featuring a custom adaptive launcher icon matching the attached Money Sack & Calculator design.
+Comprehensive performance optimization to eliminate UI frame drops, optimize Compose recompositions, and ensure all Room I/O is executed strictly off the main thread.
 
 ---
 
-## Configuration & Architecture Specifications
+## 1. Strict Dispatchers.IO for Room Database & Dispatchers.Default for Heavy Calculations
+- **`FinanceRepository.kt`**: Wrap all Room operations (inserts, updates, deletes, query Flow transformations) inside `withContext(Dispatchers.IO)`.
+- **`FinanceViewModel.kt`**:
+  - Run the 42-day calendar grid generation, transaction date-range mapping, and category spend percentage calculations using `flowOn(Dispatchers.Default)` inside Kotlin Flow combinations so the Main (UI) thread remains completely unblocked for smooth 60/120 fps rendering.
 
-### 1. Package Structure & Application ID
-- **Application ID (`app/build.gradle.kts`)**: `com.engshuvo.financemanager`
-- **Namespace & Source Package**: `com.engrshuvo.financemanager`
-- **Directory Structure**: `app/src/main/java/com/engrshuvo/financemanager/`
-  - `data/model/`: `TransactionEntity`, `LoanEntity`, `LoanRepaymentEntity`, `BudgetSettingEntity`, `TransactionType`, `LoanType`, `LoanStatus`, `CategoryCatalog`
-  - `data/local/`: `AppDatabase`, `TransactionDao`, `LoanDao`, `BudgetSettingDao`, `RoomConverters`
-  - `data/repository/`: `FinanceRepository`
-  - `ui/theme/`: `Color.kt`, `Theme.kt`, `Type.kt`
-  - `ui/state/`: `FinanceUiState.kt`
-  - `ui/model/`: `CalendarDayCell.kt`, `DaySummaryStats.kt`
-  - `ui/viewmodel/`: `FinanceViewModel.kt`, `FinanceViewModelFactory.kt`
-  - `ui/components/`: `InteractiveCalendarView.kt`, `DaySummarySheet.kt`, `DashboardOverviewView.kt`, `LoansScreen.kt`, `UniversalTransactionSheet.kt`, `AddRepaymentDialog.kt`, `SetBudgetDialog.kt`, `FilterChipsBar.kt`, `TransactionItemCard.kt`, `CategorySpendChart.kt`, `QuickActionsRow.kt`
-  - `ui/screens/`: `MainFinanceScreen.kt`
-  - `MainActivity.kt`
+---
 
-### 2. Custom Adaptive Launcher Icon
-- **Foreground & Background**: Recreate the custom gradient icon matching the attached asset (Money Sack with Dollar Sign & Calculator in white over an Indigo `#2E1065` to Purple `#7E22CE` to Pink `#EC4899` gradient).
-- **MIPMAP Densities**: Configured across all mipmap density directories with round icon masking.
+## 2. Stability & Skippability for Compose
+- Add `@androidx.compose.runtime.Immutable` and `@androidx.compose.runtime.Stable` annotations to:
+  - `FinanceUiState`
+  - `CalendarDayCell`
+  - `DaySummaryStats`
+  - `CategorySpending`
+  - `TransactionEntity`
+  - `LoanEntity`
+  - `TransactionCategory`
+- Replace mutable collections or ensure all list parameters are immutable and stable for the Compose compiler.
 
-### 3. Core Capabilities
-1. **Interactive Monthly Calendar**:
-   - Monthly grid with month/year navigation and Today shortcut.
-   - Activity color dots: **Income (Green)**, **Expense (Red)**, **Loan (Blue)**.
-   - Date selection bottom sheet showing exact **Total Income**, **Total Expense**, **Total Loan**, and the list of that day's transactions with swipe-to-delete.
-2. **Dashboard Summary**:
-   - Prominent cards for **Current Balance**, **Total Income**, **Total Expense**, and **Total Active Loans** (Lent vs Borrowed).
-   - Category spending donut chart & monthly budget tracking.
-3. **Universal Transaction Entry (FAB)**:
-   - 3 tabs: **Income**, **Expense**, and **Loan**.
-   - Handles Amount, Category / Person Name, Phone, Due Date, and Note.
-4. **Loans & Debts Management**:
-   - Tracking Lent (Receivable) and Borrowed (Payable) loans.
-   - Partial and full repayment recording with instant balance synchronization.
-5. **Room Local Database**:
-   - Persistent offline storage with foreign-key relations and reactive Kotlin Flows.
+---
+
+## 3. `LazyColumn` Optimization & Unique Stable Keys
+- Ensure every `LazyColumn` item across:
+  - `MainFinanceScreen.kt` (Calendar day logs: `"day_${item.id}"`)
+  - `DashboardOverviewView.kt` (Filtered transaction list: `key = { "tx_${it.id}" }`)
+  - `LoansScreen.kt` (Loan cards: `key = { "loan_${it.id}" }`)
+  - `DaySummarySheet.kt` (Day transactions: `key = { "sheet_tx_${it.id}" }`)
+  has a strictly unique, stable `key` parameter.
+- Add `contentType` parameter to `LazyColumn` items to enable efficient item recycling.
+
+---
+
+## 4. `derivedStateOf` & `remember` Fine-Grained Scoping
+- In Composables (e.g. `ComprehensiveDashboardCard`, `CategorySpendChart`, `FilterChipsBar`, `InteractiveCalendarView`), wrap state computations in `remember` and `derivedStateOf` so child components only recompose when their specific sub-properties change.
+- Pass lambda callbacks (e.g. `onEditClick`, `onDeleteClick`, `onDateClick`) as stable function references or `remember`ed closures.

@@ -1,10 +1,12 @@
 package com.engrshuvo.financemanager.data.model
 
+import androidx.compose.runtime.Immutable
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+@Immutable
 @Entity(tableName = "transactions")
 data class TransactionEntity(
     @PrimaryKey(autoGenerate = true)
@@ -18,6 +20,7 @@ data class TransactionEntity(
     val loanId: Long? = null
 )
 
+@Immutable
 @Entity(tableName = "loans")
 data class LoanEntity(
     @PrimaryKey(autoGenerate = true)
@@ -33,6 +36,7 @@ data class LoanEntity(
     val note: String = ""
 )
 
+@Immutable
 @Entity(
     tableName = "loan_repayments",
     foreignKeys = [
@@ -54,6 +58,7 @@ data class LoanRepaymentEntity(
     val timestamp: Long = System.currentTimeMillis()
 )
 
+@Immutable
 @Entity(tableName = "budget_settings")
 data class BudgetSettingEntity(
     @PrimaryKey

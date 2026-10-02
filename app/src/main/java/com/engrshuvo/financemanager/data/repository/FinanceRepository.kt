@@ -10,56 +10,71 @@ import com.engrshuvo.financemanager.data.model.LoanStatus
 import com.engrshuvo.financemanager.data.model.LoanType
 import com.engrshuvo.financemanager.data.model.TransactionEntity
 import com.engrshuvo.financemanager.data.model.TransactionType
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 class FinanceRepository(
     private val transactionDao: TransactionDao,
     private val budgetSettingDao: BudgetSettingDao,
     private val loanDao: LoanDao
 ) {
-    // Transaction streams
-    val allTransactions: Flow<List<TransactionEntity>> = transactionDao.getAllTransactions()
-    val totalIncome: Flow<Double> = transactionDao.getTotalIncomeFlow()
-    val totalExpense: Flow<Double> = transactionDao.getTotalExpenseFlow()
+    // Transaction streams strictly on Dispatchers.IO
+    val allTransactions: Flow<List<TransactionEntity>> =
+        transactionDao.getAllTransactions().flowOn(Dispatchers.IO)
 
-    // Loan streams
-    val allLoans: Flow<List<LoanEntity>> = loanDao.getAllLoansFlow()
-    val activeLoans: Flow<List<LoanEntity>> = loanDao.getActiveLoansFlow()
-    val totalActiveLent: Flow<Double> = loanDao.getTotalActiveLentFlow()
-    val totalActiveBorrowed: Flow<Double> = loanDao.getTotalActiveBorrowedFlow()
+    val totalIncome: Flow<Double> =
+        transactionDao.getTotalIncomeFlow().flowOn(Dispatchers.IO)
 
-    // Budget Limit stream
+    val totalExpense: Flow<Double> =
+        transactionDao.getTotalExpenseFlow().flowOn(Dispatchers.IO)
+
+    // Loan streams strictly on Dispatchers.IO
+    val allLoans: Flow<List<LoanEntity>> =
+        loanDao.getAllLoansFlow().flowOn(Dispatchers.IO)
+
+    val activeLoans: Flow<List<LoanEntity>> =
+        loanDao.getActiveLoansFlow().flowOn(Dispatchers.IO)
+
+    val totalActiveLent: Flow<Double> =
+        loanDao.getTotalActiveLentFlow().flowOn(Dispatchers.IO)
+
+    val totalActiveBorrowed: Flow<Double> =
+        loanDao.getTotalActiveBorrowedFlow().flowOn(Dispatchers.IO)
+
+    // Budget Limit stream strictly on Dispatchers.IO
     val monthlyBudgetSetting: Flow<BudgetSettingEntity?> =
-        budgetSettingDao.getSettingFlow(BudgetSettingEntity.KEY_MONTHLY_BUDGET)
+        budgetSettingDao.getSettingFlow(BudgetSettingEntity.KEY_MONTHLY_BUDGET).flowOn(Dispatchers.IO)
 
     val monthlyBudgetLimit: Flow<Double> = monthlyBudgetSetting.map { setting ->
         setting?.amountLimit ?: 30000.0
+    }.flowOn(Dispatchers.IO)
+
+    suspend fun insertTransaction(transaction: TransactionEntity): Long = withContext(Dispatchers.IO) {
+        transactionDao.insertTransaction(transaction)
     }
 
-    suspend fun insertTransaction(transaction: TransactionEntity): Long {
-        return transactionDao.insertTransaction(transaction)
-    }
-
-    suspend fun updateTransaction(transaction: TransactionEntity) {
+    suspend fun updateTransaction(transaction: TransactionEntity) = withContext(Dispatchers.IO) {
         transactionDao.updateTransaction(transaction)
     }
 
-    suspend fun deleteTransaction(transaction: TransactionEntity) {
+    suspend fun deleteTransaction(transaction: TransactionEntity) = withContext(Dispatchers.IO) {
         transactionDao.deleteTransaction(transaction)
         if (transaction.loanId != null) {
             loanDao.deleteLoanById(transaction.loanId)
         }
     }
 
-    suspend fun deleteTransactionById(id: Long) {
+    suspend fun deleteTransactionById(id: Long) = withContext(Dispatchers.IO) {
         transactionDao.deleteTransactionById(id)
     }
 
     suspend fun insertLoanWithTransaction(
         loan: LoanEntity,
         createLinkedTransaction: Boolean = true
-    ): Long {
+    ): Long = withContext(Dispatchers.IO) {
         val loanId = loanDao.insertLoan(loan)
         if (createLinkedTransaction) {
             val transType = TransactionType.LOAN
@@ -77,18 +92,18 @@ class FinanceRepository(
             )
             transactionDao.insertTransaction(transEntity)
         }
-        return loanId
+        loanId
     }
 
-    suspend fun updateLoan(loan: LoanEntity) {
+    suspend fun updateLoan(loan: LoanEntity) = withContext(Dispatchers.IO) {
         loanDao.updateLoan(loan)
     }
 
-    suspend fun deleteLoan(loan: LoanEntity) {
+    suspend fun deleteLoan(loan: LoanEntity) = withContext(Dispatchers.IO) {
         loanDao.deleteLoan(loan)
     }
 
-    suspend fun deleteLoanById(id: Long) {
+    suspend fun deleteLoanById(id: Long) = withContext(Dispatchers.IO) {
         loanDao.deleteLoanById(id)
     }
 
@@ -97,8 +112,8 @@ class FinanceRepository(
         amount: Double,
         note: String,
         timestamp: Long = System.currentTimeMillis()
-    ) {
-        val loan = loanDao.getLoanByIdDirect(loanId) ?: return
+    ) = withContext(Dispatchers.IO) {
+        val loan = loanDao.getLoanByIdDirect(loanId) ?: return@withContext
         val newRemaining = (loan.remainingAmount - amount).coerceAtLeast(0.0)
         val newStatus = if (newRemaining <= 0.0) LoanStatus.SETTLED else LoanStatus.ACTIVE
 
@@ -135,8 +150,8 @@ class FinanceRepository(
         )
     }
 
-    suspend fun markLoanSettled(loanId: Long) {
-        val loan = loanDao.getLoanByIdDirect(loanId) ?: return
+    suspend fun markLoanSettled(loanId: Long) = withContext(Dispatchers.IO) {
+        val loan = loanDao.getLoanByIdDirect(loanId) ?: return@withContext
         if (loan.remainingAmount > 0) {
             recordLoanRepayment(
                 loanId = loanId,
@@ -149,10 +164,10 @@ class FinanceRepository(
     }
 
     fun getRepaymentsForLoan(loanId: Long): Flow<List<LoanRepaymentEntity>> {
-        return loanDao.getRepaymentsForLoanFlow(loanId)
+        return loanDao.getRepaymentsForLoanFlow(loanId).flowOn(Dispatchers.IO)
     }
 
-    suspend fun setMonthlyBudgetLimit(limit: Double) {
+    suspend fun setMonthlyBudgetLimit(limit: Double) = withContext(Dispatchers.IO) {
         budgetSettingDao.insertOrUpdateSetting(
             BudgetSettingEntity(
                 settingKey = BudgetSettingEntity.KEY_MONTHLY_BUDGET,

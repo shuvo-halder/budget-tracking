@@ -1,5 +1,8 @@
 package com.engrshuvo.financemanager.ui.model
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class CalendarDayCell(
     val timestamp: Long,
     val dayOfMonth: Int,
@@ -15,6 +18,7 @@ data class CalendarDayCell(
     val transactionCount: Int = 0
 )
 
+@Immutable
 data class DaySummaryStats(
     val dateTimestamp: Long,
     val formattedDate: String,

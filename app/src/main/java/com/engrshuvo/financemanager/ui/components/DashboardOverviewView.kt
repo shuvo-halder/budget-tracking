@@ -37,6 +37,9 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -93,7 +96,7 @@ fun DashboardOverviewView(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item(key = "dashboard_hero_card") {
+        item(key = "dashboard_hero_card", contentType = "hero_card") {
             ComprehensiveDashboardCard(
                 balance = balance,
                 totalIncome = totalIncome,
@@ -107,7 +110,7 @@ fun DashboardOverviewView(
             )
         }
 
-        item(key = "quick_actions_row") {
+        item(key = "quick_actions_row", contentType = "quick_actions") {
             QuickActionsRow(
                 onAddIncomeClick = onAddIncomeClick,
                 onAddExpenseClick = onAddExpenseClick
@@ -115,7 +118,7 @@ fun DashboardOverviewView(
         }
 
         if (categoryBreakdown.isNotEmpty()) {
-            item(key = "category_spending_chart") {
+            item(key = "category_spending_chart", contentType = "donut_chart") {
                 CategorySpendChart(
                     breakdowns = categoryBreakdown,
                     totalExpense = totalExpense
@@ -123,7 +126,7 @@ fun DashboardOverviewView(
             }
         }
 
-        item(key = "filter_bar") {
+        item(key = "filter_bar", contentType = "filter_bar") {
             FilterChipsBar(
                 searchQuery = searchQuery,
                 onSearchQueryChange = onSearchQueryChange,
@@ -137,7 +140,7 @@ fun DashboardOverviewView(
         }
 
         if (filteredTransactions.isEmpty()) {
-            item(key = "empty_state") {
+            item(key = "empty_state", contentType = "empty_placeholder") {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -210,7 +213,8 @@ fun DashboardOverviewView(
         } else {
             items(
                 items = filteredTransactions,
-                key = { it.id }
+                key = { "tx_${it.id}" },
+                contentType = { "transaction_card" }
             ) { transaction ->
                 TransactionItemCard(
                     transaction = transaction,
@@ -235,6 +239,24 @@ private fun ComprehensiveDashboardCard(
     budgetProgress: Float,
     onEditBudgetClick: () -> Unit
 ) {
+    val formattedBalance by remember(balance) {
+        derivedStateOf { CurrencyUtils.formatBDT(balance, includeDecimalsIfZero = true) }
+    }
+
+    val percentageInt by remember(budgetProgress) {
+        derivedStateOf { (budgetProgress * 100).toInt() }
+    }
+
+    val progColor by remember(budgetProgress) {
+        derivedStateOf {
+            when {
+                budgetProgress >= 1f -> ExpenseRed
+                budgetProgress >= 0.8f -> Color(0xFFF59E0B)
+                else -> IncomeGreen
+            }
+        }
+    }
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -306,7 +328,7 @@ private fun ComprehensiveDashboardCard(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = CurrencyUtils.formatBDT(balance, includeDecimalsIfZero = true),
+                        text = formattedBalance,
                         style = MaterialTheme.typography.headlineLarge.copy(
                             fontSize = 32.sp,
                             fontWeight = FontWeight.ExtraBold,
@@ -397,12 +419,6 @@ private fun ComprehensiveDashboardCard(
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        val percentageInt = (budgetProgress * 100).toInt()
-                        val progColor = when {
-                            budgetProgress >= 1f -> ExpenseRed
-                            budgetProgress >= 0.8f -> Color(0xFFF59E0B)
-                            else -> IncomeGreen
-                        }
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = progColor.copy(alpha = 0.15f)
@@ -435,7 +451,7 @@ private fun ComprehensiveDashboardCard(
                         .fillMaxWidth()
                         .height(8.dp)
                         .clip(RoundedCornerShape(4.dp)),
-                    color = if (budgetProgress >= 1f) ExpenseRed else if (budgetProgress >= 0.8f) Color(0xFFF59E0B) else IncomeGreen,
+                    color = progColor,
                     trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
                 )
             }
@@ -451,6 +467,10 @@ private fun MiniStatPill(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     modifier: Modifier = Modifier
 ) {
+    val formattedAmount by remember(amount) {
+        derivedStateOf { CurrencyUtils.formatBDT(amount) }
+    }
+
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(14.dp),
@@ -483,7 +503,7 @@ private fun MiniStatPill(
                     maxLines = 1
                 )
                 Text(
-                    text = CurrencyUtils.formatBDT(amount),
+                    text = formattedAmount,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = color

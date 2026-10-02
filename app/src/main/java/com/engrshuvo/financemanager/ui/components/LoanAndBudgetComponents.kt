@@ -52,6 +52,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -98,14 +99,14 @@ fun LoansScreen(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item(key = "loan_overview_card") {
+        item(key = "loan_overview_card", contentType = "overview_header") {
             LoanOverviewHeader(
                 totalLent = totalLent,
                 totalBorrowed = totalBorrowed
             )
         }
 
-        item(key = "loan_filters") {
+        item(key = "loan_filters", contentType = "loan_filters") {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
                     modifier = Modifier
@@ -163,7 +164,7 @@ fun LoansScreen(
         }
 
         if (loans.isEmpty()) {
-            item(key = "empty_loans") {
+            item(key = "empty_loans", contentType = "empty_placeholder") {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -227,7 +228,8 @@ fun LoansScreen(
         } else {
             items(
                 items = loans,
-                key = { it.id }
+                key = { "loan_${it.id}" },
+                contentType = { "loan_card" }
             ) { loan ->
                 LoanCardItem(
                     loan = loan,
@@ -373,10 +375,16 @@ private fun LoanCardItem(
     val themeColor = if (isLent) IncomeGreen else LoanBlue
     val isSettled = loan.status == LoanStatus.SETTLED
 
-    val repaidAmount = (loan.initialAmount - loan.remainingAmount).coerceAtLeast(0.0)
-    val progress = if (loan.initialAmount > 0) (repaidAmount / loan.initialAmount).toFloat() else 1f
+    val repaidAmount by remember(loan.initialAmount, loan.remainingAmount) {
+        derivedStateOf { (loan.initialAmount - loan.remainingAmount).coerceAtLeast(0.0) }
+    }
+    val progress by remember(loan.initialAmount, repaidAmount) {
+        derivedStateOf { if (loan.initialAmount > 0) (repaidAmount / loan.initialAmount).toFloat() else 1f }
+    }
 
-    val isOverdue = !isSettled && loan.dueDate != null && loan.dueDate < System.currentTimeMillis()
+    val isOverdue by remember(isSettled, loan.dueDate) {
+        derivedStateOf { !isSettled && loan.dueDate != null && loan.dueDate < System.currentTimeMillis() }
+    }
 
     Card(
         modifier = Modifier

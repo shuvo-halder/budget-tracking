@@ -58,7 +58,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -299,7 +298,7 @@ fun MainFinanceScreen(
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        item(key = "calendar_grid") {
+                        item(key = "calendar_grid", contentType = "calendar_grid") {
                             InteractiveCalendarView(
                                 displayedMonth = uiState.displayedMonth,
                                 calendarDays = uiState.calendarDays,
@@ -311,7 +310,8 @@ fun MainFinanceScreen(
                         }
 
                         if (uiState.selectedDaySummary != null) {
-                            item(key = "selected_day_header") {
+                            item(key = "selected_day_header", contentType = "day_summary_header") {
+                                val summary = uiState.selectedDaySummary!!
                                 Card(
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(20.dp),
@@ -331,7 +331,7 @@ fun MainFinanceScreen(
                                         ) {
                                             Column {
                                                 Text(
-                                                    text = uiState.selectedDaySummary?.formattedDate ?: "",
+                                                    text = summary.formattedDate,
                                                     style = MaterialTheme.typography.titleMedium,
                                                     fontWeight = FontWeight.Bold
                                                 )
@@ -367,7 +367,7 @@ fun MainFinanceScreen(
                                             ) {
                                                 Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                                     Text("Income", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                    Text(CurrencyUtils.formatBDT(uiState.selectedDaySummary?.totalIncome ?: 0.0), fontWeight = FontWeight.Bold, color = IncomeGreen, fontSize = 13.sp)
+                                                    Text(CurrencyUtils.formatBDT(summary.totalIncome), fontWeight = FontWeight.Bold, color = IncomeGreen, fontSize = 13.sp)
                                                 }
                                             }
 
@@ -378,7 +378,7 @@ fun MainFinanceScreen(
                                             ) {
                                                 Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                                     Text("Expense", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                    Text(CurrencyUtils.formatBDT(uiState.selectedDaySummary?.totalExpense ?: 0.0), fontWeight = FontWeight.Bold, color = ExpenseRed, fontSize = 13.sp)
+                                                    Text(CurrencyUtils.formatBDT(summary.totalExpense), fontWeight = FontWeight.Bold, color = ExpenseRed, fontSize = 13.sp)
                                                 }
                                             }
 
@@ -389,7 +389,7 @@ fun MainFinanceScreen(
                                             ) {
                                                 Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                                     Text("Loan", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                    Text(CurrencyUtils.formatBDT(uiState.selectedDaySummary?.totalLoan ?: 0.0), fontWeight = FontWeight.Bold, color = LoanBlue, fontSize = 13.sp)
+                                                    Text(CurrencyUtils.formatBDT(summary.totalLoan), fontWeight = FontWeight.Bold, color = LoanBlue, fontSize = 13.sp)
                                                 }
                                             }
                                         }
@@ -400,7 +400,8 @@ fun MainFinanceScreen(
                             if (uiState.selectedDayTransactions.isNotEmpty()) {
                                 items(
                                     items = uiState.selectedDayTransactions,
-                                    key = { "day_${it.id}" }
+                                    key = { "day_tx_${it.id}" },
+                                    contentType = { "day_transaction_item" }
                                 ) { item ->
                                     TransactionItemCard(
                                         transaction = item,

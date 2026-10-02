@@ -59,6 +59,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -272,7 +273,8 @@ fun DaySummarySheet(
                 ) {
                     items(
                         items = transactions,
-                        key = { it.id }
+                        key = { "sheet_tx_${it.id}" },
+                        contentType = { "sheet_transaction_item" }
                     ) { item ->
                         TransactionItemCard(
                             transaction = item,
@@ -295,6 +297,10 @@ private fun DayStatPill(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     modifier: Modifier = Modifier
 ) {
+    val formattedAmount by remember(amount) {
+        derivedStateOf { CurrencyUtils.formatBDT(amount) }
+    }
+
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(14.dp),
@@ -321,7 +327,7 @@ private fun DayStatPill(
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = CurrencyUtils.formatBDT(amount),
+                text = formattedAmount,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = color
@@ -343,12 +349,25 @@ fun TransactionItemCard(
         CategoryCatalog.getCategoryById(transaction.categoryId)
     }
 
-    val isIncome = transaction.type == TransactionType.INCOME
-    val isLoan = transaction.type == TransactionType.LOAN
-    val amountColor = when {
-        isIncome -> IncomeGreen
-        isLoan -> LoanBlue
-        else -> ExpenseRed
+    val isIncome = remember(transaction.type) { transaction.type == TransactionType.INCOME }
+    val isLoan = remember(transaction.type) { transaction.type == TransactionType.LOAN }
+    val amountColor = remember(isIncome, isLoan) {
+        when {
+            isIncome -> IncomeGreen
+            isLoan -> LoanBlue
+            else -> ExpenseRed
+        }
+    }
+
+    val formattedAmountText by remember(transaction.amount, isIncome, isLoan) {
+        derivedStateOf {
+            if (isLoan) CurrencyUtils.formatBDT(transaction.amount)
+            else CurrencyUtils.formatBDTWithSign(transaction.amount, isIncome)
+        }
+    }
+
+    val formattedTimeText by remember(transaction.timestamp) {
+        derivedStateOf { DateUtils.formatTransactionTime(transaction.timestamp) }
     }
 
     val dismissState = rememberSwipeToDismissBoxState(
@@ -457,7 +476,7 @@ fun TransactionItemCard(
                                 color = MaterialTheme.colorScheme.outlineVariant
                             )
                             Text(
-                                text = DateUtils.formatTransactionTime(transaction.timestamp),
+                                text = formattedTimeText,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -471,7 +490,7 @@ fun TransactionItemCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (isLoan) CurrencyUtils.formatBDT(transaction.amount) else CurrencyUtils.formatBDTWithSign(transaction.amount, isIncome),
+                        text = formattedAmountText,
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp
@@ -599,7 +618,6 @@ fun CategorySpendChart(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Donut Chart Canvas
                 Box(
                     modifier = Modifier
                         .size(130.dp)
@@ -661,7 +679,6 @@ fun CategorySpendChart(
 
                 Spacer(modifier = Modifier.width(16.dp))
 
-                // Top Spending Categories
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
