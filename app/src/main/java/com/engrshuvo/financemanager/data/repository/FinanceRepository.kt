@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import java.util.Calendar
 
 class FinanceRepository(
     private val transactionDao: TransactionDao,
@@ -55,6 +56,13 @@ class FinanceRepository(
         setting?.amountLimit ?: 30000.0
     }.flowOn(Dispatchers.IO)
 
+    // Archive streams strictly on Dispatchers.IO
+    val archivedTransactions: Flow<List<TransactionEntity>> =
+        transactionDao.getArchivedTransactions().flowOn(Dispatchers.IO)
+
+    val archivedLoans: Flow<List<LoanEntity>> =
+        loanDao.getArchivedLoans().flowOn(Dispatchers.IO)
+
     suspend fun insertTransaction(transaction: TransactionEntity): Long = withContext(Dispatchers.IO) {
         transactionDao.insertTransaction(transaction)
     }
@@ -63,15 +71,36 @@ class FinanceRepository(
         transactionDao.updateTransaction(transaction)
     }
 
-    suspend fun deleteTransaction(transaction: TransactionEntity) = withContext(Dispatchers.IO) {
-        transactionDao.deleteTransaction(transaction)
+    /**
+     * Soft-deletes (archives) a transaction and any linked loan.
+     */
+    suspend fun deleteTransaction(
+        transaction: TransactionEntity,
+        archiveTimestamp: Long = System.currentTimeMillis()
+    ) = withContext(Dispatchers.IO) {
+        archiveTransaction(transaction.id, archiveTimestamp)
         if (transaction.loanId != null) {
-            loanDao.deleteLoanById(transaction.loanId)
+            archiveLoan(transaction.loanId, archiveTimestamp)
         }
     }
 
-    suspend fun deleteTransactionById(id: Long) = withContext(Dispatchers.IO) {
-        transactionDao.deleteTransactionById(id)
+    suspend fun archiveTransaction(
+        id: Long,
+        archiveTimestamp: Long = System.currentTimeMillis()
+    ) = withContext(Dispatchers.IO) {
+        transactionDao.archiveTransaction(id, archiveTimestamp)
+    }
+
+    suspend fun restoreTransaction(id: Long) = withContext(Dispatchers.IO) {
+        transactionDao.restoreTransaction(id)
+        val transaction = transactionDao.getTransactionByIdDirect(id)
+        if (transaction?.loanId != null) {
+            restoreLoan(transaction.loanId)
+        }
+    }
+
+    suspend fun permanentlyDeleteTransaction(id: Long) = withContext(Dispatchers.IO) {
+        transactionDao.permanentlyDeleteTransactionById(id)
     }
 
     suspend fun insertLoanWithTransaction(
@@ -102,12 +131,35 @@ class FinanceRepository(
         loanDao.updateLoan(loan)
     }
 
-    suspend fun deleteLoan(loan: LoanEntity) = withContext(Dispatchers.IO) {
-        loanDao.deleteLoan(loan)
+    /**
+     * Soft-deletes (archives) a loan, cascading to its repayments and linked transaction.
+     */
+    suspend fun deleteLoan(
+        loan: LoanEntity,
+        archiveTimestamp: Long = System.currentTimeMillis()
+    ) = withContext(Dispatchers.IO) {
+        archiveLoan(loan.id, archiveTimestamp)
     }
 
-    suspend fun deleteLoanById(id: Long) = withContext(Dispatchers.IO) {
-        loanDao.deleteLoanById(id)
+    suspend fun archiveLoan(
+        loanId: Long,
+        archiveTimestamp: Long = System.currentTimeMillis()
+    ) = withContext(Dispatchers.IO) {
+        loanDao.archiveLoan(loanId, archiveTimestamp)
+        loanDao.archiveRepaymentsForLoan(loanId, archiveTimestamp)
+        transactionDao.archiveTransactionsForLoan(loanId, archiveTimestamp)
+    }
+
+    suspend fun restoreLoan(loanId: Long) = withContext(Dispatchers.IO) {
+        loanDao.restoreLoan(loanId)
+        loanDao.restoreRepaymentsForLoan(loanId)
+        transactionDao.restoreTransactionsForLoan(loanId)
+    }
+
+    suspend fun permanentlyDeleteLoan(loanId: Long) = withContext(Dispatchers.IO) {
+        transactionDao.permanentlyDeleteTransactionsForLoan(loanId)
+        loanDao.permanentlyDeleteRepaymentsForLoan(loanId)
+        loanDao.permanentlyDeleteLoanById(loanId)
     }
 
     suspend fun recordLoanRepayment(
@@ -237,5 +289,31 @@ class FinanceRepository(
             }
             budgetAllocationDao.insertOrUpdateAllocations(newAllocations)
         }
+    }
+
+    /**
+     * Calculates the expiration cutoff timestamp exactly 2 calendar months before [currentTimeMillis]
+     * using calendar-month arithmetic.
+     */
+    fun getTwoMonthsExpirationCutoff(currentTimeMillis: Long = System.currentTimeMillis()): Long {
+        val cal = Calendar.getInstance().apply {
+            timeInMillis = currentTimeMillis
+            add(Calendar.MONTH, -2)
+        }
+        return cal.timeInMillis
+    }
+
+    /**
+     * Permanently deletes archived records whose retention period (2 calendar months) has expired.
+     * Idempotent and safe to run on startup, on resume, and on demand.
+     */
+    suspend fun purgeExpiredArchivedRecords(
+        currentTimeMillis: Long = System.currentTimeMillis()
+    ): Int = withContext(Dispatchers.IO) {
+        val cutoff = getTwoMonthsExpirationCutoff(currentTimeMillis)
+        val purgedTransactions = transactionDao.purgeExpiredTransactions(cutoff)
+        val purgedRepayments = loanDao.purgeExpiredRepayments(cutoff)
+        val purgedLoans = loanDao.purgeExpiredLoans(cutoff)
+        purgedTransactions + purgedRepayments + purgedLoans
     }
 }

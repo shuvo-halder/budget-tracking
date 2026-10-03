@@ -17,23 +17,44 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TransactionDao {
-    @Query("SELECT * FROM transactions ORDER BY timestamp DESC")
+    @Query("SELECT * FROM transactions WHERE archivedAt IS NULL ORDER BY timestamp DESC")
     fun getAllTransactions(): Flow<List<TransactionEntity>>
 
-    @Query("SELECT * FROM transactions WHERE type = :type ORDER BY timestamp DESC")
+    @Query("SELECT * FROM transactions WHERE type = :type AND archivedAt IS NULL ORDER BY timestamp DESC")
     fun getTransactionsByType(type: TransactionType): Flow<List<TransactionEntity>>
 
-    @Query("SELECT * FROM transactions WHERE timestamp BETWEEN :startTime AND :endTime ORDER BY timestamp DESC")
+    @Query("SELECT * FROM transactions WHERE timestamp BETWEEN :startTime AND :endTime AND archivedAt IS NULL ORDER BY timestamp DESC")
     fun getTransactionsInDateRange(startTime: Long, endTime: Long): Flow<List<TransactionEntity>>
 
-    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM transactions WHERE type = 'INCOME'")
+    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM transactions WHERE type = 'INCOME' AND archivedAt IS NULL")
     fun getTotalIncomeFlow(): Flow<Double>
 
-    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM transactions WHERE type = 'EXPENSE'")
+    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM transactions WHERE type = 'EXPENSE' AND archivedAt IS NULL")
     fun getTotalExpenseFlow(): Flow<Double>
 
-    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM transactions WHERE type = 'EXPENSE' AND timestamp >= :startTime")
+    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM transactions WHERE type = 'EXPENSE' AND timestamp >= :startTime AND archivedAt IS NULL")
     fun getMonthlyExpenseFlow(startTime: Long): Flow<Double>
+
+    @Query("SELECT * FROM transactions WHERE id = :id LIMIT 1")
+    suspend fun getTransactionByIdDirect(id: Long): TransactionEntity?
+
+    @Query("SELECT * FROM transactions WHERE archivedAt IS NOT NULL ORDER BY archivedAt DESC")
+    fun getArchivedTransactions(): Flow<List<TransactionEntity>>
+
+    @Query("UPDATE transactions SET archivedAt = :archivedAt WHERE id = :id")
+    suspend fun archiveTransaction(id: Long, archivedAt: Long)
+
+    @Query("UPDATE transactions SET archivedAt = NULL WHERE id = :id")
+    suspend fun restoreTransaction(id: Long)
+
+    @Query("UPDATE transactions SET archivedAt = :archivedAt WHERE loanId = :loanId")
+    suspend fun archiveTransactionsForLoan(loanId: Long, archivedAt: Long)
+
+    @Query("UPDATE transactions SET archivedAt = NULL WHERE loanId = :loanId")
+    suspend fun restoreTransactionsForLoan(loanId: Long)
+
+    @Query("DELETE FROM transactions WHERE loanId = :loanId")
+    suspend fun permanentlyDeleteTransactionsForLoan(loanId: Long)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: TransactionEntity): Long
@@ -45,18 +66,21 @@ interface TransactionDao {
     suspend fun deleteTransaction(transaction: TransactionEntity)
 
     @Query("DELETE FROM transactions WHERE id = :id")
-    suspend fun deleteTransactionById(id: Long)
+    suspend fun permanentlyDeleteTransactionById(id: Long)
+
+    @Query("DELETE FROM transactions WHERE archivedAt IS NOT NULL AND archivedAt <= :cutoffTime")
+    suspend fun purgeExpiredTransactions(cutoffTime: Long): Int
 }
 
 @Dao
 interface LoanDao {
-    @Query("SELECT * FROM loans ORDER BY startDate DESC")
+    @Query("SELECT * FROM loans WHERE archivedAt IS NULL ORDER BY startDate DESC")
     fun getAllLoansFlow(): Flow<List<LoanEntity>>
 
-    @Query("SELECT * FROM loans WHERE status = 'ACTIVE' ORDER BY startDate DESC")
+    @Query("SELECT * FROM loans WHERE status = 'ACTIVE' AND archivedAt IS NULL ORDER BY startDate DESC")
     fun getActiveLoansFlow(): Flow<List<LoanEntity>>
 
-    @Query("SELECT * FROM loans WHERE type = :type ORDER BY startDate DESC")
+    @Query("SELECT * FROM loans WHERE type = :type AND archivedAt IS NULL ORDER BY startDate DESC")
     fun getLoansByTypeFlow(type: LoanType): Flow<List<LoanEntity>>
 
     @Query("SELECT * FROM loans WHERE id = :id LIMIT 1")
@@ -65,14 +89,32 @@ interface LoanDao {
     @Query("SELECT * FROM loans WHERE id = :id LIMIT 1")
     suspend fun getLoanByIdDirect(id: Long): LoanEntity?
 
-    @Query("SELECT COALESCE(SUM(remainingAmount), 0.0) FROM loans WHERE type = 'LENT' AND status = 'ACTIVE'")
+    @Query("SELECT * FROM loans WHERE archivedAt IS NOT NULL ORDER BY archivedAt DESC")
+    fun getArchivedLoans(): Flow<List<LoanEntity>>
+
+    @Query("SELECT COALESCE(SUM(remainingAmount), 0.0) FROM loans WHERE type = 'LENT' AND status = 'ACTIVE' AND archivedAt IS NULL")
     fun getTotalActiveLentFlow(): Flow<Double>
 
-    @Query("SELECT COALESCE(SUM(remainingAmount), 0.0) FROM loans WHERE type = 'BORROWED' AND status = 'ACTIVE'")
+    @Query("SELECT COALESCE(SUM(remainingAmount), 0.0) FROM loans WHERE type = 'BORROWED' AND status = 'ACTIVE' AND archivedAt IS NULL")
     fun getTotalActiveBorrowedFlow(): Flow<Double>
 
-    @Query("SELECT * FROM loan_repayments WHERE loanId = :loanId ORDER BY timestamp DESC")
+    @Query("SELECT * FROM loan_repayments WHERE loanId = :loanId AND archivedAt IS NULL ORDER BY timestamp DESC")
     fun getRepaymentsForLoanFlow(loanId: Long): Flow<List<LoanRepaymentEntity>>
+
+    @Query("SELECT * FROM loan_repayments WHERE archivedAt IS NOT NULL ORDER BY archivedAt DESC")
+    fun getArchivedRepayments(): Flow<List<LoanRepaymentEntity>>
+
+    @Query("UPDATE loans SET archivedAt = :archivedAt WHERE id = :loanId")
+    suspend fun archiveLoan(loanId: Long, archivedAt: Long)
+
+    @Query("UPDATE loans SET archivedAt = NULL WHERE id = :loanId")
+    suspend fun restoreLoan(loanId: Long)
+
+    @Query("UPDATE loan_repayments SET archivedAt = :archivedAt WHERE loanId = :loanId")
+    suspend fun archiveRepaymentsForLoan(loanId: Long, archivedAt: Long)
+
+    @Query("UPDATE loan_repayments SET archivedAt = NULL WHERE loanId = :loanId")
+    suspend fun restoreRepaymentsForLoan(loanId: Long)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLoan(loan: LoanEntity): Long
@@ -84,7 +126,16 @@ interface LoanDao {
     suspend fun deleteLoan(loan: LoanEntity)
 
     @Query("DELETE FROM loans WHERE id = :id")
-    suspend fun deleteLoanById(id: Long)
+    suspend fun permanentlyDeleteLoanById(id: Long)
+
+    @Query("DELETE FROM loan_repayments WHERE loanId = :loanId")
+    suspend fun permanentlyDeleteRepaymentsForLoan(loanId: Long)
+
+    @Query("DELETE FROM loans WHERE archivedAt IS NOT NULL AND archivedAt <= :cutoffTime")
+    suspend fun purgeExpiredLoans(cutoffTime: Long): Int
+
+    @Query("DELETE FROM loan_repayments WHERE archivedAt IS NOT NULL AND archivedAt <= :cutoffTime")
+    suspend fun purgeExpiredRepayments(cutoffTime: Long): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRepayment(repayment: LoanRepaymentEntity): Long

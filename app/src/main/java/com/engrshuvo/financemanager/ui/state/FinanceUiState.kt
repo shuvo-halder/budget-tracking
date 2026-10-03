@@ -12,9 +12,58 @@ import com.engrshuvo.financemanager.ui.model.DaySummaryStats
 import java.util.Calendar
 
 enum class FinanceTab(val label: String) {
-    CALENDAR("Calendar"),
     DASHBOARD("Dashboard"),
+    TRANSACTIONS("Transactions"),
+    BUDGET("Budget"),
+    LOANS("Loans"),
+    MORE("More")
+}
+
+enum class MoreSubDestination {
+    NONE,
+    CALENDAR,
+    ARCHIVE,
+    REPORTS
+}
+
+enum class ArchiveFilterType(val label: String) {
+    ALL("All"),
+    INCOME("Income"),
+    EXPENSE("Expense"),
     LOANS("Loans")
+}
+
+@Immutable
+sealed interface ArchiveItemWrapper {
+    val id: Long
+    val title: String
+    val amount: Double
+    val originalDate: Long
+    val archivedAt: Long
+    val daysRemaining: Int
+    val formattedRetentionRemaining: String
+
+    data class Transaction(
+        val entity: TransactionEntity,
+        override val id: Long = entity.id,
+        override val title: String = entity.categoryName,
+        override val amount: Double = entity.amount,
+        override val originalDate: Long = entity.timestamp,
+        override val archivedAt: Long = entity.archivedAt ?: System.currentTimeMillis(),
+        override val daysRemaining: Int,
+        override val formattedRetentionRemaining: String
+    ) : ArchiveItemWrapper
+
+    data class Loan(
+        val entity: LoanEntity,
+        override val id: Long = entity.id,
+        override val title: String = "${if (entity.type == LoanType.LENT) "Loan to" else "Loan from"} ${entity.personName}",
+        override val amount: Double = entity.initialAmount,
+        override val originalDate: Long = entity.startDate,
+        override val archivedAt: Long = entity.archivedAt ?: System.currentTimeMillis(),
+        override val daysRemaining: Int,
+        override val formattedRetentionRemaining: String
+    ) : ArchiveItemWrapper
 }
 
 enum class TransactionTypeFilter {
@@ -64,6 +113,7 @@ data class CategoryAllocationUiModel(
 @Immutable
 data class FinanceUiState(
     val activeTab: FinanceTab = FinanceTab.DASHBOARD,
+    val moreSubDestination: MoreSubDestination = MoreSubDestination.NONE,
 
     // Calendar View State
     val displayedMonth: Calendar = Calendar.getInstance(),
@@ -118,6 +168,14 @@ data class FinanceUiState(
     val selectedLoanStatusFilter: LoanStatusFilter = LoanStatusFilter.ACTIVE,
     val repayingLoan: LoanEntity? = null,
     val isRepayDialogOpen: Boolean = false,
+
+    // Archive & Recovery State
+    val archivedItems: List<ArchiveItemWrapper> = emptyList(),
+    val filteredArchivedItems: List<ArchiveItemWrapper> = emptyList(),
+    val archiveFilterType: ArchiveFilterType = ArchiveFilterType.ALL,
+    val archiveSearchQuery: String = "",
+    val itemToPermanentlyDelete: ArchiveItemWrapper? = null,
+    val recentlyArchivedNote: String? = null,
 
     // Entry & Dialog States
     val isAddTransactionSheetOpen: Boolean = false,

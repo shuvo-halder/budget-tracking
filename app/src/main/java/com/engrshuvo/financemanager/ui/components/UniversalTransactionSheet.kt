@@ -27,7 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Notes
+import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.Button
@@ -558,7 +558,7 @@ fun UniversalTransactionSheet(
                 onValueChange = { noteText = it },
                 placeholder = { Text("Add any extra details or reference…") },
                 leadingIcon = {
-                    Icon(imageVector = Icons.Default.Notes, contentDescription = null)
+                    Icon(imageVector = Icons.AutoMirrored.Filled.Notes, contentDescription = null)
                 },
                 singleLine = true,
                 shape = RoundedCornerShape(14.dp),

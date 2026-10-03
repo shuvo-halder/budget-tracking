@@ -73,4 +73,34 @@ class ExampleRobolectricTest {
         assertTrue(startOfDay <= now)
         assertTrue(endOfDay >= now)
     }
+
+    @Test
+    fun `app database creates tables and queries without crashing`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = com.engrshuvo.financemanager.data.local.AppDatabase.getDatabase(context)
+        val txDao = db.transactionDao()
+        val loanDao = db.loanDao()
+        val budgetDao = db.budgetSettingDao()
+        val allocDao = db.budgetAllocationDao()
+        org.junit.Assert.assertNotNull(txDao)
+        org.junit.Assert.assertNotNull(loanDao)
+        org.junit.Assert.assertNotNull(budgetDao)
+        org.junit.Assert.assertNotNull(allocDao)
+    }
+
+    @Test
+    fun `finance viewmodel initializes and emits state without exception`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = com.engrshuvo.financemanager.data.local.AppDatabase.getDatabase(context)
+        val repo = com.engrshuvo.financemanager.data.repository.FinanceRepository(
+            transactionDao = db.transactionDao(),
+            budgetSettingDao = db.budgetSettingDao(),
+            loanDao = db.loanDao(),
+            budgetAllocationDao = db.budgetAllocationDao()
+        )
+        val viewModel = com.engrshuvo.financemanager.ui.viewmodel.FinanceViewModel(repo)
+        val state = viewModel.uiState.value
+        org.junit.Assert.assertNotNull(state)
+        assertEquals(com.engrshuvo.financemanager.ui.state.FinanceTab.DASHBOARD, state.activeTab)
+    }
 }

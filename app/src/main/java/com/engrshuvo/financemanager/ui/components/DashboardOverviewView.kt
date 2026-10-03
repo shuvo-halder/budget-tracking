@@ -28,7 +28,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FilterAltOff
 import androidx.compose.material.icons.filled.Handshake
-import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Warning
@@ -339,7 +339,7 @@ fun DashboardOverviewView(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = if (hasAnyTransactions) Icons.Default.FilterAltOff else Icons.Default.ReceiptLong,
+                                imageVector = if (hasAnyTransactions) Icons.Default.FilterAltOff else Icons.Default.Receipt,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(28.dp)

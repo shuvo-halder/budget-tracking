@@ -13,6 +13,8 @@ import com.engrshuvo.financemanager.data.model.TransactionType
 import com.engrshuvo.financemanager.data.repository.FinanceRepository
 import com.engrshuvo.financemanager.ui.model.CalendarDayCell
 import com.engrshuvo.financemanager.ui.model.DaySummaryStats
+import com.engrshuvo.financemanager.ui.state.ArchiveFilterType
+import com.engrshuvo.financemanager.ui.state.ArchiveItemWrapper
 import com.engrshuvo.financemanager.ui.state.CategoryAllocationUiModel
 import com.engrshuvo.financemanager.ui.state.CategorySpending
 import com.engrshuvo.financemanager.ui.state.DateFilterOption
@@ -20,6 +22,7 @@ import com.engrshuvo.financemanager.ui.state.FinanceTab
 import com.engrshuvo.financemanager.ui.state.FinanceUiState
 import com.engrshuvo.financemanager.ui.state.LoanStatusFilter
 import com.engrshuvo.financemanager.ui.state.LoanTypeFilter
+import com.engrshuvo.financemanager.ui.state.MoreSubDestination
 import com.engrshuvo.financemanager.ui.state.TransactionTypeFilter
 import com.engrshuvo.financemanager.ui.util.DateUtils
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +42,8 @@ class FinanceViewModel(
 ) : ViewModel() {
 
     private val _activeTab = MutableStateFlow(FinanceTab.DASHBOARD)
+    private val _moreSubDestination = MutableStateFlow(MoreSubDestination.NONE)
+
     private val _displayedMonth = MutableStateFlow(Calendar.getInstance())
     private val _selectedDateTimestamp = MutableStateFlow(System.currentTimeMillis())
     private val _isDayDetailSheetOpen = MutableStateFlow(false)
@@ -60,6 +65,19 @@ class FinanceViewModel(
     private val _isBudgetLimitDialogOpen = MutableStateFlow(false)
     private val _isBudgetPlanningDialogOpen = MutableStateFlow(false)
     private val _isDailyLimitDialogOpen = MutableStateFlow(false)
+
+    // Archive & Recovery state flows
+    private val _archiveFilterType = MutableStateFlow(ArchiveFilterType.ALL)
+    private val _archiveSearchQuery = MutableStateFlow("")
+    private val _itemToPermanentlyDelete = MutableStateFlow<ArchiveItemWrapper?>(null)
+    private val _recentlyArchivedNote = MutableStateFlow<String?>(null)
+
+    init {
+        // Automatic cleanup on app startup
+        viewModelScope.launch {
+            repository.purgeExpiredArchivedRecords()
+        }
+    }
 
     private data class CalendarParams(
         val month: Calendar,
@@ -83,6 +101,19 @@ class FinanceViewModel(
         val monthlyLimit: Double,
         val dailyLimit: Double,
         val allAllocations: List<BudgetAllocationEntity>
+    )
+
+    private data class ArchiveParams(
+        val filterType: ArchiveFilterType,
+        val searchQuery: String,
+        val itemToDelete: ArchiveItemWrapper?,
+        val moreDest: MoreSubDestination,
+        val recentlyArchivedNote: String?
+    )
+
+    private data class ArchiveData(
+        val archivedTransactions: List<TransactionEntity>,
+        val archivedLoans: List<LoanEntity>
     )
 
     private val budgetDataFlow = combine(
@@ -136,11 +167,31 @@ class FinanceViewModel(
         params.copy(loanStatus = loanStatus)
     }.flowOn(Dispatchers.Default)
 
+    private val archiveRawDataFlow: Flow<ArchiveData> = combine(
+        repository.archivedTransactions,
+        repository.archivedLoans
+    ) { txs, loans ->
+        ArchiveData(txs, loans)
+    }.flowOn(Dispatchers.Default)
+
+    private val archiveParamsFlow: Flow<ArchiveParams> = combine(
+        _archiveFilterType,
+        _archiveSearchQuery,
+        _itemToPermanentlyDelete,
+        _moreSubDestination
+    ) { filterType, query, itemToDelete, moreDest ->
+        ArchiveParams(filterType, query, itemToDelete, moreDest, _recentlyArchivedNote.value)
+    }.combine(_recentlyArchivedNote) { params, note ->
+        params.copy(recentlyArchivedNote = note)
+    }.flowOn(Dispatchers.Default)
+
     val uiState: StateFlow<FinanceUiState> = combine(
         coreDataFlow,
         calendarParamsFlow,
-        filterParamsFlow
-    ) { coreData, calendarParams, filterParams ->
+        filterParamsFlow,
+        archiveRawDataFlow,
+        archiveParamsFlow
+    ) { coreData, calendarParams, filterParams, archiveRawData, archiveParams ->
         val allTransactions = coreData.allTransactions
         val allLoans = coreData.allLoans
         val monthlyLimit = coreData.monthlyLimit
@@ -361,8 +412,53 @@ class FinanceViewModel(
             matchesType && matchesStatus
         }
 
+        val now = System.currentTimeMillis()
+        val txWrappers = archiveRawData.archivedTransactions.map { entity ->
+            val calArchive = Calendar.getInstance().apply {
+                timeInMillis = entity.archivedAt ?: now
+                add(Calendar.MONTH, 2)
+            }
+            val daysRemaining = ((calArchive.timeInMillis - now) / (1000L * 60 * 60 * 24)).coerceAtLeast(0).toInt()
+            val retentionText = if (daysRemaining <= 0) "Eligible for auto-purge" else "Permanent deletion in $daysRemaining days"
+            ArchiveItemWrapper.Transaction(
+                entity = entity,
+                daysRemaining = daysRemaining,
+                formattedRetentionRemaining = retentionText
+            )
+        }
+
+        val loanWrappers = archiveRawData.archivedLoans.map { entity ->
+            val calArchive = Calendar.getInstance().apply {
+                timeInMillis = entity.archivedAt ?: now
+                add(Calendar.MONTH, 2)
+            }
+            val daysRemaining = ((calArchive.timeInMillis - now) / (1000L * 60 * 60 * 24)).coerceAtLeast(0).toInt()
+            val retentionText = if (daysRemaining <= 0) "Eligible for auto-purge" else "Permanent deletion in $daysRemaining days"
+            ArchiveItemWrapper.Loan(
+                entity = entity,
+                daysRemaining = daysRemaining,
+                formattedRetentionRemaining = retentionText
+            )
+        }
+
+        val allArchivedItems = (txWrappers + loanWrappers).sortedByDescending { it.archivedAt }
+        val filteredArchivedItems = allArchivedItems.filter { item ->
+            val matchesType = when (archiveParams.filterType) {
+                ArchiveFilterType.ALL -> true
+                ArchiveFilterType.INCOME -> item is ArchiveItemWrapper.Transaction && item.entity.type == TransactionType.INCOME
+                ArchiveFilterType.EXPENSE -> item is ArchiveItemWrapper.Transaction && item.entity.type == TransactionType.EXPENSE
+                ArchiveFilterType.LOANS -> item is ArchiveItemWrapper.Loan
+            }
+            val matchesQuery = if (archiveParams.searchQuery.isBlank()) true else {
+                val q = archiveParams.searchQuery.trim().lowercase()
+                item.title.lowercase().contains(q) || item.amount.toString().contains(q)
+            }
+            matchesType && matchesQuery
+        }
+
         FinanceUiState(
             activeTab = activeTab,
+            moreSubDestination = archiveParams.moreDest,
             displayedMonth = calendarParams.month,
             selectedDateTimestamp = calendarParams.selectedDate,
             calendarDays = calendarDays,
@@ -405,6 +501,12 @@ class FinanceViewModel(
             selectedLoanStatusFilter = loanStatusFilter,
             repayingLoan = _repayingLoan.value,
             isRepayDialogOpen = _isRepayDialogOpen.value,
+            archivedItems = allArchivedItems,
+            filteredArchivedItems = filteredArchivedItems,
+            archiveFilterType = archiveParams.filterType,
+            archiveSearchQuery = archiveParams.searchQuery,
+            itemToPermanentlyDelete = archiveParams.itemToDelete,
+            recentlyArchivedNote = archiveParams.recentlyArchivedNote,
             isAddTransactionSheetOpen = _isAddTransactionSheetOpen.value,
             editingTransaction = _editingTransaction.value,
             defaultEntryType = _defaultEntryType.value,
@@ -741,6 +843,71 @@ class FinanceViewModel(
         viewModelScope.launch {
             repository.setDailyBudgetLimit(limit.coerceAtLeast(0.0))
             closeDailyLimitDialog()
+        }
+    }
+
+    fun setActiveTab(tab: FinanceTab) {
+        _activeTab.value = tab
+        if (tab != FinanceTab.MORE) {
+            _moreSubDestination.value = MoreSubDestination.NONE
+        }
+    }
+
+    fun navigateToMoreSubDestination(dest: MoreSubDestination) {
+        _moreSubDestination.value = dest
+        if (dest == MoreSubDestination.ARCHIVE) {
+            viewModelScope.launch {
+                repository.purgeExpiredArchivedRecords()
+            }
+        }
+    }
+
+    fun navigateBackFromMoreSubDestination() {
+        _moreSubDestination.value = MoreSubDestination.NONE
+    }
+
+    fun restoreTransaction(id: Long) {
+        viewModelScope.launch {
+            repository.restoreTransaction(id)
+        }
+    }
+
+    fun restoreLoan(loanId: Long) {
+        viewModelScope.launch {
+            repository.restoreLoan(loanId)
+        }
+    }
+
+    fun openPermanentDeleteDialog(item: ArchiveItemWrapper) {
+        _itemToPermanentlyDelete.value = item
+    }
+
+    fun closePermanentDeleteDialog() {
+        _itemToPermanentlyDelete.value = null
+    }
+
+    fun confirmPermanentDelete() {
+        val item = _itemToPermanentlyDelete.value ?: return
+        viewModelScope.launch {
+            when (item) {
+                is ArchiveItemWrapper.Transaction -> repository.permanentlyDeleteTransaction(item.id)
+                is ArchiveItemWrapper.Loan -> repository.permanentlyDeleteLoan(item.id)
+            }
+            closePermanentDeleteDialog()
+        }
+    }
+
+    fun setArchiveFilterType(filterType: ArchiveFilterType) {
+        _archiveFilterType.value = filterType
+    }
+
+    fun setArchiveSearchQuery(query: String) {
+        _archiveSearchQuery.value = query
+    }
+
+    fun purgeExpiredArchivedRecords() {
+        viewModelScope.launch {
+            repository.purgeExpiredArchivedRecords()
         }
     }
 }

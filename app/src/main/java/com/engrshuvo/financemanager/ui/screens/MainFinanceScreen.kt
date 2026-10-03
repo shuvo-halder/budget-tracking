@@ -8,7 +8,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,19 +17,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Handshake
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -44,7 +41,6 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -61,7 +57,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.engrshuvo.financemanager.data.model.LoanEntity
 import com.engrshuvo.financemanager.data.model.LoanType
@@ -72,15 +67,12 @@ import com.engrshuvo.financemanager.ui.components.BudgetPlanningDialog
 import com.engrshuvo.financemanager.ui.components.DailyLimitDialog
 import com.engrshuvo.financemanager.ui.components.DashboardOverviewView
 import com.engrshuvo.financemanager.ui.components.DaySummarySheet
-import com.engrshuvo.financemanager.ui.components.InteractiveCalendarView
 import com.engrshuvo.financemanager.ui.components.LoansScreen
 import com.engrshuvo.financemanager.ui.components.SetBudgetDialog
-import com.engrshuvo.financemanager.ui.components.TransactionItemCard
 import com.engrshuvo.financemanager.ui.components.UniversalTransactionSheet
 import com.engrshuvo.financemanager.ui.state.FinanceTab
+import com.engrshuvo.financemanager.ui.state.MoreSubDestination
 import com.engrshuvo.financemanager.ui.theme.ExpenseRed
-import com.engrshuvo.financemanager.ui.theme.IncomeGreen
-import com.engrshuvo.financemanager.ui.theme.LoanBlue
 import com.engrshuvo.financemanager.ui.util.CurrencyUtils
 import com.engrshuvo.financemanager.ui.util.DateUtils
 import com.engrshuvo.financemanager.ui.viewmodel.FinanceViewModel
@@ -99,13 +91,14 @@ fun MainFinanceScreen(
     var transactionToDelete by remember { mutableStateOf<TransactionEntity?>(null) }
     var loanToDelete by remember { mutableStateOf<LoanEntity?>(null) }
 
+    // Soft delete confirmation dialog for transaction
     if (transactionToDelete != null) {
         val target = transactionToDelete!!
         AlertDialog(
             onDismissRequest = { transactionToDelete = null },
-            title = { Text("Delete Transaction") },
+            title = { Text("Move to Archive?") },
             text = {
-                Text("Are you sure you want to delete ${target.categoryName} entry of ${CurrencyUtils.formatBDT(target.amount)}?")
+                Text("Archive ${target.categoryName} entry of ${CurrencyUtils.formatBDT(target.amount)}? It can be restored within 2 months before permanent auto-purge.")
             },
             confirmButton = {
                 TextButton(
@@ -115,25 +108,17 @@ fun MainFinanceScreen(
                         viewModel.deleteTransaction(toDelete)
                         coroutineScope.launch {
                             val result = snackbarHostState.showSnackbar(
-                                message = "Transaction deleted",
+                                message = "${toDelete.categoryName} archived",
                                 actionLabel = "Undo",
                                 duration = SnackbarDuration.Short
                             )
                             if (result == SnackbarResult.ActionPerformed) {
-                                viewModel.saveTransaction(
-                                    id = 0L,
-                                    type = toDelete.type,
-                                    amount = toDelete.amount,
-                                    categoryId = toDelete.categoryId,
-                                    categoryName = toDelete.categoryName,
-                                    note = toDelete.note,
-                                    timestamp = toDelete.timestamp
-                                )
+                                viewModel.restoreTransaction(toDelete.id)
                             }
                         }
                     }
                 ) {
-                    Text("Delete", color = ExpenseRed, fontWeight = FontWeight.Bold)
+                    Text("Archive", color = ExpenseRed, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -144,25 +129,34 @@ fun MainFinanceScreen(
         )
     }
 
+    // Soft delete confirmation dialog for loan
     if (loanToDelete != null) {
         val targetLoan = loanToDelete!!
         AlertDialog(
             onDismissRequest = { loanToDelete = null },
-            title = { Text("Delete Loan Record") },
+            title = { Text("Archive Loan Record?") },
             text = {
-                Text("Are you sure you want to delete the loan with ${targetLoan.personName} (${CurrencyUtils.formatBDT(targetLoan.initialAmount)})?")
+                Text("Archive loan with ${targetLoan.personName} (${CurrencyUtils.formatBDT(targetLoan.initialAmount)}) and linked repayments? It can be restored within 2 months.")
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        viewModel.deleteLoan(targetLoan)
+                        val toDeleteLoan = targetLoan
                         loanToDelete = null
+                        viewModel.deleteLoan(toDeleteLoan)
                         coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Loan record deleted")
+                            val result = snackbarHostState.showSnackbar(
+                                message = "Loan with ${toDeleteLoan.personName} archived",
+                                actionLabel = "Undo",
+                                duration = SnackbarDuration.Short
+                            )
+                            if (result == SnackbarResult.ActionPerformed) {
+                                viewModel.restoreLoan(toDeleteLoan.id)
+                            }
                         }
                     }
                 ) {
-                    Text("Delete", color = ExpenseRed, fontWeight = FontWeight.Bold)
+                    Text("Archive", color = ExpenseRed, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -180,60 +174,68 @@ fun MainFinanceScreen(
         contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(MaterialTheme.colorScheme.primary),
-                            contentAlignment = Alignment.Center
+            // Show main top bar if not in a full-screen sub-destination that has its own app bar
+            val showMainTopBar = uiState.activeTab != FinanceTab.MORE || uiState.moreSubDestination == MoreSubDestination.NONE
+            if (showMainTopBar) {
+                TopAppBar(
+                    title = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.AccountBalanceWallet,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(20.dp)
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(MaterialTheme.colorScheme.primary),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AccountBalanceWallet,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = "Daily Budget",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = when (uiState.activeTab) {
+                                        FinanceTab.DASHBOARD -> "Financial Dashboard"
+                                        FinanceTab.TRANSACTIONS -> "All Transactions Ledger"
+                                        FinanceTab.BUDGET -> "Monthly Envelope Planning"
+                                        FinanceTab.LOANS -> "Debt & Loan Tracker"
+                                        FinanceTab.MORE -> "More Tools & Services"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
-                        Column {
-                            Text(
-                                text = "Finance Manager",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = when (uiState.activeTab) {
-                                    FinanceTab.CALENDAR -> "Calendar & Daily Log"
-                                    FinanceTab.DASHBOARD -> "Financial Dashboard"
-                                    FinanceTab.LOANS -> "Debt & Loan Tracker"
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                    },
+                    actions = {
+                        if (uiState.activeTab == FinanceTab.DASHBOARD || uiState.activeTab == FinanceTab.BUDGET) {
+                            IconButton(
+                                onClick = { viewModel.openBudgetPlanningDialog() },
+                                modifier = Modifier.testTag("top_budget_settings_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Tune,
+                                    contentDescription = "Budget settings",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { viewModel.openBudgetLimitDialog() },
-                        modifier = Modifier.testTag("top_budget_settings_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Tune,
-                            contentDescription = "Budget settings",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background
+                    )
                 )
-            )
+            }
         },
         bottomBar = {
             NavigationBar(
@@ -246,13 +248,15 @@ fun MainFinanceScreen(
                 FinanceTab.values().forEach { tab ->
                     val isSelected = uiState.activeTab == tab
                     val icon = when (tab) {
-                        FinanceTab.CALENDAR -> Icons.Default.CalendarMonth
                         FinanceTab.DASHBOARD -> Icons.Default.Dashboard
+                        FinanceTab.TRANSACTIONS -> Icons.Default.Receipt
+                        FinanceTab.BUDGET -> Icons.Default.PieChart
                         FinanceTab.LOANS -> Icons.Default.Handshake
+                        FinanceTab.MORE -> Icons.Default.MoreHoriz
                     }
                     NavigationBarItem(
                         selected = isSelected,
-                        onClick = { viewModel.selectTab(tab) },
+                        onClick = { viewModel.setActiveTab(tab) },
                         icon = { Icon(imageVector = icon, contentDescription = tab.label) },
                         label = { Text(tab.label, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
                         colors = NavigationBarItemDefaults.colors(
@@ -265,22 +269,27 @@ fun MainFinanceScreen(
             }
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    when (uiState.activeTab) {
-                        FinanceTab.LOANS -> viewModel.openAddTransactionSheet(TransactionType.LOAN, LoanType.LENT)
-                        else -> viewModel.openAddTransactionSheet(TransactionType.EXPENSE)
-                    }
-                },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = RoundedCornerShape(18.dp),
-                modifier = Modifier.testTag("universal_fab")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add new transaction or loan"
-                )
+            // Show FAB on primary destinations
+            val showFab = uiState.activeTab != FinanceTab.MORE || uiState.moreSubDestination == MoreSubDestination.NONE
+            if (showFab) {
+                FloatingActionButton(
+                    onClick = {
+                        when (uiState.activeTab) {
+                            FinanceTab.LOANS -> viewModel.openAddTransactionSheet(TransactionType.LOAN, LoanType.LENT)
+                            FinanceTab.BUDGET -> viewModel.openBudgetPlanningDialog()
+                            else -> viewModel.openAddTransactionSheet(TransactionType.EXPENSE)
+                        }
+                    },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier.testTag("universal_fab")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Add new transaction, loan or budget"
+                    )
+                }
             }
         }
     ) { innerPadding ->
@@ -293,131 +302,6 @@ fun MainFinanceScreen(
             label = "tabContentAnim"
         ) { tab ->
             when (tab) {
-                FinanceTab.CALENDAR -> {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .testTag("calendar_tab_view"),
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        item(key = "calendar_grid", contentType = "calendar_grid") {
-                            InteractiveCalendarView(
-                                displayedMonth = uiState.displayedMonth,
-                                calendarDays = uiState.calendarDays,
-                                onPreviousMonth = { viewModel.changeMonth(-1) },
-                                onNextMonth = { viewModel.changeMonth(1) },
-                                onResetToToday = { viewModel.resetToCurrentMonth() },
-                                onDateClick = { timestamp -> viewModel.selectDate(timestamp, openSheet = true) }
-                            )
-                        }
-
-                        if (uiState.selectedDaySummary != null) {
-                            item(key = "selected_day_header", contentType = "day_summary_header") {
-                                val summary = uiState.selectedDaySummary!!
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(20.dp),
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                                ) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(16.dp),
-                                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Column {
-                                                Text(
-                                                    text = summary.formattedDate,
-                                                    style = MaterialTheme.typography.titleMedium,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                                Text(
-                                                    text = "Daily Total Activity",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-
-                                            Surface(
-                                                shape = RoundedCornerShape(8.dp),
-                                                color = MaterialTheme.colorScheme.primaryContainer
-                                            ) {
-                                                Text(
-                                                    text = "${uiState.selectedDayTransactions.size} entries",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                                )
-                                            }
-                                        }
-
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Surface(
-                                                modifier = Modifier.weight(1f),
-                                                shape = RoundedCornerShape(12.dp),
-                                                color = IncomeGreen.copy(alpha = 0.12f)
-                                            ) {
-                                                Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                                    Text("Income", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                    Text(CurrencyUtils.formatBDT(summary.totalIncome), fontWeight = FontWeight.Bold, color = IncomeGreen, fontSize = 13.sp)
-                                                }
-                                            }
-
-                                            Surface(
-                                                modifier = Modifier.weight(1f),
-                                                shape = RoundedCornerShape(12.dp),
-                                                color = ExpenseRed.copy(alpha = 0.12f)
-                                            ) {
-                                                Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                                    Text("Expense", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                    Text(CurrencyUtils.formatBDT(summary.totalExpense), fontWeight = FontWeight.Bold, color = ExpenseRed, fontSize = 13.sp)
-                                                }
-                                            }
-
-                                            Surface(
-                                                modifier = Modifier.weight(1f),
-                                                shape = RoundedCornerShape(12.dp),
-                                                color = LoanBlue.copy(alpha = 0.12f)
-                                            ) {
-                                                Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                                    Text("Loan", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                    Text(CurrencyUtils.formatBDT(summary.totalLoan), fontWeight = FontWeight.Bold, color = LoanBlue, fontSize = 13.sp)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (uiState.selectedDayTransactions.isNotEmpty()) {
-                                items(
-                                    items = uiState.selectedDayTransactions,
-                                    key = { "day_tx_${it.id}" },
-                                    contentType = { "day_transaction_item" }
-                                ) { item ->
-                                    TransactionItemCard(
-                                        transaction = item,
-                                        onClick = { viewModel.openEditTransactionSheet(item) },
-                                        onEditClick = { viewModel.openEditTransactionSheet(item) },
-                                        onDeleteClick = { transactionToDelete = item }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
                 FinanceTab.DASHBOARD -> {
                     DashboardOverviewView(
                         monthName = DateUtils.formatMonthYear(uiState.displayedMonth),
@@ -461,6 +345,49 @@ fun MainFinanceScreen(
                     )
                 }
 
+                FinanceTab.TRANSACTIONS -> {
+                    TransactionsScreen(
+                        filteredTransactions = uiState.filteredTransactions,
+                        allTransactionsCount = uiState.allTransactions.size,
+                        searchQuery = uiState.searchQuery,
+                        selectedType = uiState.selectedTypeFilter,
+                        selectedCategoryId = uiState.selectedCategoryFilterId,
+                        selectedDateOption = uiState.selectedDateFilter,
+                        onSearchQueryChange = { viewModel.setSearchQuery(it) },
+                        onTypeSelect = { viewModel.setTypeFilter(it) },
+                        onCategorySelect = { viewModel.setCategoryFilter(it) },
+                        onDateOptionSelect = { viewModel.setDateFilter(it) },
+                        onClearFilters = { viewModel.clearAllFilters() },
+                        onAddIncomeClick = { viewModel.openAddTransactionSheet(TransactionType.INCOME) },
+                        onAddExpenseClick = { viewModel.openAddTransactionSheet(TransactionType.EXPENSE) },
+                        onEditTransaction = { viewModel.openEditTransactionSheet(it) },
+                        onDeleteTransaction = { transactionToDelete = it }
+                    )
+                }
+
+                FinanceTab.BUDGET -> {
+                    BudgetScreen(
+                        monthName = DateUtils.formatMonthYear(uiState.displayedMonth),
+                        totalMonthlyIncome = uiState.totalIncome,
+                        totalAllocated = uiState.totalAllocated,
+                        unallocatedIncome = uiState.unallocatedIncome,
+                        plannedShortfall = uiState.plannedShortfall,
+                        isShortfall = uiState.isShortfall,
+                        plannedSavingsTotal = uiState.plannedSavingsTotal,
+                        dailyLimit = uiState.dailyBudgetLimit,
+                        todayExpenses = uiState.todayExpenses,
+                        dailyRemaining = uiState.dailyBudgetRemaining,
+                        dailyProgress = uiState.dailyBudgetProgress,
+                        isDailyOverBudget = uiState.isDailyOverBudget,
+                        allocations = uiState.monthAllocations,
+                        onPreviousMonth = { viewModel.changeMonth(-1) },
+                        onNextMonth = { viewModel.changeMonth(1) },
+                        onPlanBudgetClick = { viewModel.openBudgetPlanningDialog() },
+                        onConfigureDailyLimitClick = { viewModel.openDailyLimitDialog() },
+                        onCopyFromPreviousMonth = { viewModel.copyFromPreviousMonth() }
+                    )
+                }
+
                 FinanceTab.LOANS -> {
                     LoansScreen(
                         loans = uiState.filteredLoans,
@@ -474,6 +401,41 @@ fun MainFinanceScreen(
                         onRepayClick = { viewModel.openRepayDialog(it) },
                         onSettleClick = { viewModel.markLoanSettled(it.id) },
                         onDeleteLoanClick = { loanToDelete = it }
+                    )
+                }
+
+                FinanceTab.MORE -> {
+                    MoreScreen(
+                        uiState = uiState,
+                        onNavigateToSubDestination = { viewModel.navigateToMoreSubDestination(it) },
+                        onNavigateBack = { viewModel.navigateBackFromMoreSubDestination() },
+                        onPreviousMonth = { viewModel.changeMonth(-1) },
+                        onNextMonth = { viewModel.changeMonth(1) },
+                        onResetToToday = { viewModel.resetToCurrentMonth() },
+                        onSelectDate = { timestamp -> viewModel.selectDate(timestamp, openSheet = true) },
+                        onEditTransaction = { viewModel.openEditTransactionSheet(it) },
+                        onDeleteTransaction = { transactionToDelete = it },
+                        onArchiveSearchQueryChange = { viewModel.setArchiveSearchQuery(it) },
+                        onArchiveFilterSelect = { viewModel.setArchiveFilterType(it) },
+                        onRestoreArchiveItem = { item ->
+                            when (item) {
+                                is com.engrshuvo.financemanager.ui.state.ArchiveItemWrapper.Transaction -> {
+                                    viewModel.restoreTransaction(item.id)
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("Transaction restored")
+                                    }
+                                }
+                                is com.engrshuvo.financemanager.ui.state.ArchiveItemWrapper.Loan -> {
+                                    viewModel.restoreLoan(item.id)
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("Loan and repayments restored")
+                                    }
+                                }
+                            }
+                        },
+                        onRequestPermanentDelete = { viewModel.openPermanentDeleteDialog(it) },
+                        onConfirmPermanentDelete = { viewModel.confirmPermanentDelete() },
+                        onDismissPermanentDeleteDialog = { viewModel.closePermanentDeleteDialog() }
                     )
                 }
             }

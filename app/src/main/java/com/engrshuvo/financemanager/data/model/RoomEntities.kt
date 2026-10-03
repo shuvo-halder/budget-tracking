@@ -7,7 +7,10 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 @Immutable
-@Entity(tableName = "transactions")
+@Entity(
+    tableName = "transactions",
+    indices = [Index("archivedAt"), Index("loanId")]
+)
 data class TransactionEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
@@ -17,11 +20,15 @@ data class TransactionEntity(
     val categoryName: String,
     val note: String,
     val timestamp: Long = System.currentTimeMillis(),
-    val loanId: Long? = null
+    val loanId: Long? = null,
+    val archivedAt: Long? = null
 )
 
 @Immutable
-@Entity(tableName = "loans")
+@Entity(
+    tableName = "loans",
+    indices = [Index("archivedAt")]
+)
 data class LoanEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
@@ -33,7 +40,8 @@ data class LoanEntity(
     val status: LoanStatus = LoanStatus.ACTIVE,
     val startDate: Long = System.currentTimeMillis(),
     val dueDate: Long? = null,
-    val note: String = ""
+    val note: String = "",
+    val archivedAt: Long? = null
 )
 
 @Immutable
@@ -47,7 +55,7 @@ data class LoanEntity(
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("loanId")]
+    indices = [Index("loanId"), Index("archivedAt")]
 )
 data class LoanRepaymentEntity(
     @PrimaryKey(autoGenerate = true)
@@ -55,7 +63,8 @@ data class LoanRepaymentEntity(
     val loanId: Long,
     val amount: Double,
     val note: String = "",
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val archivedAt: Long? = null
 )
 
 @Immutable
