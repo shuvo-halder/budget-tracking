@@ -68,6 +68,8 @@ import com.engrshuvo.financemanager.data.model.LoanType
 import com.engrshuvo.financemanager.data.model.TransactionEntity
 import com.engrshuvo.financemanager.data.model.TransactionType
 import com.engrshuvo.financemanager.ui.components.AddRepaymentDialog
+import com.engrshuvo.financemanager.ui.components.BudgetPlanningDialog
+import com.engrshuvo.financemanager.ui.components.DailyLimitDialog
 import com.engrshuvo.financemanager.ui.components.DashboardOverviewView
 import com.engrshuvo.financemanager.ui.components.DaySummarySheet
 import com.engrshuvo.financemanager.ui.components.InteractiveCalendarView
@@ -80,6 +82,7 @@ import com.engrshuvo.financemanager.ui.theme.ExpenseRed
 import com.engrshuvo.financemanager.ui.theme.IncomeGreen
 import com.engrshuvo.financemanager.ui.theme.LoanBlue
 import com.engrshuvo.financemanager.ui.util.CurrencyUtils
+import com.engrshuvo.financemanager.ui.util.DateUtils
 import com.engrshuvo.financemanager.ui.viewmodel.FinanceViewModel
 import kotlinx.coroutines.launch
 
@@ -417,14 +420,26 @@ fun MainFinanceScreen(
 
                 FinanceTab.DASHBOARD -> {
                     DashboardOverviewView(
+                        monthName = DateUtils.formatMonthYear(uiState.displayedMonth),
+                        onPreviousMonth = { viewModel.changeMonth(-1) },
+                        onNextMonth = { viewModel.changeMonth(1) },
                         balance = uiState.balance,
                         totalIncome = uiState.totalIncome,
                         totalExpense = uiState.totalExpense,
+                        netOperatingCashChange = uiState.netOperatingCashChange,
                         totalLent = uiState.totalActiveLent,
                         totalBorrowed = uiState.totalActiveBorrowed,
-                        monthlyLimit = uiState.monthlyLimit,
-                        monthlySpent = uiState.monthlySpent,
-                        budgetProgress = uiState.budgetProgress,
+                        totalAllocated = uiState.totalAllocated,
+                        unallocatedIncome = uiState.unallocatedIncome,
+                        plannedShortfall = uiState.plannedShortfall,
+                        isShortfall = uiState.isShortfall,
+                        plannedSavingsTotal = uiState.plannedSavingsTotal,
+                        todayExpenses = uiState.todayExpenses,
+                        dailyBudgetLimit = uiState.dailyBudgetLimit,
+                        dailyBudgetRemaining = uiState.dailyBudgetRemaining,
+                        dailyBudgetProgress = uiState.dailyBudgetProgress,
+                        isDailyOverBudget = uiState.isDailyOverBudget,
+                        monthAllocations = uiState.monthAllocations,
                         categoryBreakdown = uiState.categorySpendBreakdown,
                         filteredTransactions = uiState.filteredTransactions,
                         hasAnyTransactions = uiState.allTransactions.isNotEmpty(),
@@ -437,7 +452,8 @@ fun MainFinanceScreen(
                         onCategorySelect = { viewModel.setCategoryFilter(it) },
                         onDateOptionSelect = { viewModel.setDateFilter(it) },
                         onClearFilters = { viewModel.clearAllFilters() },
-                        onEditBudgetClick = { viewModel.openBudgetLimitDialog() },
+                        onPlanBudgetClick = { viewModel.openBudgetPlanningDialog() },
+                        onConfigureDailyLimitClick = { viewModel.openDailyLimitDialog() },
                         onAddIncomeClick = { viewModel.openAddTransactionSheet(TransactionType.INCOME) },
                         onAddExpenseClick = { viewModel.openAddTransactionSheet(TransactionType.EXPENSE) },
                         onEditTransaction = { viewModel.openEditTransactionSheet(it) },
@@ -511,4 +527,30 @@ fun MainFinanceScreen(
             viewModel.updateMonthlyBudgetLimit(newLimit)
         }
     )
+
+    if (uiState.isBudgetPlanningDialogOpen) {
+        BudgetPlanningDialog(
+            monthName = DateUtils.formatMonthYear(uiState.displayedMonth),
+            totalMonthlyIncome = uiState.totalIncome,
+            currentAllocations = uiState.monthAllocations,
+            onDismiss = { viewModel.closeBudgetPlanningDialog() },
+            onSaveAllocations = { allocations ->
+                viewModel.saveCategoryAllocations(allocations)
+            },
+            onCopyFromPreviousMonth = {
+                viewModel.copyFromPreviousMonth()
+            }
+        )
+    }
+
+    if (uiState.isDailyLimitDialogOpen) {
+        DailyLimitDialog(
+            currentLimit = uiState.dailyBudgetLimit,
+            suggestedDailyLimit = uiState.suggestedDailyLimit,
+            onDismiss = { viewModel.closeDailyLimitDialog() },
+            onSaveLimit = { newDailyLimit ->
+                viewModel.updateDailyBudgetLimit(newDailyLimit)
+            }
+        )
+    }
 }

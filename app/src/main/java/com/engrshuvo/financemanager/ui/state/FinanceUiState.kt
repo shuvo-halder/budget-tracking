@@ -52,8 +52,18 @@ data class CategorySpending(
 )
 
 @Immutable
+data class CategoryAllocationUiModel(
+    val category: TransactionCategory,
+    val allocatedAmount: Double,
+    val actualSpent: Double,
+    val remainingAmount: Double,
+    val usagePercentage: Float,
+    val isOverBudget: Boolean
+)
+
+@Immutable
 data class FinanceUiState(
-    val activeTab: FinanceTab = FinanceTab.CALENDAR,
+    val activeTab: FinanceTab = FinanceTab.DASHBOARD,
 
     // Calendar View State
     val displayedMonth: Calendar = Calendar.getInstance(),
@@ -64,11 +74,31 @@ data class FinanceUiState(
     val isDayDetailSheetOpen: Boolean = false,
 
     // Overview / Dashboard State
+    val selectedMonthKey: String = "",
     val balance: Double = 0.0,
-    val totalIncome: Double = 0.0,
-    val totalExpense: Double = 0.0,
+    val totalIncome: Double = 0.0, // Monthly ordinary income
+    val totalExpense: Double = 0.0, // Monthly ordinary expense
+    val netOperatingCashChange: Double = 0.0, // totalIncome - totalExpense
     val totalActiveLent: Double = 0.0,
     val totalActiveBorrowed: Double = 0.0,
+    
+    // Month-Specific Budget Allocations
+    val monthAllocations: List<CategoryAllocationUiModel> = emptyList(),
+    val totalAllocated: Double = 0.0,
+    val unallocatedIncome: Double = 0.0,
+    val plannedShortfall: Double = 0.0,
+    val isShortfall: Boolean = false,
+    val plannedSavingsTotal: Double = 0.0,
+
+    // Daily Spending State
+    val todayExpenses: Double = 0.0,
+    val dailyBudgetLimit: Double = 500.0,
+    val dailyBudgetRemaining: Double = 500.0,
+    val dailyBudgetProgress: Float = 0.0f,
+    val isDailyOverBudget: Boolean = false,
+    val suggestedDailyLimit: Double = 0.0,
+
+    // Legacy / Overall monthly limit fallback
     val monthlyLimit: Double = 30000.0,
     val monthlySpent: Double = 0.0,
     val budgetProgress: Float = 0.0f,
@@ -95,5 +125,8 @@ data class FinanceUiState(
     val defaultEntryType: TransactionType = TransactionType.EXPENSE,
     val defaultLoanType: LoanType = LoanType.LENT,
     val isBudgetLimitDialogOpen: Boolean = false,
+    val isBudgetPlanningDialogOpen: Boolean = false,
+    val isDailyLimitDialogOpen: Boolean = false,
     val currencySymbol: String = "৳"
 )
+

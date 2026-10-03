@@ -22,7 +22,8 @@ class MainActivity : ComponentActivity() {
         val repository = FinanceRepository(
             transactionDao = database.transactionDao(),
             budgetSettingDao = database.budgetSettingDao(),
-            loanDao = database.loanDao()
+            loanDao = database.loanDao(),
+            budgetAllocationDao = database.budgetAllocationDao()
         )
         FinanceViewModelFactory(repository)
     }

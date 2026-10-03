@@ -1,48 +1,88 @@
-# Daily Budget & Loan Manager
+# Salary-Based Personal Finance & Budget Management System
 
-A modern, privacy-focused, offline-first personal finance and debt tracking application for Android. Built with **Kotlin**, **Jetpack Compose (Material 3)**, and **Room Database**, the app empowers users to monitor daily transactions, track income and expenses, maintain personal debts and loans, and visualize financial habits with an interactive calendar and comprehensive dashboards.
+A modern, privacy-focused, offline-first personal finance, salary budgeting, and debt tracking application for Android. Built with **Kotlin**, **Jetpack Compose (Material 3)**, and **Room Database**, the app empowers users to manage monthly salary and additional income, allocate funds to essential categories (House Rent, Family Maintenance, Daily Expenses, Bills, Savings, Emergency Reserves), record actual living expenses, track daily spending against independent limits, and maintain personal loans without double counting.
 
 ---
 
 ## 📱 App Overview
 
-Managing personal finances often involves tracking fragmented details: daily discretionary expenses, variable income streams, and informal loans with friends, family, or colleagues. **Daily Budget & Loan Manager** unifies these financial streams into a single, intuitive interface with full offline capability and local data sovereignty.
+**Daily Budget & Loan Manager** implements an accurate salary-based envelope budgeting and financial accounting model:
 
-- **Currency:** Bangladeshi Taka (৳ BDT) with support for decimal formatting.
-- **Privacy:** 100% offline local database. No accounts, external analytics, or remote tracking.
-- **Visual Clarity:** Daily transaction dot indicators on an interactive monthly calendar with real-time financial health summaries.
+- **Primary Scenario:**
+  1. The user logs their monthly salary and any additional income (Bonus, Freelance, Business, etc.).
+  2. The user allocates funds across categories such as House Rent, Family Maintenance, Daily Expenses, Food & Dining, Groceries, Bills & Utilities, Savings, and Emergency Reserve.
+  3. The user records actual expenses throughout the month. Each expense reduces the remaining allocation of exactly one category and available cash once.
+  4. Daily spending is tracked against an independent daily limit, with an optional 1-tap suggestion derived from the monthly Daily Expenses allocation.
+  5. The application shows how much was allocated, how much was spent, how much remains, and the available operating cash balance.
+  6. Personal debt and loan tracking (Lent/Borrowed) remains cleanly isolated from operating income and living expenses.
+
+- **Currency:** Bangladeshi Taka (৳ BDT) with clear decimal and sign formatting.
+- **Privacy:** 100% offline local Room database. Zero remote tracking, external cloud sync, or third-party telemetry.
+- **Default Screen:** The app launches directly into the **Dashboard** overview.
 
 ---
 
 ## ✨ Key Features
 
-### 📅 Interactive Monthly Calendar View
-- **42-Day Calendar Grid:** Full month calendar showing current days and adjacent month boundary days.
-- **Daily Financial Indicators:** Color-coded dots beneath each day:
+### 💵 Salary & Income Management
+- **Actual Received Funds:** Logs monthly salary, festive bonuses, freelance income, and business receipts.
+- **Distinction Between Plans & Cash:** Budget allocations are financial plans, not cash deductions. Cash is reduced only by actual expenses.
+
+### 📋 Month-Specific Budget Allocations
+- **Envelope Budgeting:** Set planned budgets for essential categories:
+  - 🏠 House Rent
+  - 👨‍👩‍👧‍👦 Family Maintenance
+  - 💳 Daily Expenses
+  - 🍔 Food & Dining
+  - 🛒 Groceries
+  - 💡 Bills & Utilities
+  - 🚗 Transportation
+  - 💰 Savings (Planned Reserve)
+  - 🛡️ Emergency Reserve
+  - 🛍️ Shopping, Health, Education, Fitness, and Other
+- **Pre-Fill Drafts:** Opening a new month automatically pre-fills the previous month's allocation targets as editable drafts without copying historical transactions.
+- **Planned Shortfall Alert Banner:** Prominently alerts the user when planned allocations exceed actual monthly income (`totalAllocated > totalIncome`) and highlights over-allocated categories without rejecting or silently modifying user plans.
+
+### ⏱️ Independent Daily Spending Limit
+- **Today's Living Expenses:** Tracks today's actual expenses against a configurable daily spending ceiling.
+- **Suggested Daily Calculation:** 1-tap helper suggests `monthlyDailyExpensesAllocation ÷ daysInMonth` without silently altering either saved value until confirmed.
+- **Visual Feedback:** Color-coded progress bar (Green → Amber → Red) with real-time overspending alerts.
+
+### 🤝 Debt & Loan Tracker (Lend & Borrow)
+- **Clear Accounting Boundaries:** Lent receivables and borrowed payables remain separate from ordinary operating income and living expenses.
+- **Partial Repayments:** Record installment payments with timestamped receipts and notes.
+- **Full Settlement:** One-tap loan settlement.
+
+### 📅 Interactive Monthly Calendar
+- **42-Day Matrix:** Visual month calendar with colored activity dots:
   - 🟢 **Green Dot:** Income logged
   - 🔴 **Red Dot:** Expense logged
   - 🔵 **Blue Dot:** Loan activity logged
-- **Daily Summary Bottom Sheet:** Tap any day to inspect daily income, expense, and loan aggregates, with instant entry creation and inline transaction editing.
-- **One-Tap Today Jump:** Fast navigation to the current date or browsing previous/future months.
+- **Daily Activity Sheet:** Inspect daily breakdown and log entries directly from any day.
 
-### 📊 Comprehensive Financial Dashboard
-- **Real-Time Financial Snapshot:** Visual hero card displaying current net balance, total income, total expenses, total money you lent (receivable), and total money you owe (payable).
-- **Monthly Spending Target:** Configurable monthly expense limit with a live dynamic progress bar (Green → Amber → Red warning when approaching or exceeding limits).
-- **Category Expense Breakdown:** Animated donut chart showing proportional spending across categorized expenses (Food, Groceries, Transport, Bills, Rent, Entertainment, Health, and more).
-- **Multi-Filter Transaction Search:** Filter transaction logs by type (Income, Expense, Loan), category, pre-defined date ranges (Today, This Week, This Month, All Time), and full-text keyword search.
+---
 
-### 🤝 Debt & Loan Tracker (Lend & Borrow)
-- **Two-Way Debt Management:** Track money you lent to others (assets/receivables) and money borrowed from others (liabilities/debts).
-- **Repayment Milestones:** Record partial payments with timestamps and notes, automatically updating remaining balances and progress indicators.
-- **Settlement & Overdue Tracking:** Mark debts as fully settled or track overdue dates with prominent visual alerts.
-- **Contact Integration:** Store counterparty names, notes, and contact phone numbers for every loan.
+## 🧮 Core Financial Accounting Formulas
 
-### ⚡ Offline Local Persistence
-- **Room Database (SQLite):** Fast, resilient, offline persistence with zero network latency.
-- **Reactive Streams:** Continuous UI updates via Room `Flow` queries and background coroutine dispatchers.
+For a selected month $M$ within bounded interval $[\text{startOfMonth}, \text{endOfMonth}]$:
 
-### 📁 CSV / Excel Export *(Planned Roadmap)*
-- Export transaction logs, monthly summaries, and debt registers into standard CSV and Excel formats for external auditing, spreadsheet analysis, and offline backups.
+$$\text{totalIncome} = \sum \text{amount for } (\text{type} == \text{INCOME} \land \text{categoryId} \neq \text{"loan\_collected"})$$
+
+$$\text{totalExpenses} = \sum \text{amount for } (\text{type} == \text{EXPENSE} \land \text{categoryId} \neq \text{"loan\_repaid"})$$
+
+$$\text{netOperatingCashChange} = \text{totalIncome} - \text{totalExpenses}$$
+
+$$\text{totalAllocated} = \sum \text{allocatedAmount for all active categories in } M$$
+
+$$\text{unallocatedIncome} = \text{totalIncome} - \text{totalAllocated}$$
+
+$$\text{plannedShortfall} = \max(0.0, \text{totalAllocated} - \text{totalIncome})$$
+
+$$\text{categoryRemaining} = \text{allocatedAmount} - \text{categoryActualSpent}$$
+
+$$\text{todayExpenses} = \sum \text{amount for } (\text{type} == \text{EXPENSE} \land \text{categoryId} \neq \text{"loan\_repaid"} \land \text{timestamp} \in [\text{startOfToday}, \text{endOfToday}])$$
+
+$$\text{dailyBudgetRemaining} = \text{dailyBudgetLimit} - \text{todayExpenses}$$
 
 ---
 
@@ -53,82 +93,61 @@ Managing personal finances often involves tracking fragmented details: daily dis
 | **Language** | [Kotlin](https://kotlinlang.org/) (100% modern Kotlin) |
 | **UI Toolkit** | [Jetpack Compose](https://developer.android.com/jetpack/compose) with Material Design 3 (M3) |
 | **Architecture** | MVVM (Model-View-ViewModel) + Unidirectional Data Flow (UDF) |
-| **Local Storage** | [Room Database](https://developer.android.com/training/data-storage/room) via KSP |
+| **Local Storage** | [Room Database](https://developer.android.com/training/data-storage/room) (SQLite) via KSP |
 | **Concurrency** | Kotlin Coroutines (`Dispatchers.IO`, `Dispatchers.Default`) & Kotlin Flow |
 | **State Management** | `StateFlow`, `collectAsStateWithLifecycle`, `@Immutable` models |
-| **CI/CD** | GitHub Actions (JDK 17, Gradle Build Tools, Native `zipalign` & `apksigner`) |
+| **CI/CD** | GitHub Actions (JDK 17, Native `zipalign` & `apksigner` with Keystore secrets) |
+
+---
+
+## 💾 Database Schema & Room Migrations
+
+The database (`AppDatabase`, Version 2) includes:
+- `transactions`: Log of all Income, Expense, and Loan transactions.
+- `loans`: Personal debt records (Lent/Borrowed), counterparties, and balances.
+- `loan_repayments`: Installment repayments referencing `loans(id)` on `CASCADE` delete.
+- `budget_settings`: Key-value configuration for `monthly_budget_limit` and `daily_budget_limit`.
+- `budget_allocations` *(Added in v2)*: Month-specific category allocations keyed by `(monthKey, categoryId)`.
+
+### Non-Destructive Migration (1 -> 2)
+The schema upgrade is executed through an explicit `MIGRATION_1_2` SQLite script that preserves all historical transactions, loans, and settings without data loss.
 
 ---
 
 ## 🚀 CI/CD Pipeline
 
-The project includes an automated GitHub Actions workflow (`.github/workflows/android.yml`) that triggers on every push and pull request to the `main` branch.
-
-### Automated Workflow Steps
-1. **Checkout & Java Setup:** Clones repository and configures **JDK 17 (Eclipse Temurin)**.
-2. **Gradle Setup:** Bootstraps Gradle via `gradle/actions/setup-gradle@v3`.
-3. **Assemble Release APK:** Runs `gradle assembleRelease` to compile an unsigned release binary (`app-release-unsigned.apk`).
+Automated GitHub Actions workflow (`.github/workflows/android.yml`):
+1. **Checkout & Java Setup:** Sets up **JDK 17 (Eclipse Temurin)**.
+2. **Gradle Setup:** Uses `gradle/actions/setup-gradle@v3`.
+3. **Assemble Release APK:** Runs `gradle assembleRelease` to compile `app-release-unsigned.apk`.
 4. **Native Android Signing:**
-   - Extracts the release keystore from a Base64 repository secret (`KEYSTORE_BASE64`).
-   - Locates the latest Android SDK `build-tools` on the runner.
-   - Executes `zipalign -v 4` for 4-byte boundary optimization required by Android runtime.
-   - Executes `apksigner sign` using the repository secrets (`KEY_ALIAS`, `KEYSTORE_PASSWORD`, `KEY_PASSWORD`).
-5. **Artifact Publishing:** Uploads the signed, production-ready `Budget.apk` as a downloadable GitHub Actions artifact.
-
-### Required GitHub Secrets for Signing
-To enable APK signing in your own repository fork:
-- `KEYSTORE_BASE64`: Base64 encoded string of your `.jks` keystore file.
-- `KEY_ALIAS`: Alias name of the signing key.
-- `KEY_PASSWORD`: Password for the private key.
-- `KEYSTORE_PASSWORD`: Password for the keystore file.
+   - Decodes `KEYSTORE_BASE64` to `my-upload-key.jks`.
+   - Locates latest Android SDK build-tools.
+   - Runs `zipalign -v 4` for 4-byte boundary alignment.
+   - Signs APK with `apksigner sign` using repository secrets (`KEY_ALIAS`, `KEYSTORE_PASSWORD`, `KEY_PASSWORD`).
+5. **Artifact Upload:** Publishes the signed `Budget.apk`.
 
 ---
 
 ## 🏁 Getting Started
 
 ### Prerequisites
-- **Android Studio** Hedgehog (2023.1.1) or newer / **IntelliJ IDEA** / **Firebase Studio**
-- **JDK 17** (configured as your Gradle JDK)
+- **Android Studio** Hedgehog (2023.1.1) or newer
+- **JDK 17**
 - **Android SDK:** Compile SDK 35, Min SDK 26, Target SDK 35
 
-### Local Installation & Build
+### Local Build & Execution
+```bash
+# Clone the repository
+git clone https://github.com/your-username/daily-finance-and-loan-tracking.git
+cd daily-finance-and-loan-tracking
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/your-username/daily-finance-and-loan-tracking.git
-   cd daily-finance-and-loan-tracking
-   ```
+# Run unit tests
+gradle :app:testDebugUnitTest
 
-2. **Open in Android Studio:**
-   - Open Android Studio, select **File > Open**, and select the project root folder.
-   - Wait for Gradle sync to complete automatically.
+# Build debug APK
+gradle assembleDebug
 
-3. **Build the Debug APK:**
-   ```bash
-   gradle assembleDebug
-   ```
-   The output APK will be generated at `app/build/outputs/apk/debug/app-debug.apk`.
-
-4. **Build the Release APK (Unsigned):**
-   ```bash
-   gradle assembleRelease
-   ```
-   The output unsigned APK will be generated at `app/build/outputs/apk/release/app-release-unsigned.apk`.
-
-5. **Run Unit & Robolectric Tests:**
-   ```bash
-   gradle :app:testDebugUnitTest
-   ```
-
-6. **Deploy to Device / Emulator:**
-   - Connect an Android device with USB Debugging enabled or start an Android Virtual Device (AVD).
-   - In Android Studio, click the green **Run ▶** button or execute:
-     ```bash
-     gradle installDebug
-     ```
-
----
-
-## 📄 License
-
-This project is licensed under the Apache License 2.0.
+# Build release APK
+gradle assembleRelease
+```

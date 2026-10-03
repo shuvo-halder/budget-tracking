@@ -32,26 +32,43 @@ data class TransactionCategory(
 
 object CategoryCatalog {
     val expenseCategories = listOf(
+        TransactionCategory("housing", "House Rent", TransactionType.EXPENSE, Icons.Default.Home, Color(0xFF06B6D4)),
+        TransactionCategory("family", "Family Maintenance", TransactionType.EXPENSE, Icons.Default.AccountBalance, Color(0xFF3B82F6)),
+        TransactionCategory("daily_expenses", "Daily Expenses", TransactionType.EXPENSE, Icons.Default.Payments, Color(0xFFF59E0B)),
         TransactionCategory("food", "Food & Dining", TransactionType.EXPENSE, Icons.Default.Fastfood, Color(0xFFF97316)),
         TransactionCategory("grocery", "Groceries", TransactionType.EXPENSE, Icons.Default.ShoppingCart, Color(0xFF10B981)),
-        TransactionCategory("transport", "Transportation", TransactionType.EXPENSE, Icons.Default.DirectionsBus, Color(0xFF3B82F6)),
-        TransactionCategory("shopping", "Shopping", TransactionType.EXPENSE, Icons.Default.LocalMall, Color(0xFFEC4899)),
         TransactionCategory("bills", "Bills & Utilities", TransactionType.EXPENSE, Icons.Default.Receipt, Color(0xFF8B5CF6)),
-        TransactionCategory("housing", "Rent & Housing", TransactionType.EXPENSE, Icons.Default.Home, Color(0xFF06B6D4)),
+        TransactionCategory("transport", "Transportation", TransactionType.EXPENSE, Icons.Default.DirectionsBus, Color(0xFF2563EB)),
+        TransactionCategory("savings", "Savings Allocation", TransactionType.EXPENSE, Icons.Default.AccountBalance, Color(0xFF059669)),
+        TransactionCategory("emergency", "Emergency Reserve", TransactionType.EXPENSE, Icons.Default.HealthAndSafety, Color(0xFFDC2626)),
+        TransactionCategory("shopping", "Shopping", TransactionType.EXPENSE, Icons.Default.LocalMall, Color(0xFFEC4899)),
         TransactionCategory("health", "Health & Medical", TransactionType.EXPENSE, Icons.Default.HealthAndSafety, Color(0xFFEF4444)),
-        TransactionCategory("entertainment", "Entertainment", TransactionType.EXPENSE, Icons.Default.Movie, Color(0xFFA855F7)),
         TransactionCategory("education", "Education", TransactionType.EXPENSE, Icons.Default.School, Color(0xFFEAB308)),
+        TransactionCategory("entertainment", "Entertainment", TransactionType.EXPENSE, Icons.Default.Movie, Color(0xFFA855F7)),
         TransactionCategory("fitness", "Fitness & Sports", TransactionType.EXPENSE, Icons.Default.FitnessCenter, Color(0xFF14B8A6)),
         TransactionCategory("other_expense", "Other Expense", TransactionType.EXPENSE, Icons.Default.Payments, Color(0xFF64748B))
     )
 
     val incomeCategories = listOf(
-        TransactionCategory("salary", "Salary", TransactionType.INCOME, Icons.Default.Payments, Color(0xFF10B981)),
-        TransactionCategory("business", "Business & Sales", TransactionType.INCOME, Icons.Default.Work, Color(0xFF3B82F6)),
+        TransactionCategory("salary", "Monthly Salary", TransactionType.INCOME, Icons.Default.Payments, Color(0xFF10B981)),
+        TransactionCategory("bonus", "Bonus & Gifts", TransactionType.INCOME, Icons.Default.CardGiftcard, Color(0xFFEC4899)),
         TransactionCategory("freelance", "Freelance", TransactionType.INCOME, Icons.Default.Commute, Color(0xFF8B5CF6)),
+        TransactionCategory("business", "Business & Sales", TransactionType.INCOME, Icons.Default.Work, Color(0xFF3B82F6)),
         TransactionCategory("investment", "Investments", TransactionType.INCOME, Icons.Default.AccountBalance, Color(0xFF06B6D4)),
-        TransactionCategory("gift", "Gift & Bonus", TransactionType.INCOME, Icons.Default.CardGiftcard, Color(0xFFEC4899)),
+        TransactionCategory("gift", "Gifts", TransactionType.INCOME, Icons.Default.CardGiftcard, Color(0xFFF43F5E)),
         TransactionCategory("other_income", "Other Income", TransactionType.INCOME, Icons.Default.Payments, Color(0xFF64748B))
+    )
+
+    val defaultBudgetCategories = listOf(
+        "housing",
+        "family",
+        "daily_expenses",
+        "food",
+        "grocery",
+        "bills",
+        "transport",
+        "savings",
+        "emergency"
     )
 
     fun getAllCategories(): List<TransactionCategory> = expenseCategories + incomeCategories

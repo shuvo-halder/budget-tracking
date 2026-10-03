@@ -68,5 +68,21 @@ data class BudgetSettingEntity(
 ) {
     companion object {
         const val KEY_MONTHLY_BUDGET = "monthly_budget_limit"
+        const val KEY_DAILY_BUDGET = "daily_budget_limit"
     }
 }
+
+@Immutable
+@Entity(
+    tableName = "budget_allocations",
+    primaryKeys = ["monthKey", "categoryId"],
+    indices = [Index("monthKey")]
+)
+data class BudgetAllocationEntity(
+    val monthKey: String, // Normalized "yyyy-MM", e.g. "2026-10"
+    val categoryId: String,
+    val categoryName: String,
+    val allocatedAmount: Double,
+    val updatedAt: Long = System.currentTimeMillis()
+)
+

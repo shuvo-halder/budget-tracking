@@ -6,6 +6,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import com.engrshuvo.financemanager.data.model.BudgetAllocationEntity
 import com.engrshuvo.financemanager.data.model.BudgetSettingEntity
 import com.engrshuvo.financemanager.data.model.LoanEntity
 import com.engrshuvo.financemanager.data.model.LoanRepaymentEntity
@@ -100,3 +101,28 @@ interface BudgetSettingDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdateSetting(setting: BudgetSettingEntity)
 }
+
+@Dao
+interface BudgetAllocationDao {
+    @Query("SELECT * FROM budget_allocations WHERE monthKey = :monthKey ORDER BY allocatedAmount DESC")
+    fun getAllocationsForMonth(monthKey: String): Flow<List<BudgetAllocationEntity>>
+
+    @Query("SELECT * FROM budget_allocations ORDER BY monthKey DESC")
+    fun getAllAllocations(): Flow<List<BudgetAllocationEntity>>
+
+    @Query("SELECT * FROM budget_allocations WHERE monthKey = :monthKey")
+    suspend fun getAllocationsForMonthDirect(monthKey: String): List<BudgetAllocationEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdateAllocation(allocation: BudgetAllocationEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdateAllocations(allocations: List<BudgetAllocationEntity>)
+
+    @Query("DELETE FROM budget_allocations WHERE monthKey = :monthKey AND categoryId = :categoryId")
+    suspend fun deleteAllocation(monthKey: String, categoryId: String)
+
+    @Query("DELETE FROM budget_allocations WHERE monthKey = :monthKey")
+    suspend fun deleteAllAllocationsForMonth(monthKey: String)
+}
+

@@ -1,8 +1,10 @@
 package com.engrshuvo.financemanager.data.repository
 
+import com.engrshuvo.financemanager.data.local.BudgetAllocationDao
 import com.engrshuvo.financemanager.data.local.BudgetSettingDao
 import com.engrshuvo.financemanager.data.local.LoanDao
 import com.engrshuvo.financemanager.data.local.TransactionDao
+import com.engrshuvo.financemanager.data.model.BudgetAllocationEntity
 import com.engrshuvo.financemanager.data.model.BudgetSettingEntity
 import com.engrshuvo.financemanager.data.model.LoanEntity
 import com.engrshuvo.financemanager.data.model.LoanRepaymentEntity
@@ -19,7 +21,8 @@ import kotlinx.coroutines.withContext
 class FinanceRepository(
     private val transactionDao: TransactionDao,
     private val budgetSettingDao: BudgetSettingDao,
-    private val loanDao: LoanDao
+    private val loanDao: LoanDao,
+    private val budgetAllocationDao: BudgetAllocationDao
 ) {
     // Transaction streams strictly on Dispatchers.IO
     val allTransactions: Flow<List<TransactionEntity>> =
@@ -175,5 +178,64 @@ class FinanceRepository(
                 currencyCode = "BDT"
             )
         )
+    }
+
+    // Daily Budget Limit stream strictly on Dispatchers.IO
+    val dailyBudgetSetting: Flow<BudgetSettingEntity?> =
+        budgetSettingDao.getSettingFlow(BudgetSettingEntity.KEY_DAILY_BUDGET).flowOn(Dispatchers.IO)
+
+    val dailyBudgetLimit: Flow<Double> = dailyBudgetSetting.map { setting ->
+        setting?.amountLimit ?: 500.0
+    }.flowOn(Dispatchers.IO)
+
+    suspend fun setDailyBudgetLimit(limit: Double) = withContext(Dispatchers.IO) {
+        budgetSettingDao.insertOrUpdateSetting(
+            BudgetSettingEntity(
+                settingKey = BudgetSettingEntity.KEY_DAILY_BUDGET,
+                amountLimit = limit,
+                currencyCode = "BDT"
+            )
+        )
+    }
+
+    // Budget Allocations streams strictly on Dispatchers.IO
+    val allBudgetAllocations: Flow<List<BudgetAllocationEntity>> =
+        budgetAllocationDao.getAllAllocations().flowOn(Dispatchers.IO)
+
+    fun getAllocationsForMonth(monthKey: String): Flow<List<BudgetAllocationEntity>> {
+        return budgetAllocationDao.getAllocationsForMonth(monthKey).flowOn(Dispatchers.IO)
+    }
+
+    suspend fun getAllocationsForMonthDirect(monthKey: String): List<BudgetAllocationEntity> =
+        withContext(Dispatchers.IO) {
+            budgetAllocationDao.getAllocationsForMonthDirect(monthKey)
+        }
+
+    suspend fun saveBudgetAllocation(allocation: BudgetAllocationEntity) = withContext(Dispatchers.IO) {
+        budgetAllocationDao.insertOrUpdateAllocation(allocation)
+    }
+
+    suspend fun saveBudgetAllocations(allocations: List<BudgetAllocationEntity>) = withContext(Dispatchers.IO) {
+        budgetAllocationDao.insertOrUpdateAllocations(allocations)
+    }
+
+    suspend fun deleteBudgetAllocation(monthKey: String, categoryId: String) = withContext(Dispatchers.IO) {
+        budgetAllocationDao.deleteAllocation(monthKey, categoryId)
+    }
+
+    /**
+     * Copies budget allocation targets from one month to another month.
+     * CRITICAL: Strictly copies budget allocation plans only!
+     * NEVER copies transactions, expenses, income, savings transfers, or loans.
+     */
+    suspend fun copyAllocations(fromMonthKey: String, toMonthKey: String) = withContext(Dispatchers.IO) {
+        val previousAllocations = budgetAllocationDao.getAllocationsForMonthDirect(fromMonthKey)
+        if (previousAllocations.isNotEmpty()) {
+            val now = System.currentTimeMillis()
+            val newAllocations = previousAllocations.map {
+                it.copy(monthKey = toMonthKey, updatedAt = now)
+            }
+            budgetAllocationDao.insertOrUpdateAllocations(newAllocations)
+        }
     }
 }
