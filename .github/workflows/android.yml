@@ -27,21 +27,25 @@ jobs:
     - name: Build Release APK
       run: gradle assembleRelease
       
-    # Ei notun step-ti lukano chabi diye app sign korbe
-    - name: Sign APK
-      uses: r0adkll/sign-android-release@v1
-      id: sign_app
-      with:
-        releaseDirectory: app/build/outputs/apk/release
-        signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}
-        alias: ${{ secrets.KEY_ALIAS }}
-        keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
-        keyPassword: ${{ secrets.KEY_PASSWORD }}
-        buildToolsVersion: 34.0.0
-      
-    - name: Rename Signed APK
-      run: mv ${{steps.sign_app.outputs.signedReleaseFile}} "Budget.apk"
-      
+    - name: Sign APK using Native Android Tools
+      env:
+        KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASS: ${{ secrets.KEY_PASSWORD }}
+        STORE_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+      run: |
+        # 1. Base64 text theke asol Keystore file toiri
+        echo "$KEYSTORE_BASE64" | base64 -d > my-upload-key.jks
+        
+        # 2. Latest Android Build Tools khuje ber kora
+        BUILD_TOOLS=$(ls -1d /usr/local/lib/android/sdk/build-tools/* | sort -V | tail -n 1)
+        
+        # 3. APK Zipalign kora (Google Play er niyam onujayi)
+        $BUILD_TOOLS/zipalign -v 4 app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
+        
+        # 4. Official apksigner diye APK Sign kora
+        $BUILD_TOOLS/apksigner sign --ks my-upload-key.jks --ks-key-alias "$ALIAS" --ks-pass pass:"$STORE_PASS" --key-pass pass:"$KEY_PASS" --out "Budget.apk" aligned.apk
+        
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
