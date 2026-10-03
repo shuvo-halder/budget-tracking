@@ -67,6 +67,7 @@ fun BudgetScreen(
     dailyProgress: Float,
     isDailyOverBudget: Boolean,
     allocations: List<CategoryAllocationUiModel>,
+    isDraft: Boolean = false,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
     onPlanBudgetClick: () -> Unit,
@@ -167,13 +168,17 @@ fun BudgetScreen(
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Budget Shortfall Alert",
+                                text = if (isDraft) "Draft Budget Shortfall Notice" else "Budget Shortfall Alert",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = ExpenseRed
                             )
                             Text(
-                                text = "Allocations (${CurrencyUtils.formatBDT(totalAllocated)}) exceed monthly income (${CurrencyUtils.formatBDT(totalMonthlyIncome)}) by ${CurrencyUtils.formatBDT(plannedShortfall)}.",
+                                text = if (isDraft) {
+                                    "Draft targets copied from last month (${CurrencyUtils.formatBDT(totalAllocated)}) exceed current income (${CurrencyUtils.formatBDT(totalMonthlyIncome)}) by ${CurrencyUtils.formatBDT(plannedShortfall)}. These are unsaved draft targets; adjust or confirm them in Plan / Edit."
+                                } else {
+                                    "Allocations (${CurrencyUtils.formatBDT(totalAllocated)}) exceed monthly income (${CurrencyUtils.formatBDT(totalMonthlyIncome)}) by ${CurrencyUtils.formatBDT(plannedShortfall)}."
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 fontSize = 12.sp
                             )
@@ -357,11 +362,28 @@ fun BudgetScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Category Allocations",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Category Allocations",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (isDraft) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.7f)
+                        ) {
+                            Text(
+                                text = "Draft (Unsaved)",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
 
                 OutlinedButton(
                     onClick = onCopyFromPreviousMonth,

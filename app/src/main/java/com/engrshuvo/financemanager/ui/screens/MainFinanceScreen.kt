@@ -1,5 +1,6 @@
 package com.engrshuvo.financemanager.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -56,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.engrshuvo.financemanager.data.model.LoanEntity
@@ -87,6 +89,14 @@ fun MainFinanceScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+
+    BackHandler(enabled = uiState.activeTab != FinanceTab.DASHBOARD) {
+        if (uiState.activeTab == FinanceTab.MORE && uiState.moreSubDestination != MoreSubDestination.NONE) {
+            viewModel.navigateBackFromMoreSubDestination()
+        } else {
+            viewModel.setActiveTab(FinanceTab.DASHBOARD)
+        }
+    }
 
     var transactionToDelete by remember { mutableStateOf<TransactionEntity?>(null) }
     var loanToDelete by remember { mutableStateOf<LoanEntity?>(null) }
@@ -247,23 +257,42 @@ fun MainFinanceScreen(
             ) {
                 FinanceTab.values().forEach { tab ->
                     val isSelected = uiState.activeTab == tab
+                    val isDashboard = tab == FinanceTab.DASHBOARD
                     val icon = when (tab) {
-                        FinanceTab.DASHBOARD -> Icons.Default.Dashboard
                         FinanceTab.TRANSACTIONS -> Icons.Default.Receipt
-                        FinanceTab.BUDGET -> Icons.Default.PieChart
+                        FinanceTab.BUDGET -> Icons.Default.AccountBalanceWallet
+                        FinanceTab.DASHBOARD -> Icons.Default.Dashboard
                         FinanceTab.LOANS -> Icons.Default.Handshake
                         FinanceTab.MORE -> Icons.Default.MoreHoriz
                     }
                     NavigationBarItem(
                         selected = isSelected,
                         onClick = { viewModel.setActiveTab(tab) },
-                        icon = { Icon(imageVector = icon, contentDescription = tab.label) },
-                        label = { Text(tab.label, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                        icon = {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = tab.label,
+                                modifier = if (isDashboard) Modifier.size(26.dp) else Modifier.size(24.dp)
+                            )
+                        },
+                        label = {
+                            Text(
+                                text = tab.label,
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        },
+                        alwaysShowLabel = true,
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = MaterialTheme.colorScheme.primary,
                             selectedTextColor = MaterialTheme.colorScheme.primary,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             indicatorColor = MaterialTheme.colorScheme.primaryContainer
-                        )
+                        ),
+                        modifier = Modifier.testTag("nav_tab_${tab.name.lowercase()}")
                     )
                 }
             }
@@ -317,6 +346,7 @@ fun MainFinanceScreen(
                         unallocatedIncome = uiState.unallocatedIncome,
                         plannedShortfall = uiState.plannedShortfall,
                         isShortfall = uiState.isShortfall,
+                        isDraft = uiState.isBudgetAllocationDraft,
                         plannedSavingsTotal = uiState.plannedSavingsTotal,
                         todayExpenses = uiState.todayExpenses,
                         dailyBudgetLimit = uiState.dailyBudgetLimit,
@@ -380,6 +410,7 @@ fun MainFinanceScreen(
                         dailyProgress = uiState.dailyBudgetProgress,
                         isDailyOverBudget = uiState.isDailyOverBudget,
                         allocations = uiState.monthAllocations,
+                        isDraft = uiState.isBudgetAllocationDraft,
                         onPreviousMonth = { viewModel.changeMonth(-1) },
                         onNextMonth = { viewModel.changeMonth(1) },
                         onPlanBudgetClick = { viewModel.openBudgetPlanningDialog() },
@@ -495,6 +526,7 @@ fun MainFinanceScreen(
             monthName = DateUtils.formatMonthYear(uiState.displayedMonth),
             totalMonthlyIncome = uiState.totalIncome,
             currentAllocations = uiState.monthAllocations,
+            isDraft = uiState.isBudgetAllocationDraft,
             onDismiss = { viewModel.closeBudgetPlanningDialog() },
             onSaveAllocations = { allocations ->
                 viewModel.saveCategoryAllocations(allocations)

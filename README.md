@@ -60,17 +60,26 @@ A modern, privacy-focused, offline-first personal finance, salary budgeting, and
   - 🔵 **Blue Dot:** Loan activity logged
 - **Daily Activity Sheet:** Inspect daily breakdown and log entries directly from any day.
 
+### 🗑️ Archive, Recovery & 2-Month Retention
+- **Soft-Deletion with Undo:** Deleting any transaction or loan moves it to the archive, preserving relational links and original identifiers.
+- **2 Calendar Months Expiration:** Expired records are automatically and permanently purged after 2 calendar months using calendar-month arithmetic.
+- **Zero Accidental Data Loss:** Instant Snackbar Undo and independent Archive screen Restore capability.
+
+### 🧭 Center-Dashboard Bottom Navigation
+- **Balanced 5-Destination Layout:** Transactions, Budget, **Dashboard (Exact Center)**, Loans, More.
+- **Edge-to-Edge & Gesture Navigation:** Fully compliant with Material 3 insets and predictive back handling.
+
 ---
 
 ## 🧮 Core Financial Accounting Formulas
-
-For a selected month $M$ within bounded interval $[\text{startOfMonth}, \text{endOfMonth}]$:
 
 $$\text{totalIncome} = \sum \text{amount for } (\text{type} == \text{INCOME} \land \text{categoryId} \neq \text{"loan\_collected"})$$
 
 $$\text{totalExpenses} = \sum \text{amount for } (\text{type} == \text{EXPENSE} \land \text{categoryId} \neq \text{"loan\_repaid"})$$
 
 $$\text{netOperatingCashChange} = \text{totalIncome} - \text{totalExpenses}$$
+
+$$\text{availableCashBalance} = \text{allTimeIncome} - \text{allTimeExpense} + \text{allTimeBorrowed} - \text{allTimeLent}$$
 
 $$\text{totalAllocated} = \sum \text{allocatedAmount for all active categories in } M$$
 

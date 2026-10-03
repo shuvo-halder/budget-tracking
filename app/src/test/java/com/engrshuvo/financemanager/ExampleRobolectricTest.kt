@@ -103,4 +103,15 @@ class ExampleRobolectricTest {
         org.junit.Assert.assertNotNull(state)
         assertEquals(com.engrshuvo.financemanager.ui.state.FinanceTab.DASHBOARD, state.activeTab)
     }
+
+    @Test
+    fun `bottom navigation tab order has dashboard in exact center and more at rightmost`() {
+        val tabs = com.engrshuvo.financemanager.ui.state.FinanceTab.values()
+        assertEquals(5, tabs.size)
+        assertEquals(com.engrshuvo.financemanager.ui.state.FinanceTab.TRANSACTIONS, tabs[0])
+        assertEquals(com.engrshuvo.financemanager.ui.state.FinanceTab.BUDGET, tabs[1])
+        assertEquals(com.engrshuvo.financemanager.ui.state.FinanceTab.DASHBOARD, tabs[2])
+        assertEquals(com.engrshuvo.financemanager.ui.state.FinanceTab.LOANS, tabs[3])
+        assertEquals(com.engrshuvo.financemanager.ui.state.FinanceTab.MORE, tabs[4])
+    }
 }

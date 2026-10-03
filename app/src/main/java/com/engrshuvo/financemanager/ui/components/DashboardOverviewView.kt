@@ -84,6 +84,7 @@ fun DashboardOverviewView(
     unallocatedIncome: Double,
     plannedShortfall: Double,
     isShortfall: Boolean,
+    isDraft: Boolean = false,
     plannedSavingsTotal: Double,
     todayExpenses: Double,
     dailyBudgetLimit: Double,
@@ -210,13 +211,17 @@ fun DashboardOverviewView(
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Planned Budget Shortfall",
+                                text = if (isDraft) "Draft Budget Shortfall Notice" else "Planned Budget Shortfall",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = ExpenseRed
                             )
                             Text(
-                                text = "Planned allocations (${CurrencyUtils.formatBDT(totalAllocated)}) exceed received income (${CurrencyUtils.formatBDT(totalIncome)}) by ${CurrencyUtils.formatBDT(plannedShortfall)}.",
+                                text = if (isDraft) {
+                                    "Draft targets pre-filled from last month (${CurrencyUtils.formatBDT(totalAllocated)}) exceed received income (${CurrencyUtils.formatBDT(totalIncome)}) by ${CurrencyUtils.formatBDT(plannedShortfall)}. Adjust or confirm in Plan / Edit."
+                                } else {
+                                    "Planned allocations (${CurrencyUtils.formatBDT(totalAllocated)}) exceed received income (${CurrencyUtils.formatBDT(totalIncome)}) by ${CurrencyUtils.formatBDT(plannedShortfall)}."
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 fontSize = 12.sp

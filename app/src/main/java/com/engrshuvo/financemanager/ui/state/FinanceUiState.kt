@@ -12,9 +12,9 @@ import com.engrshuvo.financemanager.ui.model.DaySummaryStats
 import java.util.Calendar
 
 enum class FinanceTab(val label: String) {
-    DASHBOARD("Dashboard"),
     TRANSACTIONS("Transactions"),
     BUDGET("Budget"),
+    DASHBOARD("Dashboard"),
     LOANS("Loans"),
     MORE("More")
 }
@@ -134,6 +134,7 @@ data class FinanceUiState(
     
     // Month-Specific Budget Allocations
     val monthAllocations: List<CategoryAllocationUiModel> = emptyList(),
+    val isBudgetAllocationDraft: Boolean = false,
     val totalAllocated: Double = 0.0,
     val unallocatedIncome: Double = 0.0,
     val plannedShortfall: Double = 0.0,

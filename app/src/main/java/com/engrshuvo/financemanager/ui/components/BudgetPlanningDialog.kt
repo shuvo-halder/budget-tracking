@@ -53,6 +53,7 @@ fun BudgetPlanningDialog(
     monthName: String,
     totalMonthlyIncome: Double,
     currentAllocations: List<CategoryAllocationUiModel>,
+    isDraft: Boolean = false,
     onDismiss: () -> Unit,
     onSaveAllocations: (Map<String, Double>) -> Unit,
     onCopyFromPreviousMonth: () -> Unit
@@ -81,7 +82,7 @@ fun BudgetPlanningDialog(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "For $monthName • Allocations do not deduct cash directly",
+                    text = if (isDraft) "For $monthName • Pre-filled draft from last month (unsaved)" else "For $monthName • Allocations do not deduct cash directly",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

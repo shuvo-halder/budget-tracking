@@ -61,7 +61,7 @@ To prevent double-counting and misrepresentation of funds, the system establishe
 └──────────────────────────▲─────────────────────────────┘
                            │ Room DAOs
 ┌──────────────────────────┴─────────────────────────────┐
-│                 Room Database (v2)                     │
+│                 Room Database (v3)                     │
 │   (AppDatabase, TransactionDao, LoanDao,               │
 │    BudgetSettingDao, BudgetAllocationDao)              │
 └────────────────────────────────────────────────────────┘
@@ -69,61 +69,25 @@ To prevent double-counting and misrepresentation of funds, the system establishe
 
 ---
 
-## 3. Database Schema (Room Version 2)
+## 3. Database Schema (Room Version 3)
 
 The database is defined in `com.engrshuvo.financemanager.data.local.AppDatabase`:
 
 ### 1. `budget_allocations` Table *(Added in v2)*
 Stores month-specific category allocation plans.
+Primary Key: `(monthKey, categoryId)`, Index: `monthKey`.
 
-| Column Name | SQLite Type | Kotlin Type | Constraints & Description |
-|---|---|---|---|
-| `monthKey` | `TEXT` | `String` | Part of Composite Primary Key, Indexed (`"yyyy-MM"`) |
-| `categoryId` | `TEXT` | `String` | Part of Composite Primary Key (e.g. `"housing"`, `"daily_expenses"`) |
-| `categoryName` | `TEXT` | `String` | Human-readable category label |
-| `allocatedAmount` | `REAL` | `Double` | Planned target budget in BDT |
-| `updatedAt` | `INTEGER` | `Long` | Timestamp of last modification |
-
-### 2. `transactions` Table
+### 2. `transactions` Table *(Updated in v3)*
 Stores all actual financial transaction records.
+Columns: `id`, `type`, `amount`, `categoryId`, `categoryName`, `note`, `timestamp`, `loanId`, `archivedAt` (Nullable Long, Indexed).
 
-| Column Name | SQLite Type | Kotlin Type | Constraints & Description |
-|---|---|---|---|
-| `id` | `INTEGER` | `Long` | Primary Key, Auto-generate |
-| `type` | `TEXT` | `TransactionType` | Enum: `INCOME`, `EXPENSE`, `LOAN` |
-| `amount` | `REAL` | `Double` | Transaction monetary value in BDT |
-| `categoryId` | `TEXT` | `String` | Category identifier |
-| `categoryName` | `TEXT` | `String` | Display name of the category |
-| `note` | `TEXT` | `String` | User notes or description |
-| `timestamp` | `INTEGER` | `Long` | Epoch timestamp in milliseconds |
-| `loanId` | `INTEGER` | `Long?` | Optional reference to linked loan |
-
-### 3. `loans` Table
+### 3. `loans` Table *(Updated in v3)*
 Stores counterparty debt records.
+Columns: `id`, `type`, `personName`, `phoneNumber`, `initialAmount`, `remainingAmount`, `status`, `startDate`, `dueDate`, `note`, `archivedAt` (Nullable Long, Indexed).
 
-| Column Name | SQLite Type | Kotlin Type | Constraints & Description |
-|---|---|---|---|
-| `id` | `INTEGER` | `Long` | Primary Key, Auto-generate |
-| `type` | `TEXT` | `LoanType` | Enum: `LENT` (Receivable) or `BORROWED` (Payable) |
-| `personName` | `TEXT` | `String` | Counterparty full name |
-| `phoneNumber` | `TEXT` | `String` | Contact phone number |
-| `initialAmount`| `REAL` | `Double` | Principal loan value |
-| `remainingAmount`| `REAL` | `Double` | Outstanding debt balance |
-| `status` | `TEXT` | `LoanStatus` | Enum: `ACTIVE` or `SETTLED` |
-| `startDate` | `INTEGER` | `Long` | Issuance timestamp |
-| `dueDate` | `INTEGER` | `Long?` | Repayment deadline |
-| `note` | `TEXT` | `String` | Supplementary terms |
-
-### 4. `loan_repayments` Table
+### 4. `loan_repayments` Table *(Updated in v3)*
 Tracks installment payments against loans.
-
-| Column Name | SQLite Type | Kotlin Type | Constraints & Description |
-|---|---|---|---|
-| `id` | `INTEGER` | `Long` | Primary Key, Auto-generate |
-| `loanId` | `INTEGER` | `Long` | Foreign Key references `loans(id)` on `CASCADE` delete |
-| `amount` | `REAL` | `Double` | Repayment amount |
-| `note` | `TEXT` | `String` | Payment notes |
-| `timestamp` | `INTEGER` | `Long` | Epoch timestamp |
+Columns: `id`, `loanId`, `amount`, `note`, `timestamp`, `archivedAt` (Nullable Long, Indexed).
 
 ### 5. `budget_settings` Table
 Key-value storage for overall user settings (`monthly_budget_limit`, `daily_budget_limit`).
@@ -132,12 +96,39 @@ Key-value storage for overall user settings (`monthly_budget_limit`, `daily_budg
 
 ## 4. Non-Destructive Room Migration Strategy
 
-To ensure zero user data loss during schema evolution from version 1 to 2, the app registers an explicit migration:
+To ensure zero user data loss during schema evolution, the app registers explicit migrations:
+
+1. **`MIGRATION_1_2` (v1 → v2)**: Creates `budget_allocations` table and index.
+2. **`MIGRATION_2_3` (v2 → v3)**: Adds nullable `archivedAt INTEGER DEFAULT NULL` columns to `transactions`, `loans`, and `loan_repayments`, and creates indexing on each `archivedAt` column. Active records default to null.
 
 ```kotlin
 val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `budget_allocations` (
+                `monthKey` TEXT NOT NULL,
+                `categoryId` TEXT NOT NULL,
+                `categoryName` TEXT NOT NULL,
+                `allocatedAmount` REAL NOT NULL,
+                `updatedAt` INTEGER NOT NULL,
+                PRIMARY KEY(`monthKey`, `categoryId`)
+            )
+        """.trimIndent())
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_budget_allocations_monthKey` ON `budget_allocations` (`monthKey`)")
+    }
+}
+
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `transactions` ADD COLUMN `archivedAt` INTEGER DEFAULT NULL")
+        db.execSQL("ALTER TABLE `loans` ADD COLUMN `archivedAt` INTEGER DEFAULT NULL")
+        db.execSQL("ALTER TABLE `loan_repayments` ADD COLUMN `archivedAt` INTEGER DEFAULT NULL")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_archivedAt` ON `transactions` (`archivedAt`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_loans_archivedAt` ON `loans` (`archivedAt`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_loan_repayments_archivedAt` ON `loan_repayments` (`archivedAt`)")
+    }
+}
+```
             CREATE TABLE IF NOT EXISTS `budget_allocations` (
                 `monthKey` TEXT NOT NULL,
                 `categoryId` TEXT NOT NULL,
@@ -170,11 +161,11 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
 MainActivity
 └── MainFinanceScreen (Default Tab: FinanceTab.DASHBOARD)
     ├── TopAppBar (Title, Category Subtitle, Actions)
-    ├── NavigationBar (Dashboard [Default], Calendar, Loans)
+    ├── NavigationBar (Transactions, Budget, Dashboard [Center - Default], Loans, More [Rightmost])
     ├── FloatingActionButton (Universal Add Entry)
     │
     ├── AnimatedContent (Tab Transitions)
-    │   ├── [DASHBOARD TAB - DEFAULT]
+    │   ├── [DASHBOARD TAB - CENTER DEFAULT]
     │   │   ├── MonthSelectorHeader (< October 2026 >)
     │   │   ├── PlannedShortfallAlertBanner (Conditional when allocated > income)
     │   │   ├── SalaryFinancialHeroCard (Available Cash, Monthly Cash Flow, Allocations, Debts)
@@ -184,13 +175,27 @@ MainActivity
     │   │   ├── CategorySpendChart (Donut chart of actual expenses)
     │   │   └── FilterChipsBar & TransactionItemCard List
     │   │
-    │   ├── [CALENDAR TAB]
-    │   │   ├── InteractiveCalendarView (Header, Day-of-Week, 42-day dot grid)
-    │   │   └── Selected Day Activity Cards
+    │   ├── [TRANSACTIONS TAB]
+    │   │   ├── Filter & Search Controls (Income, Expense, Category, Date range)
+    │   │   └── Transaction Ledger List (Item details, Swipe-to-archive, Edit, Undo)
     │   │
-    │   └── [LOANS TAB]
-    │       ├── LoanOverviewHeader (Receivables vs Payables)
-    │       └── Loans List (Progress, Repayments, Settlement)
+    │   ├── [BUDGET TAB]
+    │   │   ├── Month Selector Header (< October 2026 >)
+    │   │   ├── Planned Shortfall Alert Banner
+    │   │   ├── Budget Planning Overview Card (Income vs Planned Targets)
+    │   │   ├── Daily Living Limit Ceiling & Progress Indicator
+    │   │   └── Category Allocations List (Planned vs Actual, Usage Bar, Copy Last Month)
+    │   │
+    │   ├── [LOANS TAB]
+    │   │   ├── LoanOverviewHeader (Receivables vs Payables)
+    │   │   └── Loans List (Progress, Installment Repayments, Full Settlement, Archive)
+    │   │
+    │   └── [MORE TAB - RIGHTMOST]
+    │       ├── MoreScreen Hub (Interactive Calendar, Archive & Recovery, Reports & Analytics)
+    │       ├── InteractiveCalendarView (42-day dot grid & Day activity sheet)
+    │       ├── ArchiveScreen (Soft-deleted records, Search, Filter, Restore, Permanent Purge)
+    │       ├── ReportsView (Donut chart, Cash flow ratios, Planned savings reserve)
+    │       └── Privacy & 100% Offline-first local Room v3 data information
     │
     └── Modal Sheets & Dialogs
         ├── BudgetPlanningDialog (Month category allocation planner & Copy Last Month action)

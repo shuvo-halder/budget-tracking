@@ -237,10 +237,16 @@ class FinanceViewModel(
 
         val netOperatingCashChange = totalIncome - totalExpense
 
-        // All-time available cash balance
+        // All-time available cash balance:
+        // Cash = Income (salary, other income, loan repayments collected)
+        //        - Expenses (living expenses, loan repayments paid)
+        //        + Borrowed loan principal received
+        //        - Lent loan principal disbursed
         val allTimeIncome = allTransactions.filter { it.type == TransactionType.INCOME }.sumOf { it.amount }
         val allTimeExpense = allTransactions.filter { it.type == TransactionType.EXPENSE }.sumOf { it.amount }
-        val balance = allTimeIncome - allTimeExpense
+        val allTimeBorrowed = allTransactions.filter { it.type == TransactionType.LOAN && it.categoryId == "loan_borrowed" }.sumOf { it.amount }
+        val allTimeLent = allTransactions.filter { it.type == TransactionType.LOAN && it.categoryId == "loan_lent" }.sumOf { it.amount }
+        val balance = allTimeIncome - allTimeExpense + allTimeBorrowed - allTimeLent
 
         // 2. Today's expenses & daily budget limit
         val startOfToday = DateUtils.getStartOfDay()
@@ -253,22 +259,21 @@ class FinanceViewModel(
         val dailyBudgetProgress = if (dailyLimit > 0) (todayExpenses / dailyLimit).toFloat().coerceIn(0f, 1f) else 0f
         val isDailyOverBudget = todayExpenses > dailyLimit && dailyLimit > 0
 
-        // 3. Month Allocations for selectedMonthKey
+        // 3. Month Allocations for selectedMonthKey (strictly stored per-month)
         val savedMonthAllocations = allAllocations.filter { it.monthKey == selectedMonthKey }
-
-        // If current month has no saved allocations, pre-fill from previous month as editable draft
         val prevCal = (cal.clone() as Calendar).apply { add(Calendar.MONTH, -1) }
         val prevMonthKey = String.format(Locale.US, "%04d-%02d", prevCal.get(Calendar.YEAR), prevCal.get(Calendar.MONTH) + 1)
-        val prevMonthAllocations = if (savedMonthAllocations.isEmpty()) {
-            allAllocations.filter { it.monthKey == prevMonthKey }
-        } else {
-            emptyList()
-        }
+        val prevMonthAllocations = allAllocations.filter { it.monthKey == prevMonthKey }
 
-        val allocationsSourceMap = if (savedMonthAllocations.isNotEmpty()) {
+        val hasSavedAllocations = savedMonthAllocations.isNotEmpty()
+        val isBudgetAllocationDraft = !hasSavedAllocations && prevMonthAllocations.isNotEmpty()
+
+        val allocationsSourceMap = if (hasSavedAllocations) {
             savedMonthAllocations.associateBy { it.categoryId }
-        } else {
+        } else if (prevMonthAllocations.isNotEmpty()) {
             prevMonthAllocations.associateBy { it.categoryId }
+        } else {
+            emptyMap()
         }
 
         val categoryIds = LinkedHashSet<String>().apply {
@@ -473,6 +478,7 @@ class FinanceViewModel(
             totalActiveLent = totalActiveLent,
             totalActiveBorrowed = totalActiveBorrowed,
             monthAllocations = monthCategoryAllocations,
+            isBudgetAllocationDraft = isBudgetAllocationDraft,
             totalAllocated = totalAllocated,
             unallocatedIncome = unallocatedIncome,
             plannedShortfall = plannedShortfall,
