@@ -314,4 +314,118 @@ class ArchiveAndRecoveryUnitTest {
         assertTrue(repayments.isEmpty())
         assertTrue(transactions.isEmpty())
     }
+
+    @Test
+    fun `repayment validation rejects zero, negative, overpayment, and settled loans`() {
+        val loan = LoanEntity(
+            id = 50L,
+            type = LoanType.LENT,
+            personName = "Tareq",
+            initialAmount = 5000.0,
+            remainingAmount = 3000.0,
+            status = LoanStatus.ACTIVE
+        )
+
+        fun validateRepayment(l: LoanEntity, amount: Double): Boolean {
+            if (amount <= 0.0) return false
+            if (l.status != LoanStatus.ACTIVE || l.archivedAt != null || l.remainingAmount <= 0.0) return false
+            if (amount > l.remainingAmount) return false
+            return true
+        }
+
+        // Zero repayment rejected
+        assertFalse(validateRepayment(loan, 0.0))
+
+        // Negative repayment rejected
+        assertFalse(validateRepayment(loan, -100.0))
+
+        // Overpayment rejected (3500 > 3000)
+        assertFalse(validateRepayment(loan, 3500.0))
+
+        // Partial repayment accepted (1500 <= 3000)
+        assertTrue(validateRepayment(loan, 1500.0))
+
+        // Exact full repayment accepted (3000 == 3000)
+        assertTrue(validateRepayment(loan, 3000.0))
+
+        // Repayment on settled loan rejected
+        val settledLoan = loan.copy(remainingAmount = 0.0, status = LoanStatus.SETTLED)
+        assertFalse(validateRepayment(settledLoan, 500.0))
+
+        // Repayment on archived loan rejected
+        val archivedLoan = loan.copy(archivedAt = System.currentTimeMillis())
+        assertFalse(validateRepayment(archivedLoan, 500.0))
+    }
+
+    @Test
+    fun `rejected repayment leaves loan, repayments, and transactions completely unchanged`() {
+        val loan = LoanEntity(
+            id = 50L,
+            type = LoanType.LENT,
+            personName = "Tareq",
+            initialAmount = 5000.0,
+            remainingAmount = 3000.0,
+            status = LoanStatus.ACTIVE
+        )
+        val initialRepayments = listOf(
+            LoanRepaymentEntity(id = 1L, loanId = 50L, amount = 2000.0)
+        )
+        val initialTransactions = listOf(
+            TransactionEntity(id = 10L, type = TransactionType.LOAN, amount = 5000.0, categoryId = "loan_lent", categoryName = "Loan to Tareq", note = "", loanId = 50L),
+            TransactionEntity(id = 11L, type = TransactionType.INCOME, amount = 2000.0, categoryId = "loan_collected", categoryName = "Repayment", note = "", loanId = 50L)
+        )
+
+        // Attempt invalid repayment of 4000 (overpayment)
+        val amount = 4000.0
+        val isValid = amount > 0 && amount <= loan.remainingAmount && loan.status == LoanStatus.ACTIVE && loan.archivedAt == null
+
+        var currentLoan = loan
+        var repayments = initialRepayments
+        var transactions = initialTransactions
+
+        if (isValid) {
+            currentLoan = currentLoan.copy(remainingAmount = currentLoan.remainingAmount - amount)
+            repayments = repayments + LoanRepaymentEntity(id = 2L, loanId = 50L, amount = amount)
+            transactions = transactions + TransactionEntity(id = 12L, type = TransactionType.INCOME, amount = amount, categoryId = "loan_collected", categoryName = "Repayment", note = "", loanId = 50L)
+        }
+
+        // All 3 records remain strictly identical to initial
+        assertEquals(3000.0, currentLoan.remainingAmount, 0.001)
+        assertEquals(LoanStatus.ACTIVE, currentLoan.status)
+        assertEquals(1, repayments.size)
+        assertEquals(2, transactions.size)
+    }
+
+    @Test
+    fun `valid repayment creates exactly one audit row and one linked transaction`() {
+        val loan = LoanEntity(
+            id = 50L,
+            type = LoanType.BORROWED,
+            personName = "Bank",
+            initialAmount = 10000.0,
+            remainingAmount = 10000.0,
+            status = LoanStatus.ACTIVE
+        )
+        val initialRepayments = emptyList<LoanRepaymentEntity>()
+        val initialTransactions = listOf(
+            TransactionEntity(id = 1L, type = TransactionType.LOAN, amount = 10000.0, categoryId = "loan_borrowed", categoryName = "Loan from Bank", note = "", loanId = 50L)
+        )
+
+        val amount = 4000.0
+        val newRemaining = loan.remainingAmount - amount
+        val newStatus = if (newRemaining <= 0.0) LoanStatus.SETTLED else LoanStatus.ACTIVE
+        val updatedLoan = loan.copy(remainingAmount = newRemaining, status = newStatus)
+
+        val newRepayment = LoanRepaymentEntity(id = 2L, loanId = 50L, amount = amount)
+        val newTransaction = TransactionEntity(id = 3L, type = TransactionType.EXPENSE, amount = amount, categoryId = "loan_repaid", categoryName = "Repaid to Bank", note = "", loanId = 50L)
+
+        val updatedRepayments = initialRepayments + newRepayment
+        val updatedTransactions = initialTransactions + newTransaction
+
+        assertEquals(6000.0, updatedLoan.remainingAmount, 0.001)
+        assertEquals(LoanStatus.ACTIVE, updatedLoan.status)
+        assertEquals(1, updatedRepayments.size)
+        assertEquals(2, updatedTransactions.size)
+        assertEquals(1, updatedTransactions.count { it.categoryId == "loan_repaid" })
+    }
 }

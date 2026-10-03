@@ -89,6 +89,7 @@ fun MainFinanceScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     BackHandler(enabled = uiState.activeTab != FinanceTab.DASHBOARD) {
         if (uiState.activeTab == FinanceTab.MORE && uiState.moreSubDestination != MoreSubDestination.NONE) {
@@ -466,7 +467,12 @@ fun MainFinanceScreen(
                         },
                         onRequestPermanentDelete = { viewModel.openPermanentDeleteDialog(it) },
                         onConfirmPermanentDelete = { viewModel.confirmPermanentDelete() },
-                        onDismissPermanentDeleteDialog = { viewModel.closePermanentDeleteDialog() }
+                        onDismissPermanentDeleteDialog = { viewModel.closePermanentDeleteDialog() },
+                        onUpdateMorningEnabled = { viewModel.updateMorningNotificationEnabled(it, context) },
+                        onUpdateMorningTime = { hour, minute -> viewModel.updateMorningNotificationTime(hour, minute, context) },
+                        onUpdateReminderEnabled = { viewModel.updateExpenseReminderEnabled(it, context) },
+                        onUpdateReminderInterval = { viewModel.updateExpenseReminderInterval(it, context) },
+                        onUpdateQuietHours = { enabled, start, end -> viewModel.updateQuietHours(enabled, start, end, context) }
                     )
                 }
             }

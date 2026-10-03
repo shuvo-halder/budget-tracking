@@ -114,4 +114,51 @@ class ExampleRobolectricTest {
         assertEquals(com.engrshuvo.financemanager.ui.state.FinanceTab.LOANS, tabs[3])
         assertEquals(com.engrshuvo.financemanager.ui.state.FinanceTab.MORE, tabs[4])
     }
+
+    @Test
+    fun `successful repayment atomically updates loan, inserts repayment audit row and linked transaction in Room database`() = kotlinx.coroutines.runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = com.engrshuvo.financemanager.data.local.AppDatabase.getDatabase(context)
+        val repo = com.engrshuvo.financemanager.data.repository.FinanceRepository(
+            transactionDao = db.transactionDao(),
+            budgetSettingDao = db.budgetSettingDao(),
+            loanDao = db.loanDao(),
+            budgetAllocationDao = db.budgetAllocationDao(),
+            database = db
+        )
+
+        val loan = LoanEntity(
+            id = 0,
+            type = LoanType.LENT,
+            personName = "Kamal",
+            initialAmount = 5000.0,
+            remainingAmount = 5000.0,
+            status = LoanStatus.ACTIVE
+        )
+        val loanId = repo.insertLoanWithTransaction(loan)
+
+        val success = repo.recordLoanRepayment(loanId, 2000.0, "First partial")
+        assertTrue(success)
+
+        val updatedLoan = db.loanDao().getLoanByIdDirect(loanId)
+        org.junit.Assert.assertNotNull(updatedLoan)
+        assertEquals(3000.0, updatedLoan!!.remainingAmount, 0.001)
+        assertEquals(LoanStatus.ACTIVE, updatedLoan.status)
+
+        // Try second repayment that overpays (4000 > 3000)
+        val overpaySuccess = repo.recordLoanRepayment(loanId, 4000.0, "Overpay")
+        org.junit.Assert.assertFalse(overpaySuccess)
+
+        // Ensure loan remained at 3000
+        val loanAfterOverpay = db.loanDao().getLoanByIdDirect(loanId)
+        assertEquals(3000.0, loanAfterOverpay!!.remainingAmount, 0.001)
+
+        // Settle exact remaining (3000)
+        val settleSuccess = repo.markLoanSettled(loanId)
+        assertTrue(settleSuccess)
+
+        val settledLoan = db.loanDao().getLoanByIdDirect(loanId)
+        assertEquals(0.0, settledLoan!!.remainingAmount, 0.001)
+        assertEquals(LoanStatus.SETTLED, settledLoan.status)
+    }
 }

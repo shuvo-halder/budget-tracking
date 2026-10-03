@@ -65,6 +65,12 @@ A modern, privacy-focused, offline-first personal finance, salary budgeting, and
 - **2 Calendar Months Expiration:** Expired records are automatically and permanently purged after 2 calendar months using calendar-month arithmetic.
 - **Zero Accidental Data Loss:** Instant Snackbar Undo and independent Archive screen Restore capability.
 
+### 🔔 Daily Budget Notifications & Expense Reminders
+- **Morning Daily Budget Alerts:** Default 8:00 AM local time notification delivering current day's planned spending limit and remaining allowance (`dailyBudgetLimit - todayExpenses`). Tapping opens the Dashboard.
+- **Periodic Expense Recording Reminders:** Customizable background reminders (every 2, 3, 4, 6, 8 hours) prompting users to record daily expenses. Tapping opens the Add Expense sheet.
+- **Smart Quiet Hours:** Mutes reminders during sleep hours (default 10:00 PM to 8:00 AM) with support for overnight wrapping.
+- **Offline & Battery-Friendly:** Powered by AndroidX WorkManager and DataStore Preferences. Zero cloud reliance, survives device reboots and timezone adjustments without duplicate alarms.
+
 ### 🧭 Center-Dashboard Bottom Navigation
 - **Balanced 5-Destination Layout:** Transactions, Budget, **Dashboard (Exact Center)**, Loans, More.
 - **Edge-to-Edge & Gesture Navigation:** Fully compliant with Material 3 insets and predictive back handling.

@@ -26,6 +26,12 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE timestamp BETWEEN :startTime AND :endTime AND archivedAt IS NULL ORDER BY timestamp DESC")
     fun getTransactionsInDateRange(startTime: Long, endTime: Long): Flow<List<TransactionEntity>>
 
+    @Query("SELECT * FROM transactions WHERE timestamp BETWEEN :startTime AND :endTime AND archivedAt IS NULL ORDER BY timestamp DESC")
+    suspend fun getTransactionsInDateRangeDirect(startTime: Long, endTime: Long): List<TransactionEntity>
+
+    @Query("SELECT * FROM transactions WHERE archivedAt IS NULL ORDER BY timestamp DESC")
+    suspend fun getAllTransactionsDirect(): List<TransactionEntity>
+
     @Query("SELECT COALESCE(SUM(amount), 0.0) FROM transactions WHERE type = 'INCOME' AND archivedAt IS NULL")
     fun getTotalIncomeFlow(): Flow<Double>
 
@@ -148,6 +154,9 @@ interface LoanDao {
 interface BudgetSettingDao {
     @Query("SELECT * FROM budget_settings WHERE settingKey = :key LIMIT 1")
     fun getSettingFlow(key: String): Flow<BudgetSettingEntity?>
+
+    @Query("SELECT * FROM budget_settings WHERE settingKey = :key LIMIT 1")
+    suspend fun getSettingDirect(key: String): BudgetSettingEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdateSetting(setting: BudgetSettingEntity)

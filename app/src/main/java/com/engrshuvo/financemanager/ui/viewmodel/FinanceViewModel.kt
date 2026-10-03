@@ -25,6 +25,10 @@ import com.engrshuvo.financemanager.ui.state.LoanTypeFilter
 import com.engrshuvo.financemanager.ui.state.MoreSubDestination
 import com.engrshuvo.financemanager.ui.state.TransactionTypeFilter
 import com.engrshuvo.financemanager.ui.util.DateUtils
+import android.content.Context
+import com.engrshuvo.financemanager.notification.NotificationPreferences
+import com.engrshuvo.financemanager.notification.NotificationPreferencesRepository
+import com.engrshuvo.financemanager.notification.NotificationScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,7 +42,8 @@ import java.util.Calendar
 import java.util.Locale
 
 class FinanceViewModel(
-    private val repository: FinanceRepository
+    private val repository: FinanceRepository,
+    private val notificationPreferencesRepo: NotificationPreferencesRepository? = null
 ) : ViewModel() {
 
     private val _activeTab = MutableStateFlow(FinanceTab.DASHBOARD)
@@ -72,10 +77,21 @@ class FinanceViewModel(
     private val _itemToPermanentlyDelete = MutableStateFlow<ArchiveItemWrapper?>(null)
     private val _recentlyArchivedNote = MutableStateFlow<String?>(null)
 
+    // Notification State
+    private val _notificationPrefs = MutableStateFlow(NotificationPreferences())
+    private val _notificationPermissionGranted = MutableStateFlow(true)
+
     init {
         // Automatic cleanup on app startup
         viewModelScope.launch {
             repository.purgeExpiredArchivedRecords()
+        }
+        if (notificationPreferencesRepo != null) {
+            viewModelScope.launch {
+                notificationPreferencesRepo.preferencesFlow.collect {
+                    _notificationPrefs.value = it
+                }
+            }
         }
     }
 
@@ -520,7 +536,9 @@ class FinanceViewModel(
             isBudgetLimitDialogOpen = _isBudgetLimitDialogOpen.value,
             isBudgetPlanningDialogOpen = _isBudgetPlanningDialogOpen.value,
             isDailyLimitDialogOpen = _isDailyLimitDialogOpen.value,
-            currencySymbol = "৳"
+            currencySymbol = "৳",
+            notificationPreferences = _notificationPrefs.value,
+            notificationPermissionGranted = _notificationPermissionGranted.value
         )
     }.flowOn(Dispatchers.Default)
     .stateIn(
@@ -916,15 +934,69 @@ class FinanceViewModel(
             repository.purgeExpiredArchivedRecords()
         }
     }
+
+    fun updateMorningNotificationEnabled(enabled: Boolean, context: Context) {
+        viewModelScope.launch {
+            notificationPreferencesRepo?.updateMorningNotificationEnabled(enabled)
+            val updated = _notificationPrefs.value.copy(morningNotificationEnabled = enabled)
+            _notificationPrefs.value = updated
+            NotificationScheduler.scheduleMorningBudgetWork(context, updated)
+        }
+    }
+
+    fun updateMorningNotificationTime(hour: Int, minute: Int, context: Context) {
+        viewModelScope.launch {
+            notificationPreferencesRepo?.updateMorningNotificationTime(hour, minute)
+            val updated = _notificationPrefs.value.copy(morningNotificationHour = hour, morningNotificationMinute = minute)
+            _notificationPrefs.value = updated
+            NotificationScheduler.scheduleMorningBudgetWork(context, updated)
+        }
+    }
+
+    fun updateExpenseReminderEnabled(enabled: Boolean, context: Context) {
+        viewModelScope.launch {
+            notificationPreferencesRepo?.updateExpenseReminderEnabled(enabled)
+            val updated = _notificationPrefs.value.copy(expenseReminderEnabled = enabled)
+            _notificationPrefs.value = updated
+            NotificationScheduler.scheduleExpenseReminderWork(context, updated)
+        }
+    }
+
+    fun updateExpenseReminderInterval(hours: Int, context: Context) {
+        viewModelScope.launch {
+            notificationPreferencesRepo?.updateExpenseReminderInterval(hours)
+            val updated = _notificationPrefs.value.copy(expenseReminderIntervalHours = hours)
+            _notificationPrefs.value = updated
+            NotificationScheduler.scheduleExpenseReminderWork(context, updated)
+        }
+    }
+
+    fun updateQuietHours(enabled: Boolean, startHour: Int, endHour: Int, context: Context) {
+        viewModelScope.launch {
+            notificationPreferencesRepo?.updateQuietHours(enabled, startHour, endHour)
+            val updated = _notificationPrefs.value.copy(
+                quietHoursEnabled = enabled,
+                quietHoursStartHour = startHour,
+                quietHoursEndHour = endHour
+            )
+            _notificationPrefs.value = updated
+            NotificationScheduler.scheduleExpenseReminderWork(context, updated)
+        }
+    }
+
+    fun setNotificationPermissionStatus(granted: Boolean) {
+        _notificationPermissionGranted.value = granted
+    }
 }
 
 class FinanceViewModelFactory(
-    private val repository: FinanceRepository
+    private val repository: FinanceRepository,
+    private val notificationPreferencesRepo: NotificationPreferencesRepository? = null
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(FinanceViewModel::class.java)) {
-            return FinanceViewModel(repository) as T
+            return FinanceViewModel(repository, notificationPreferencesRepo) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }

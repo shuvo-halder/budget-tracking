@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.Card
@@ -87,6 +88,12 @@ fun MoreScreen(
     onRequestPermanentDelete: (ArchiveItemWrapper) -> Unit,
     onConfirmPermanentDelete: () -> Unit,
     onDismissPermanentDeleteDialog: () -> Unit,
+    // Notification actions
+    onUpdateMorningEnabled: (Boolean) -> Unit = {},
+    onUpdateMorningTime: (hour: Int, minute: Int) -> Unit = { _, _ -> },
+    onUpdateReminderEnabled: (Boolean) -> Unit = {},
+    onUpdateReminderInterval: (hours: Int) -> Unit = {},
+    onUpdateQuietHours: (enabled: Boolean, startHour: Int, endHour: Int) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     AnimatedContent(
@@ -141,6 +148,19 @@ fun MoreScreen(
                     onNavigateBack = onNavigateBack
                 )
             }
+
+            MoreSubDestination.NOTIFICATION_SETTINGS -> {
+                BackHandler { onNavigateBack() }
+                NotificationSettingsScreen(
+                    preferences = uiState.notificationPreferences,
+                    onNavigateBack = onNavigateBack,
+                    onUpdateMorningEnabled = onUpdateMorningEnabled,
+                    onUpdateMorningTime = onUpdateMorningTime,
+                    onUpdateReminderEnabled = onUpdateReminderEnabled,
+                    onUpdateReminderInterval = onUpdateReminderInterval,
+                    onUpdateQuietHours = onUpdateQuietHours
+                )
+            }
         }
     }
 }
@@ -167,7 +187,7 @@ private fun MoreHubView(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Calendar ledger, archived recovery system, and analytics",
+                    text = "Calendar ledger, notifications, archived recovery, and analytics",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -185,6 +205,20 @@ private fun MoreHubView(
                 badgeColor = MaterialTheme.colorScheme.primary,
                 onClick = { onNavigateToSubDestination(MoreSubDestination.CALENDAR) },
                 testTag = "more_calendar_card"
+            )
+        }
+
+        item(key = "more_item_notifications") {
+            MoreDestinationCard(
+                icon = Icons.Default.NotificationsActive,
+                iconColor = Color(0xFF059669),
+                iconBg = Color(0xFFD1FAE5),
+                title = "Notifications & Reminders",
+                subtitle = "Morning daily budget alerts (8:00 AM) and periodic expense recording nudges",
+                badgeText = "Daily Alerts",
+                badgeColor = Color(0xFF059669),
+                onClick = { onNavigateToSubDestination(MoreSubDestination.NOTIFICATION_SETTINGS) },
+                testTag = "more_notifications_card"
             )
         }
 

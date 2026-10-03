@@ -1,5 +1,7 @@
 package com.engrshuvo.financemanager.data.repository
 
+import androidx.room.withTransaction
+import com.engrshuvo.financemanager.data.local.AppDatabase
 import com.engrshuvo.financemanager.data.local.BudgetAllocationDao
 import com.engrshuvo.financemanager.data.local.BudgetSettingDao
 import com.engrshuvo.financemanager.data.local.LoanDao
@@ -23,7 +25,8 @@ class FinanceRepository(
     private val transactionDao: TransactionDao,
     private val budgetSettingDao: BudgetSettingDao,
     private val loanDao: LoanDao,
-    private val budgetAllocationDao: BudgetAllocationDao
+    private val budgetAllocationDao: BudgetAllocationDao,
+    private val database: AppDatabase? = null
 ) {
     // Transaction streams strictly on Dispatchers.IO
     val allTransactions: Flow<List<TransactionEntity>> =
@@ -103,28 +106,41 @@ class FinanceRepository(
         transactionDao.permanentlyDeleteTransactionById(id)
     }
 
+    private suspend fun <R> runInTransaction(block: suspend () -> R): R {
+        val db = database
+        return if (db != null) {
+            db.withTransaction {
+                block()
+            }
+        } else {
+            block()
+        }
+    }
+
     suspend fun insertLoanWithTransaction(
         loan: LoanEntity,
         createLinkedTransaction: Boolean = true
     ): Long = withContext(Dispatchers.IO) {
-        val loanId = loanDao.insertLoan(loan)
-        if (createLinkedTransaction) {
-            val transType = TransactionType.LOAN
-            val categoryId = if (loan.type == LoanType.LENT) "loan_lent" else "loan_borrowed"
-            val categoryName = if (loan.type == LoanType.LENT) "Loan to ${loan.personName}" else "Loan from ${loan.personName}"
-            val transEntity = TransactionEntity(
-                id = 0,
-                type = transType,
-                amount = loan.initialAmount,
-                categoryId = categoryId,
-                categoryName = categoryName,
-                note = loan.note.ifBlank { if (loan.type == LoanType.LENT) "Lent to ${loan.personName}" else "Borrowed from ${loan.personName}" },
-                timestamp = loan.startDate,
-                loanId = loanId
-            )
-            transactionDao.insertTransaction(transEntity)
+        runInTransaction {
+            val loanId = loanDao.insertLoan(loan)
+            if (createLinkedTransaction) {
+                val transType = TransactionType.LOAN
+                val categoryId = if (loan.type == LoanType.LENT) "loan_lent" else "loan_borrowed"
+                val categoryName = if (loan.type == LoanType.LENT) "Loan to ${loan.personName}" else "Loan from ${loan.personName}"
+                val transEntity = TransactionEntity(
+                    id = 0,
+                    type = transType,
+                    amount = loan.initialAmount,
+                    categoryId = categoryId,
+                    categoryName = categoryName,
+                    note = loan.note.ifBlank { if (loan.type == LoanType.LENT) "Lent to ${loan.personName}" else "Borrowed from ${loan.personName}" },
+                    timestamp = loan.startDate,
+                    loanId = loanId
+                )
+                transactionDao.insertTransaction(transEntity)
+            }
+            loanId
         }
-        loanId
     }
 
     suspend fun updateLoan(loan: LoanEntity) = withContext(Dispatchers.IO) {
@@ -145,21 +161,27 @@ class FinanceRepository(
         loanId: Long,
         archiveTimestamp: Long = System.currentTimeMillis()
     ) = withContext(Dispatchers.IO) {
-        loanDao.archiveLoan(loanId, archiveTimestamp)
-        loanDao.archiveRepaymentsForLoan(loanId, archiveTimestamp)
-        transactionDao.archiveTransactionsForLoan(loanId, archiveTimestamp)
+        runInTransaction {
+            loanDao.archiveLoan(loanId, archiveTimestamp)
+            loanDao.archiveRepaymentsForLoan(loanId, archiveTimestamp)
+            transactionDao.archiveTransactionsForLoan(loanId, archiveTimestamp)
+        }
     }
 
     suspend fun restoreLoan(loanId: Long) = withContext(Dispatchers.IO) {
-        loanDao.restoreLoan(loanId)
-        loanDao.restoreRepaymentsForLoan(loanId)
-        transactionDao.restoreTransactionsForLoan(loanId)
+        runInTransaction {
+            loanDao.restoreLoan(loanId)
+            loanDao.restoreRepaymentsForLoan(loanId)
+            transactionDao.restoreTransactionsForLoan(loanId)
+        }
     }
 
     suspend fun permanentlyDeleteLoan(loanId: Long) = withContext(Dispatchers.IO) {
-        transactionDao.permanentlyDeleteTransactionsForLoan(loanId)
-        loanDao.permanentlyDeleteRepaymentsForLoan(loanId)
-        loanDao.permanentlyDeleteLoanById(loanId)
+        runInTransaction {
+            transactionDao.permanentlyDeleteTransactionsForLoan(loanId)
+            loanDao.permanentlyDeleteRepaymentsForLoan(loanId)
+            loanDao.permanentlyDeleteLoanById(loanId)
+        }
     }
 
     suspend fun recordLoanRepayment(
@@ -167,54 +189,77 @@ class FinanceRepository(
         amount: Double,
         note: String,
         timestamp: Long = System.currentTimeMillis()
-    ) = withContext(Dispatchers.IO) {
-        val loan = loanDao.getLoanByIdDirect(loanId) ?: return@withContext
-        val newRemaining = (loan.remainingAmount - amount).coerceAtLeast(0.0)
-        val newStatus = if (newRemaining <= 0.0) LoanStatus.SETTLED else LoanStatus.ACTIVE
+    ): Boolean = withContext(Dispatchers.IO) {
+        if (amount <= 0.0) {
+            return@withContext false
+        }
+        runInTransaction {
+            // Re-read fresh loan state inside the database transaction to prevent race conditions
+            val loan = loanDao.getLoanByIdDirect(loanId) ?: return@runInTransaction false
 
-        val updatedLoan = loan.copy(
-            remainingAmount = newRemaining,
-            status = newStatus
-        )
-        loanDao.updateLoan(updatedLoan)
+            // Ineligible for repayment if settled, archived, or zero/negative remaining balance
+            if (loan.status != LoanStatus.ACTIVE || loan.archivedAt != null || loan.remainingAmount <= 0.0) {
+                return@runInTransaction false
+            }
 
-        val repayment = LoanRepaymentEntity(
-            id = 0,
-            loanId = loanId,
-            amount = amount,
-            note = note,
-            timestamp = timestamp
-        )
-        loanDao.insertRepayment(repayment)
+            // Overpayment rejected
+            if (amount > loan.remainingAmount) {
+                return@runInTransaction false
+            }
 
-        val repaymentType = if (loan.type == LoanType.LENT) TransactionType.INCOME else TransactionType.EXPENSE
-        val catId = if (loan.type == LoanType.LENT) "loan_collected" else "loan_repaid"
-        val catName = if (loan.type == LoanType.LENT) "Repayment from ${loan.personName}" else "Repaid to ${loan.personName}"
+            val newRemaining = (loan.remainingAmount - amount).coerceAtLeast(0.0)
+            val newStatus = if (newRemaining <= 0.0) LoanStatus.SETTLED else LoanStatus.ACTIVE
 
-        transactionDao.insertTransaction(
-            TransactionEntity(
-                id = 0,
-                type = repaymentType,
-                amount = amount,
-                categoryId = catId,
-                categoryName = catName,
-                note = note.ifBlank { "Loan repayment (${loan.personName})" },
-                timestamp = timestamp,
-                loanId = loanId
+            val updatedLoan = loan.copy(
+                remainingAmount = newRemaining,
+                status = newStatus
             )
-        )
+            loanDao.updateLoan(updatedLoan)
+
+            val repayment = LoanRepaymentEntity(
+                id = 0,
+                loanId = loanId,
+                amount = amount,
+                note = note,
+                timestamp = timestamp
+            )
+            loanDao.insertRepayment(repayment)
+
+            val repaymentType = if (loan.type == LoanType.LENT) TransactionType.INCOME else TransactionType.EXPENSE
+            val catId = if (loan.type == LoanType.LENT) "loan_collected" else "loan_repaid"
+            val catName = if (loan.type == LoanType.LENT) "Repayment from ${loan.personName}" else "Repaid to ${loan.personName}"
+
+            transactionDao.insertTransaction(
+                TransactionEntity(
+                    id = 0,
+                    type = repaymentType,
+                    amount = amount,
+                    categoryId = catId,
+                    categoryName = catName,
+                    note = note.ifBlank { "Loan repayment (${loan.personName})" },
+                    timestamp = timestamp,
+                    loanId = loanId
+                )
+            )
+            true
+        }
     }
 
-    suspend fun markLoanSettled(loanId: Long) = withContext(Dispatchers.IO) {
-        val loan = loanDao.getLoanByIdDirect(loanId) ?: return@withContext
-        if (loan.remainingAmount > 0) {
-            recordLoanRepayment(
-                loanId = loanId,
-                amount = loan.remainingAmount,
-                note = "Full Settlement"
-            )
-        } else {
-            loanDao.updateLoan(loan.copy(status = LoanStatus.SETTLED))
+    suspend fun markLoanSettled(loanId: Long): Boolean = withContext(Dispatchers.IO) {
+        runInTransaction {
+            val loan = loanDao.getLoanByIdDirect(loanId) ?: return@runInTransaction false
+            if (loan.remainingAmount > 0 && loan.status == LoanStatus.ACTIVE && loan.archivedAt == null) {
+                recordLoanRepayment(
+                    loanId = loanId,
+                    amount = loan.remainingAmount,
+                    note = "Full Settlement"
+                )
+            } else if (loan.status != LoanStatus.SETTLED) {
+                loanDao.updateLoan(loan.copy(status = LoanStatus.SETTLED))
+                true
+            } else {
+                true
+            }
         }
     }
 

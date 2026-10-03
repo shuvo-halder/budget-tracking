@@ -23,7 +23,8 @@ enum class MoreSubDestination {
     NONE,
     CALENDAR,
     ARCHIVE,
-    REPORTS
+    REPORTS,
+    NOTIFICATION_SETTINGS
 }
 
 enum class ArchiveFilterType(val label: String) {
@@ -186,6 +187,10 @@ data class FinanceUiState(
     val isBudgetLimitDialogOpen: Boolean = false,
     val isBudgetPlanningDialogOpen: Boolean = false,
     val isDailyLimitDialogOpen: Boolean = false,
-    val currencySymbol: String = "৳"
+    val currencySymbol: String = "৳",
+
+    // Notification & Reminders State
+    val notificationPreferences: com.engrshuvo.financemanager.notification.NotificationPreferences = com.engrshuvo.financemanager.notification.NotificationPreferences(),
+    val notificationPermissionGranted: Boolean = true
 )
 
