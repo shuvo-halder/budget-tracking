@@ -74,6 +74,15 @@ interface TransactionDao {
     @Query("DELETE FROM transactions WHERE id = :id")
     suspend fun permanentlyDeleteTransactionById(id: Long)
 
+    @Query("SELECT * FROM transactions ORDER BY id ASC")
+    suspend fun getAllTransactionsForBackup(): List<TransactionEntity>
+
+    @Query("DELETE FROM transactions")
+    suspend fun clearAllTransactions()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllTransactions(transactions: List<TransactionEntity>)
+
     @Query("DELETE FROM transactions WHERE archivedAt IS NOT NULL AND archivedAt <= :cutoffTime")
     suspend fun purgeExpiredTransactions(cutoffTime: Long): Int
 }
@@ -148,6 +157,24 @@ interface LoanDao {
 
     @Query("DELETE FROM loan_repayments WHERE id = :repaymentId")
     suspend fun deleteRepayment(repaymentId: Long)
+
+    @Query("SELECT * FROM loans ORDER BY id ASC")
+    suspend fun getAllLoansForBackup(): List<LoanEntity>
+
+    @Query("SELECT * FROM loan_repayments ORDER BY id ASC")
+    suspend fun getAllRepaymentsForBackup(): List<LoanRepaymentEntity>
+
+    @Query("DELETE FROM loan_repayments")
+    suspend fun clearAllRepayments()
+
+    @Query("DELETE FROM loans")
+    suspend fun clearAllLoans()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllLoans(loans: List<LoanEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllRepayments(repayments: List<LoanRepaymentEntity>)
 }
 
 @Dao
@@ -160,6 +187,15 @@ interface BudgetSettingDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdateSetting(setting: BudgetSettingEntity)
+
+    @Query("SELECT * FROM budget_settings")
+    suspend fun getAllSettingsForBackup(): List<BudgetSettingEntity>
+
+    @Query("DELETE FROM budget_settings")
+    suspend fun clearAllSettings()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllSettings(settings: List<BudgetSettingEntity>)
 }
 
 @Dao
@@ -173,6 +209,9 @@ interface BudgetAllocationDao {
     @Query("SELECT * FROM budget_allocations WHERE monthKey = :monthKey")
     suspend fun getAllocationsForMonthDirect(monthKey: String): List<BudgetAllocationEntity>
 
+    @Query("SELECT * FROM budget_allocations")
+    suspend fun getAllAllocationsDirect(): List<BudgetAllocationEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdateAllocation(allocation: BudgetAllocationEntity)
 
@@ -184,5 +223,8 @@ interface BudgetAllocationDao {
 
     @Query("DELETE FROM budget_allocations WHERE monthKey = :monthKey")
     suspend fun deleteAllAllocationsForMonth(monthKey: String)
+
+    @Query("DELETE FROM budget_allocations")
+    suspend fun clearAllAllocations()
 }
 

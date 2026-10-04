@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.Locale
 
@@ -80,6 +81,14 @@ class FinanceViewModel(
     // Notification State
     private val _notificationPrefs = MutableStateFlow(NotificationPreferences())
     private val _notificationPermissionGranted = MutableStateFlow(true)
+
+    // Backup & Restore State
+    private val _isExportingBackup = MutableStateFlow(false)
+    private val _isRestoringBackup = MutableStateFlow(false)
+    private val _backupPreview = MutableStateFlow<com.engrshuvo.financemanager.data.model.BackupSummaryPreview?>(null)
+    private val _pendingRestoreData = MutableStateFlow<com.engrshuvo.financemanager.data.model.FinanceBackupData?>(null)
+    private val _backupOperationMessage = MutableStateFlow<String?>(null)
+    private val _backupOperationError = MutableStateFlow<String?>(null)
 
     // In-flight operation guards to prevent duplicate concurrent submissions
     private val isTransactionSaving = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -618,7 +627,13 @@ class FinanceViewModel(
             isDailyLimitDialogOpen = _isDailyLimitDialogOpen.value,
             currencySymbol = "৳",
             notificationPreferences = _notificationPrefs.value,
-            notificationPermissionGranted = _notificationPermissionGranted.value
+            notificationPermissionGranted = _notificationPermissionGranted.value,
+            isExportingBackup = _isExportingBackup.value,
+            isRestoringBackup = _isRestoringBackup.value,
+            backupPreview = _backupPreview.value,
+            pendingRestoreData = _pendingRestoreData.value,
+            backupOperationMessage = _backupOperationMessage.value,
+            backupOperationError = _backupOperationError.value
         )
     }.flowOn(Dispatchers.Default)
     .stateIn(
@@ -973,9 +988,7 @@ class FinanceViewModel(
 
     fun setActiveTab(tab: FinanceTab) {
         _activeTab.value = tab
-        if (tab != FinanceTab.MORE) {
-            _moreSubDestination.value = MoreSubDestination.NONE
-        }
+        _moreSubDestination.value = MoreSubDestination.NONE
     }
 
     fun navigateToMoreSubDestination(dest: MoreSubDestination) {
@@ -1087,6 +1100,77 @@ class FinanceViewModel(
 
     fun setNotificationPermissionStatus(granted: Boolean) {
         _notificationPermissionGranted.value = granted
+    }
+
+    fun exportBackupToUri(uri: android.net.Uri, context: Context) {
+        viewModelScope.launch {
+            _isExportingBackup.value = true
+            try {
+                val backupData = repository.exportBackupData()
+                val jsonString = backupData.toJsonString()
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                        outputStream.write(jsonString.toByteArray(Charsets.UTF_8))
+                        outputStream.flush()
+                    } ?: throw IllegalStateException("Unable to open output stream for selected file.")
+                }
+                _backupOperationMessage.value = "Backup exported successfully (${backupData.transactions.size} transactions, ${backupData.loans.size} loans)."
+            } catch (e: Exception) {
+                _backupOperationError.value = "Export failed: ${e.message ?: "Unknown error"}"
+            } finally {
+                _isExportingBackup.value = false
+            }
+        }
+    }
+
+    fun readBackupFile(uri: android.net.Uri, context: Context) {
+        viewModelScope.launch {
+            try {
+                val jsonString = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                        inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                    } ?: throw IllegalStateException("Unable to open input stream for selected file.")
+                }
+                val backupData = com.engrshuvo.financemanager.data.model.FinanceBackupData.fromJsonString(jsonString)
+                _pendingRestoreData.value = backupData
+                _backupPreview.value = backupData.getSummaryPreview()
+            } catch (e: Exception) {
+                _backupOperationError.value = "Validation error: ${e.message ?: "Invalid backup file"}"
+                _backupPreview.value = null
+                _pendingRestoreData.value = null
+            }
+        }
+    }
+
+    fun confirmRestoreBackup(context: Context) {
+        val backupData = _pendingRestoreData.value ?: return
+        viewModelScope.launch {
+            _isRestoringBackup.value = true
+            try {
+                val result = repository.restoreBackupData(backupData)
+                if (result.isSuccess) {
+                    _backupOperationMessage.value = "Successfully restored ${result.getOrNull() ?: 0} records."
+                    _backupPreview.value = null
+                    _pendingRestoreData.value = null
+                } else {
+                    _backupOperationError.value = "Restore failed: ${result.exceptionOrNull()?.message ?: "Transaction rolled back"}"
+                }
+            } catch (e: Exception) {
+                _backupOperationError.value = "Restore failed: ${e.message ?: "Transaction rolled back"}"
+            } finally {
+                _isRestoringBackup.value = false
+            }
+        }
+    }
+
+    fun dismissRestorePreview() {
+        _backupPreview.value = null
+        _pendingRestoreData.value = null
+    }
+
+    fun dismissBackupOperationMessage() {
+        _backupOperationMessage.value = null
+        _backupOperationError.value = null
     }
 }
 

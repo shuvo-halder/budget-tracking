@@ -8,6 +8,7 @@ import com.engrshuvo.financemanager.data.local.LoanDao
 import com.engrshuvo.financemanager.data.local.TransactionDao
 import com.engrshuvo.financemanager.data.model.BudgetAllocationEntity
 import com.engrshuvo.financemanager.data.model.BudgetSettingEntity
+import com.engrshuvo.financemanager.data.model.FinanceBackupData
 import com.engrshuvo.financemanager.data.model.LoanEntity
 import com.engrshuvo.financemanager.data.model.LoanRepaymentEntity
 import com.engrshuvo.financemanager.data.model.LoanStatus
@@ -352,7 +353,7 @@ class FinanceRepository(
      * Permanently deletes archived records whose retention period (2 calendar months) has expired.
      * Idempotent and safe to run on startup, on resume, and on demand.
      */
-    suspend fun purgeExpiredArchivedRecords(
+     suspend fun purgeExpiredArchivedRecords(
         currentTimeMillis: Long = System.currentTimeMillis()
     ): Int = withContext(Dispatchers.IO) {
         val cutoff = getTwoMonthsExpirationCutoff(currentTimeMillis)
@@ -360,5 +361,65 @@ class FinanceRepository(
         val purgedRepayments = loanDao.purgeExpiredRepayments(cutoff)
         val purgedLoans = loanDao.purgeExpiredLoans(cutoff)
         purgedTransactions + purgedRepayments + purgedLoans
+    }
+
+    /**
+     * Exports all user financial data into a versioned FinanceBackupData model.
+     * Must be called on Dispatchers.IO.
+     */
+    suspend fun exportBackupData(): FinanceBackupData = withContext(Dispatchers.IO) {
+        val txs = transactionDao.getAllTransactionsForBackup()
+        val loans = loanDao.getAllLoansForBackup()
+        val repayments = loanDao.getAllRepaymentsForBackup()
+        val settings = budgetSettingDao.getAllSettingsForBackup()
+        val allocations = budgetAllocationDao.getAllAllocationsDirect()
+
+        FinanceBackupData(
+            exportTimestamp = System.currentTimeMillis(),
+            transactions = txs,
+            loans = loans,
+            loanRepayments = repayments,
+            budgetSettings = settings,
+            budgetAllocations = allocations
+        )
+    }
+
+    /**
+     * Atomically restores all database tables from [backupData] within a single Room transaction.
+     * Deletes existing data and inserts backup data in strict relation order.
+     * Completely rolls back if any insertion fails.
+     */
+    suspend fun restoreBackupData(backupData: FinanceBackupData): Result<Int> = withContext(Dispatchers.IO) {
+        try {
+            runInTransaction {
+                // 1. Clear tables in child-to-parent order
+                loanDao.clearAllRepayments()
+                transactionDao.clearAllTransactions()
+                loanDao.clearAllLoans()
+                budgetAllocationDao.clearAllAllocations()
+                budgetSettingDao.clearAllSettings()
+
+                // 2. Insert parent tables first
+                if (backupData.loans.isNotEmpty()) {
+                    loanDao.insertAllLoans(backupData.loans)
+                }
+                if (backupData.loanRepayments.isNotEmpty()) {
+                    loanDao.insertAllRepayments(backupData.loanRepayments)
+                }
+                if (backupData.transactions.isNotEmpty()) {
+                    transactionDao.insertAllTransactions(backupData.transactions)
+                }
+                if (backupData.budgetSettings.isNotEmpty()) {
+                    budgetSettingDao.insertAllSettings(backupData.budgetSettings)
+                }
+                if (backupData.budgetAllocations.isNotEmpty()) {
+                    budgetAllocationDao.insertOrUpdateAllocations(backupData.budgetAllocations)
+                }
+            }
+            val totalRestored = backupData.transactions.size + backupData.loans.size + backupData.loanRepayments.size + backupData.budgetAllocations.size
+            Result.success(totalRestored)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }

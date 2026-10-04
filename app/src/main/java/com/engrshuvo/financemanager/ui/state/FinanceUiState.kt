@@ -15,8 +15,8 @@ enum class FinanceTab(val label: String) {
     TRANSACTIONS("Transactions"),
     BUDGET("Budget"),
     DASHBOARD("Dashboard"),
-    LOANS("Loans"),
-    MORE("More")
+    CALENDAR("Calendar"),
+    LOANS("Loans")
 }
 
 enum class MoreSubDestination {
@@ -24,7 +24,8 @@ enum class MoreSubDestination {
     CALENDAR,
     ARCHIVE,
     REPORTS,
-    NOTIFICATION_SETTINGS
+    NOTIFICATION_SETTINGS,
+    BACKUP_RESTORE
 }
 
 enum class ArchiveFilterType(val label: String) {
@@ -191,6 +192,14 @@ data class FinanceUiState(
 
     // Notification & Reminders State
     val notificationPreferences: com.engrshuvo.financemanager.notification.NotificationPreferences = com.engrshuvo.financemanager.notification.NotificationPreferences(),
-    val notificationPermissionGranted: Boolean = true
+    val notificationPermissionGranted: Boolean = true,
+
+    // Backup & Restore State
+    val isExportingBackup: Boolean = false,
+    val isRestoringBackup: Boolean = false,
+    val backupPreview: com.engrshuvo.financemanager.data.model.BackupSummaryPreview? = null,
+    val pendingRestoreData: com.engrshuvo.financemanager.data.model.FinanceBackupData? = null,
+    val backupOperationMessage: String? = null,
+    val backupOperationError: String? = null
 )
 

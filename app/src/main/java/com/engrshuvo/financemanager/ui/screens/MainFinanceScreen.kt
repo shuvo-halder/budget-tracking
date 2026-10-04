@@ -22,13 +22,22 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -55,6 +64,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -91,8 +101,10 @@ fun MainFinanceScreen(
     val coroutineScope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    BackHandler(enabled = uiState.activeTab != FinanceTab.DASHBOARD) {
-        if (uiState.activeTab == FinanceTab.MORE && uiState.moreSubDestination != MoreSubDestination.NONE) {
+    var showMoreMenu by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = uiState.moreSubDestination != MoreSubDestination.NONE || uiState.activeTab != FinanceTab.DASHBOARD) {
+        if (uiState.moreSubDestination != MoreSubDestination.NONE) {
             viewModel.navigateBackFromMoreSubDestination()
         } else {
             viewModel.setActiveTab(FinanceTab.DASHBOARD)
@@ -185,9 +197,8 @@ fun MainFinanceScreen(
         contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            // Show main top bar if not in a full-screen sub-destination that has its own app bar
-            val showMainTopBar = uiState.activeTab != FinanceTab.MORE || uiState.moreSubDestination == MoreSubDestination.NONE
-            if (showMainTopBar) {
+            // Show main top bar when not in sub-screens with their own top bars
+            if (uiState.moreSubDestination == MoreSubDestination.NONE) {
                 TopAppBar(
                     title = {
                         Row(
@@ -219,8 +230,8 @@ fun MainFinanceScreen(
                                         FinanceTab.DASHBOARD -> "Financial Dashboard"
                                         FinanceTab.TRANSACTIONS -> "All Transactions Ledger"
                                         FinanceTab.BUDGET -> "Monthly Envelope Planning"
+                                        FinanceTab.CALENDAR -> "Financial Calendar"
                                         FinanceTab.LOANS -> "Debt & Loan Tracker"
-                                        FinanceTab.MORE -> "More Tools & Services"
                                     },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -238,6 +249,83 @@ fun MainFinanceScreen(
                                     imageVector = Icons.Default.Tune,
                                     contentDescription = "Budget settings",
                                     tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        Box {
+                            IconButton(
+                                onClick = { showMoreMenu = true },
+                                modifier = Modifier.testTag("top_overflow_menu_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = "More options",
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showMoreMenu,
+                                onDismissRequest = { showMoreMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Backup & Restore") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.CloudSync,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        viewModel.navigateToMoreSubDestination(MoreSubDestination.BACKUP_RESTORE)
+                                    },
+                                    modifier = Modifier.testTag("overflow_menu_backup_restore")
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Archive & Recovery") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Archive,
+                                            contentDescription = null,
+                                            tint = Color(0xFFD97706)
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        viewModel.navigateToMoreSubDestination(MoreSubDestination.ARCHIVE)
+                                    },
+                                    modifier = Modifier.testTag("overflow_menu_archive")
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Reports & Analytics") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Analytics,
+                                            contentDescription = null,
+                                            tint = Color(0xFF2563EB)
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        viewModel.navigateToMoreSubDestination(MoreSubDestination.REPORTS)
+                                    },
+                                    modifier = Modifier.testTag("overflow_menu_reports")
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Notification Reminders") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.NotificationsActive,
+                                            contentDescription = null,
+                                            tint = Color(0xFF059669)
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        viewModel.navigateToMoreSubDestination(MoreSubDestination.NOTIFICATION_SETTINGS)
+                                    },
+                                    modifier = Modifier.testTag("overflow_menu_notifications")
                                 )
                             }
                         }
@@ -263,8 +351,8 @@ fun MainFinanceScreen(
                         FinanceTab.TRANSACTIONS -> Icons.Default.Receipt
                         FinanceTab.BUDGET -> Icons.Default.AccountBalanceWallet
                         FinanceTab.DASHBOARD -> Icons.Default.Dashboard
+                        FinanceTab.CALENDAR -> Icons.Default.CalendarMonth
                         FinanceTab.LOANS -> Icons.Default.Handshake
-                        FinanceTab.MORE -> Icons.Default.MoreHoriz
                     }
                     NavigationBarItem(
                         selected = isSelected,
@@ -299,14 +387,14 @@ fun MainFinanceScreen(
             }
         },
         floatingActionButton = {
-            // Show FAB on primary destinations
-            val showFab = uiState.activeTab != FinanceTab.MORE || uiState.moreSubDestination == MoreSubDestination.NONE
+            val showFab = uiState.moreSubDestination == MoreSubDestination.NONE
             if (showFab) {
                 FloatingActionButton(
                     onClick = {
                         when (uiState.activeTab) {
                             FinanceTab.LOANS -> viewModel.openAddTransactionSheet(TransactionType.LOAN, LoanType.LENT)
                             FinanceTab.BUDGET -> viewModel.openBudgetPlanningDialog()
+                            FinanceTab.CALENDAR -> viewModel.openAddTransactionSheet(TransactionType.EXPENSE)
                             else -> viewModel.openAddTransactionSheet(TransactionType.EXPENSE)
                         }
                     },
@@ -323,157 +411,178 @@ fun MainFinanceScreen(
             }
         }
     ) { innerPadding ->
-        AnimatedContent(
-            targetState = uiState.activeTab,
-            transitionSpec = { fadeIn() togetherWith fadeOut() },
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            label = "tabContentAnim"
-        ) { tab ->
-            when (tab) {
-                FinanceTab.DASHBOARD -> {
-                    DashboardOverviewView(
-                        monthName = DateUtils.formatMonthYear(uiState.displayedMonth),
-                        onPreviousMonth = { viewModel.changeMonth(-1) },
-                        onNextMonth = { viewModel.changeMonth(1) },
-                        balance = uiState.balance,
-                        totalIncome = uiState.totalIncome,
-                        totalExpense = uiState.totalExpense,
-                        netOperatingCashChange = uiState.netOperatingCashChange,
-                        totalLent = uiState.totalActiveLent,
-                        totalBorrowed = uiState.totalActiveBorrowed,
-                        totalAllocated = uiState.totalAllocated,
-                        unallocatedIncome = uiState.unallocatedIncome,
-                        plannedShortfall = uiState.plannedShortfall,
-                        isShortfall = uiState.isShortfall,
-                        isDraft = uiState.isBudgetAllocationDraft,
-                        plannedSavingsTotal = uiState.plannedSavingsTotal,
-                        todayExpenses = uiState.todayExpenses,
-                        dailyBudgetLimit = uiState.dailyBudgetLimit,
-                        dailyBudgetRemaining = uiState.dailyBudgetRemaining,
-                        dailyBudgetProgress = uiState.dailyBudgetProgress,
-                        isDailyOverBudget = uiState.isDailyOverBudget,
-                        monthAllocations = uiState.monthAllocations,
-                        categoryBreakdown = uiState.categorySpendBreakdown,
-                        filteredTransactions = uiState.filteredTransactions,
-                        hasAnyTransactions = uiState.allTransactions.isNotEmpty(),
-                        searchQuery = uiState.searchQuery,
-                        selectedType = uiState.selectedTypeFilter,
-                        selectedCategoryId = uiState.selectedCategoryFilterId,
-                        selectedDateOption = uiState.selectedDateFilter,
-                        onSearchQueryChange = { viewModel.setSearchQuery(it) },
-                        onTypeSelect = { viewModel.setTypeFilter(it) },
-                        onCategorySelect = { viewModel.setCategoryFilter(it) },
-                        onDateOptionSelect = { viewModel.setDateFilter(it) },
-                        onClearFilters = { viewModel.clearAllFilters() },
-                        onPlanBudgetClick = { viewModel.openBudgetPlanningDialog() },
-                        onConfigureDailyLimitClick = { viewModel.openDailyLimitDialog() },
-                        onAddIncomeClick = { viewModel.openAddTransactionSheet(TransactionType.INCOME) },
-                        onAddExpenseClick = { viewModel.openAddTransactionSheet(TransactionType.EXPENSE) },
-                        onEditTransaction = { viewModel.openEditTransactionSheet(it) },
-                        onDeleteTransaction = { transactionToDelete = it }
-                    )
-                }
-
-                FinanceTab.TRANSACTIONS -> {
-                    TransactionsScreen(
-                        filteredTransactions = uiState.filteredTransactions,
-                        allTransactionsCount = uiState.allTransactions.size,
-                        searchQuery = uiState.searchQuery,
-                        selectedType = uiState.selectedTypeFilter,
-                        selectedCategoryId = uiState.selectedCategoryFilterId,
-                        selectedDateOption = uiState.selectedDateFilter,
-                        onSearchQueryChange = { viewModel.setSearchQuery(it) },
-                        onTypeSelect = { viewModel.setTypeFilter(it) },
-                        onCategorySelect = { viewModel.setCategoryFilter(it) },
-                        onDateOptionSelect = { viewModel.setDateFilter(it) },
-                        onClearFilters = { viewModel.clearAllFilters() },
-                        onAddIncomeClick = { viewModel.openAddTransactionSheet(TransactionType.INCOME) },
-                        onAddExpenseClick = { viewModel.openAddTransactionSheet(TransactionType.EXPENSE) },
-                        onEditTransaction = { viewModel.openEditTransactionSheet(it) },
-                        onDeleteTransaction = { transactionToDelete = it }
-                    )
-                }
-
-                FinanceTab.BUDGET -> {
-                    BudgetScreen(
-                        monthName = DateUtils.formatMonthYear(uiState.displayedMonth),
-                        totalMonthlyIncome = uiState.totalIncome,
-                        totalAllocated = uiState.totalAllocated,
-                        unallocatedIncome = uiState.unallocatedIncome,
-                        plannedShortfall = uiState.plannedShortfall,
-                        isShortfall = uiState.isShortfall,
-                        plannedSavingsTotal = uiState.plannedSavingsTotal,
-                        dailyLimit = uiState.dailyBudgetLimit,
-                        todayExpenses = uiState.todayExpenses,
-                        dailyRemaining = uiState.dailyBudgetRemaining,
-                        dailyProgress = uiState.dailyBudgetProgress,
-                        isDailyOverBudget = uiState.isDailyOverBudget,
-                        allocations = uiState.monthAllocations,
-                        isDraft = uiState.isBudgetAllocationDraft,
-                        onPreviousMonth = { viewModel.changeMonth(-1) },
-                        onNextMonth = { viewModel.changeMonth(1) },
-                        onPlanBudgetClick = { viewModel.openBudgetPlanningDialog() },
-                        onConfigureDailyLimitClick = { viewModel.openDailyLimitDialog() },
-                        onCopyFromPreviousMonth = { viewModel.copyFromPreviousMonth() }
-                    )
-                }
-
-                FinanceTab.LOANS -> {
-                    LoansScreen(
-                        loans = uiState.filteredLoans,
-                        totalLent = uiState.totalActiveLent,
-                        totalBorrowed = uiState.totalActiveBorrowed,
-                        selectedTypeFilter = uiState.selectedLoanFilter,
-                        onTypeFilterChange = { viewModel.setLoanTypeFilter(it) },
-                        selectedStatusFilter = uiState.selectedLoanStatusFilter,
-                        onStatusFilterChange = { viewModel.setLoanStatusFilter(it) },
-                        onAddLoanClick = { viewModel.openAddTransactionSheet(TransactionType.LOAN, LoanType.LENT) },
-                        onRepayClick = { viewModel.openRepayDialog(it) },
-                        onSettleClick = { viewModel.markLoanSettled(it.id) },
-                        onDeleteLoanClick = { loanToDelete = it }
-                    )
-                }
-
-                FinanceTab.MORE -> {
-                    MoreScreen(
-                        uiState = uiState,
-                        onNavigateToSubDestination = { viewModel.navigateToMoreSubDestination(it) },
-                        onNavigateBack = { viewModel.navigateBackFromMoreSubDestination() },
-                        onPreviousMonth = { viewModel.changeMonth(-1) },
-                        onNextMonth = { viewModel.changeMonth(1) },
-                        onResetToToday = { viewModel.resetToCurrentMonth() },
-                        onSelectDate = { timestamp -> viewModel.selectDate(timestamp, openSheet = true) },
-                        onEditTransaction = { viewModel.openEditTransactionSheet(it) },
-                        onDeleteTransaction = { transactionToDelete = it },
-                        onArchiveSearchQueryChange = { viewModel.setArchiveSearchQuery(it) },
-                        onArchiveFilterSelect = { viewModel.setArchiveFilterType(it) },
-                        onRestoreArchiveItem = { item ->
-                            when (item) {
-                                is com.engrshuvo.financemanager.ui.state.ArchiveItemWrapper.Transaction -> {
-                                    viewModel.restoreTransaction(item.id)
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar("Transaction restored")
-                                    }
-                                }
-                                is com.engrshuvo.financemanager.ui.state.ArchiveItemWrapper.Loan -> {
-                                    viewModel.restoreLoan(item.id)
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar("Loan and repayments restored")
-                                    }
-                                }
+        if (uiState.moreSubDestination != MoreSubDestination.NONE) {
+            MoreScreen(
+                uiState = uiState,
+                onNavigateToSubDestination = { viewModel.navigateToMoreSubDestination(it) },
+                onNavigateBack = { viewModel.navigateBackFromMoreSubDestination() },
+                onPreviousMonth = { viewModel.changeMonth(-1) },
+                onNextMonth = { viewModel.changeMonth(1) },
+                onResetToToday = { viewModel.resetToCurrentMonth() },
+                onSelectDate = { timestamp -> viewModel.selectDate(timestamp, openSheet = true) },
+                onEditTransaction = { viewModel.openEditTransactionSheet(it) },
+                onDeleteTransaction = { transactionToDelete = it },
+                onArchiveSearchQueryChange = { viewModel.setArchiveSearchQuery(it) },
+                onArchiveFilterSelect = { viewModel.setArchiveFilterType(it) },
+                onRestoreArchiveItem = { item ->
+                    when (item) {
+                        is com.engrshuvo.financemanager.ui.state.ArchiveItemWrapper.Transaction -> {
+                            viewModel.restoreTransaction(item.id)
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("Transaction restored")
                             }
-                        },
-                        onRequestPermanentDelete = { viewModel.openPermanentDeleteDialog(it) },
-                        onConfirmPermanentDelete = { viewModel.confirmPermanentDelete() },
-                        onDismissPermanentDeleteDialog = { viewModel.closePermanentDeleteDialog() },
-                        onUpdateMorningEnabled = { viewModel.updateMorningNotificationEnabled(it, context) },
-                        onUpdateMorningTime = { hour, minute -> viewModel.updateMorningNotificationTime(hour, minute, context) },
-                        onUpdateReminderEnabled = { viewModel.updateExpenseReminderEnabled(it, context) },
-                        onUpdateReminderInterval = { viewModel.updateExpenseReminderInterval(it, context) },
-                        onUpdateQuietHours = { enabled, start, end -> viewModel.updateQuietHours(enabled, start, end, context) }
-                    )
+                        }
+                        is com.engrshuvo.financemanager.ui.state.ArchiveItemWrapper.Loan -> {
+                            viewModel.restoreLoan(item.id)
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("Loan and repayments restored")
+                            }
+                        }
+                    }
+                },
+                onRequestPermanentDelete = { viewModel.openPermanentDeleteDialog(it) },
+                onConfirmPermanentDelete = { viewModel.confirmPermanentDelete() },
+                onDismissPermanentDeleteDialog = { viewModel.closePermanentDeleteDialog() },
+                onUpdateMorningEnabled = { viewModel.updateMorningNotificationEnabled(it, context) },
+                onUpdateMorningTime = { hour, minute -> viewModel.updateMorningNotificationTime(hour, minute, context) },
+                onUpdateReminderEnabled = { viewModel.updateExpenseReminderEnabled(it, context) },
+                onUpdateReminderInterval = { viewModel.updateExpenseReminderInterval(it, context) },
+                onUpdateQuietHours = { enabled, start, end -> viewModel.updateQuietHours(enabled, start, end, context) },
+                onExportBackup = { viewModel.exportBackupToUri(it, context) },
+                onReadBackupFile = { viewModel.readBackupFile(it, context) },
+                onConfirmRestore = { viewModel.confirmRestoreBackup(context) },
+                onDismissRestorePreview = { viewModel.dismissRestorePreview() },
+                onDismissOperationMessage = { viewModel.dismissBackupOperationMessage() },
+                modifier = Modifier.padding(innerPadding)
+            )
+        } else {
+            AnimatedContent(
+                targetState = uiState.activeTab,
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                label = "tabContentAnim"
+            ) { tab ->
+                when (tab) {
+                    FinanceTab.DASHBOARD -> {
+                        DashboardOverviewView(
+                            monthName = DateUtils.formatMonthYear(uiState.displayedMonth),
+                            onPreviousMonth = { viewModel.changeMonth(-1) },
+                            onNextMonth = { viewModel.changeMonth(1) },
+                            balance = uiState.balance,
+                            totalIncome = uiState.totalIncome,
+                            totalExpense = uiState.totalExpense,
+                            netOperatingCashChange = uiState.netOperatingCashChange,
+                            totalLent = uiState.totalActiveLent,
+                            totalBorrowed = uiState.totalActiveBorrowed,
+                            totalAllocated = uiState.totalAllocated,
+                            unallocatedIncome = uiState.unallocatedIncome,
+                            plannedShortfall = uiState.plannedShortfall,
+                            isShortfall = uiState.isShortfall,
+                            isDraft = uiState.isBudgetAllocationDraft,
+                            plannedSavingsTotal = uiState.plannedSavingsTotal,
+                            todayExpenses = uiState.todayExpenses,
+                            dailyBudgetLimit = uiState.dailyBudgetLimit,
+                            dailyBudgetRemaining = uiState.dailyBudgetRemaining,
+                            dailyBudgetProgress = uiState.dailyBudgetProgress,
+                            isDailyOverBudget = uiState.isDailyOverBudget,
+                            monthAllocations = uiState.monthAllocations,
+                            categoryBreakdown = uiState.categorySpendBreakdown,
+                            filteredTransactions = uiState.filteredTransactions,
+                            hasAnyTransactions = uiState.allTransactions.isNotEmpty(),
+                            searchQuery = uiState.searchQuery,
+                            selectedType = uiState.selectedTypeFilter,
+                            selectedCategoryId = uiState.selectedCategoryFilterId,
+                            selectedDateOption = uiState.selectedDateFilter,
+                            onSearchQueryChange = { viewModel.setSearchQuery(it) },
+                            onTypeSelect = { viewModel.setTypeFilter(it) },
+                            onCategorySelect = { viewModel.setCategoryFilter(it) },
+                            onDateOptionSelect = { viewModel.setDateFilter(it) },
+                            onClearFilters = { viewModel.clearAllFilters() },
+                            onPlanBudgetClick = { viewModel.openBudgetPlanningDialog() },
+                            onConfigureDailyLimitClick = { viewModel.openDailyLimitDialog() },
+                            onAddIncomeClick = { viewModel.openAddTransactionSheet(TransactionType.INCOME) },
+                            onAddExpenseClick = { viewModel.openAddTransactionSheet(TransactionType.EXPENSE) },
+                            onEditTransaction = { viewModel.openEditTransactionSheet(it) },
+                            onDeleteTransaction = { transactionToDelete = it }
+                        )
+                    }
+
+                    FinanceTab.TRANSACTIONS -> {
+                        TransactionsScreen(
+                            filteredTransactions = uiState.filteredTransactions,
+                            allTransactionsCount = uiState.allTransactions.size,
+                            searchQuery = uiState.searchQuery,
+                            selectedType = uiState.selectedTypeFilter,
+                            selectedCategoryId = uiState.selectedCategoryFilterId,
+                            selectedDateOption = uiState.selectedDateFilter,
+                            onSearchQueryChange = { viewModel.setSearchQuery(it) },
+                            onTypeSelect = { viewModel.setTypeFilter(it) },
+                            onCategorySelect = { viewModel.setCategoryFilter(it) },
+                            onDateOptionSelect = { viewModel.setDateFilter(it) },
+                            onClearFilters = { viewModel.clearAllFilters() },
+                            onAddIncomeClick = { viewModel.openAddTransactionSheet(TransactionType.INCOME) },
+                            onAddExpenseClick = { viewModel.openAddTransactionSheet(TransactionType.EXPENSE) },
+                            onEditTransaction = { viewModel.openEditTransactionSheet(it) },
+                            onDeleteTransaction = { transactionToDelete = it }
+                        )
+                    }
+
+                    FinanceTab.BUDGET -> {
+                        BudgetScreen(
+                            monthName = DateUtils.formatMonthYear(uiState.displayedMonth),
+                            totalMonthlyIncome = uiState.totalIncome,
+                            totalAllocated = uiState.totalAllocated,
+                            unallocatedIncome = uiState.unallocatedIncome,
+                            plannedShortfall = uiState.plannedShortfall,
+                            isShortfall = uiState.isShortfall,
+                            plannedSavingsTotal = uiState.plannedSavingsTotal,
+                            dailyLimit = uiState.dailyBudgetLimit,
+                            todayExpenses = uiState.todayExpenses,
+                            dailyRemaining = uiState.dailyBudgetRemaining,
+                            dailyProgress = uiState.dailyBudgetProgress,
+                            isDailyOverBudget = uiState.isDailyOverBudget,
+                            allocations = uiState.monthAllocations,
+                            isDraft = uiState.isBudgetAllocationDraft,
+                            onPreviousMonth = { viewModel.changeMonth(-1) },
+                            onNextMonth = { viewModel.changeMonth(1) },
+                            onPlanBudgetClick = { viewModel.openBudgetPlanningDialog() },
+                            onConfigureDailyLimitClick = { viewModel.openDailyLimitDialog() },
+                            onCopyFromPreviousMonth = { viewModel.copyFromPreviousMonth() }
+                        )
+                    }
+
+                    FinanceTab.CALENDAR -> {
+                        CalendarScreen(
+                            uiState = uiState,
+                            onPreviousMonth = { viewModel.changeMonth(-1) },
+                            onNextMonth = { viewModel.changeMonth(1) },
+                            onResetToToday = { viewModel.resetToCurrentMonth() },
+                            onSelectDate = { timestamp -> viewModel.selectDate(timestamp, openSheet = true) },
+                            onAddExpenseClick = { viewModel.openAddTransactionSheet(TransactionType.EXPENSE) },
+                            onAddIncomeClick = { viewModel.openAddTransactionSheet(TransactionType.INCOME) },
+                            onEditTransaction = { viewModel.openEditTransactionSheet(it) },
+                            onDeleteTransaction = { transactionToDelete = it },
+                            onConfigureDailyLimitClick = { viewModel.openDailyLimitDialog() }
+                        )
+                    }
+
+                    FinanceTab.LOANS -> {
+                        LoansScreen(
+                            loans = uiState.filteredLoans,
+                            totalLent = uiState.totalActiveLent,
+                            totalBorrowed = uiState.totalActiveBorrowed,
+                            selectedTypeFilter = uiState.selectedLoanFilter,
+                            onTypeFilterChange = { viewModel.setLoanTypeFilter(it) },
+                            selectedStatusFilter = uiState.selectedLoanStatusFilter,
+                            onStatusFilterChange = { viewModel.setLoanStatusFilter(it) },
+                            onAddLoanClick = { viewModel.openAddTransactionSheet(TransactionType.LOAN, LoanType.LENT) },
+                            onRepayClick = { viewModel.openRepayDialog(it) },
+                            onSettleClick = { viewModel.markLoanSettled(it.id) },
+                            onDeleteLoanClick = { loanToDelete = it }
+                        )
+                    }
                 }
             }
         }

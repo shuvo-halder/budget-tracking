@@ -123,15 +123,30 @@ class UiReliabilityAndPerformanceUnitTest {
         override suspend fun permanentlyDeleteTransactionsForLoan(loanId: Long) {}
         override suspend fun purgeExpiredTransactions(cutoffTime: Long): Int = 0
         override suspend fun getTransactionByIdDirect(id: Long): TransactionEntity? = transactions.find { it.id == id }
+
+        override suspend fun getAllTransactionsForBackup(): List<TransactionEntity> = transactions.toList()
+        override suspend fun clearAllTransactions() {
+            transactions.clear()
+            emit()
+        }
+        override suspend fun insertAllTransactions(transactions: List<TransactionEntity>) {
+            this.transactions.addAll(transactions)
+            emit()
+        }
     }
 
     private class FakeLoanDao : LoanDao {
         val loans = mutableListOf<LoanEntity>()
         val repayments = mutableListOf<LoanRepaymentEntity>()
         val flow = MutableStateFlow<List<LoanEntity>>(emptyList())
+        val repaymentsFlow = MutableStateFlow<List<LoanRepaymentEntity>>(emptyList())
 
-        fun emit() {
+        fun emitLoans() {
             flow.value = loans.toList()
+        }
+
+        fun emitRepayments() {
+            repaymentsFlow.value = repayments.toList()
         }
 
         override fun getAllLoansFlow(): Flow<List<LoanEntity>> = flow
@@ -152,29 +167,33 @@ class UiReliabilityAndPerformanceUnitTest {
         override suspend fun insertLoan(loan: LoanEntity): Long {
             val id = if (loan.id == 0L) (loans.size + 1).toLong() else loan.id
             loans.add(loan.copy(id = id))
-            emit()
+            emitLoans()
             return id
         }
         override suspend fun updateLoan(loan: LoanEntity) {
             val index = loans.indexOfFirst { it.id == loan.id }
             if (index >= 0) {
                 loans[index] = loan
-                emit()
+                emitLoans()
             }
         }
         override suspend fun deleteLoan(loan: LoanEntity) {
             loans.removeAll { it.id == loan.id }
-            emit()
+            emitLoans()
         }
         override suspend fun getLoanByIdDirect(id: Long): LoanEntity? = loans.find { it.id == id }
         override suspend fun insertRepayment(repayment: LoanRepaymentEntity): Long {
             repayments.add(repayment)
+            emitRepayments()
             return repayments.size.toLong()
         }
         override suspend fun deleteRepayment(repaymentId: Long) {
             repayments.removeAll { it.id == repaymentId }
+            emitRepayments()
         }
-        override fun getRepaymentsForLoanFlow(loanId: Long): Flow<List<LoanRepaymentEntity>> = MutableStateFlow(emptyList())
+        override fun getRepaymentsForLoanFlow(loanId: Long): Flow<List<LoanRepaymentEntity>> = MutableStateFlow(
+            repayments.filter { it.loanId == loanId && it.archivedAt == null }
+        )
         override suspend fun archiveLoan(loanId: Long, archivedAt: Long) {}
         override suspend fun archiveRepaymentsForLoan(loanId: Long, archivedAt: Long) {}
         override suspend fun restoreLoan(loanId: Long) {}
@@ -185,25 +204,60 @@ class UiReliabilityAndPerformanceUnitTest {
         override suspend fun purgeExpiredRepayments(cutoffTime: Long): Int = 0
         override fun getTotalActiveLentFlow(): Flow<Double> = MutableStateFlow(0.0)
         override fun getTotalActiveBorrowedFlow(): Flow<Double> = MutableStateFlow(0.0)
+
+        override suspend fun getAllLoansForBackup(): List<LoanEntity> = loans.toList()
+        override suspend fun getAllRepaymentsForBackup(): List<LoanRepaymentEntity> = repayments.toList()
+        override suspend fun clearAllRepayments() {
+            repayments.clear()
+            emitRepayments()
+        }
+        override suspend fun clearAllLoans() {
+            loans.clear()
+            emitLoans()
+        }
+        override suspend fun insertAllLoans(loans: List<LoanEntity>) {
+            this.loans.addAll(loans)
+            emitLoans()
+        }
+        override suspend fun insertAllRepayments(repayments: List<LoanRepaymentEntity>) {
+            this.repayments.addAll(repayments)
+            emitRepayments()
+        }
     }
 
     private class FakeBudgetSettingDao : BudgetSettingDao {
         val settings = mutableMapOf<String, BudgetSettingEntity>()
         val monthlyFlow = MutableStateFlow<BudgetSettingEntity?>(null)
 
+        fun emit() {
+            monthlyFlow.value = settings[BudgetSettingEntity.KEY_MONTHLY_BUDGET]
+        }
+
         override fun getSettingFlow(key: String): Flow<BudgetSettingEntity?> = monthlyFlow
         override suspend fun getSettingDirect(key: String): BudgetSettingEntity? = settings[key]
         override suspend fun insertOrUpdateSetting(setting: BudgetSettingEntity) {
             settings[setting.settingKey] = setting
-            if (setting.settingKey == BudgetSettingEntity.KEY_MONTHLY_BUDGET) {
-                monthlyFlow.value = setting
-            }
+            emit()
+        }
+
+        override suspend fun getAllSettingsForBackup(): List<BudgetSettingEntity> = settings.values.toList()
+        override suspend fun clearAllSettings() {
+            settings.clear()
+            emit()
+        }
+        override suspend fun insertAllSettings(settings: List<BudgetSettingEntity>) {
+            settings.forEach { this.settings[it.settingKey] = it }
+            emit()
         }
     }
 
     private class FakeBudgetAllocationDao : BudgetAllocationDao {
         val allocations = mutableListOf<BudgetAllocationEntity>()
         val flow = MutableStateFlow<List<BudgetAllocationEntity>>(emptyList())
+
+        fun emit() {
+            flow.value = allocations.toList()
+        }
 
         override fun getAllAllocations(): Flow<List<BudgetAllocationEntity>> = flow
         override fun getAllocationsForMonth(monthKey: String): Flow<List<BudgetAllocationEntity>> = MutableStateFlow(
@@ -214,20 +268,26 @@ class UiReliabilityAndPerformanceUnitTest {
         override suspend fun insertOrUpdateAllocation(allocation: BudgetAllocationEntity) {
             allocations.removeAll { it.monthKey == allocation.monthKey && it.categoryId == allocation.categoryId }
             allocations.add(allocation)
-            flow.value = allocations.toList()
+            emit()
         }
         override suspend fun insertOrUpdateAllocations(allocations: List<BudgetAllocationEntity>) {
             this.allocations.removeAll { existing -> allocations.any { it.monthKey == existing.monthKey && it.categoryId == existing.categoryId } }
             this.allocations.addAll(allocations)
-            flow.value = this.allocations.toList()
+            emit()
         }
         override suspend fun deleteAllocation(monthKey: String, categoryId: String) {
             allocations.removeAll { it.monthKey == monthKey && it.categoryId == categoryId }
-            flow.value = allocations.toList()
+            emit()
         }
         override suspend fun deleteAllAllocationsForMonth(monthKey: String) {
             allocations.removeAll { it.monthKey == monthKey }
-            flow.value = allocations.toList()
+            emit()
+        }
+
+        override suspend fun getAllAllocationsDirect(): List<BudgetAllocationEntity> = allocations.toList()
+        override suspend fun clearAllAllocations() {
+            allocations.clear()
+            emit()
         }
     }
 

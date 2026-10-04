@@ -94,6 +94,12 @@ fun MoreScreen(
     onUpdateReminderEnabled: (Boolean) -> Unit = {},
     onUpdateReminderInterval: (hours: Int) -> Unit = {},
     onUpdateQuietHours: (enabled: Boolean, startHour: Int, endHour: Int) -> Unit = { _, _, _ -> },
+    // Backup & Restore actions
+    onExportBackup: (android.net.Uri) -> Unit = {},
+    onReadBackupFile: (android.net.Uri) -> Unit = {},
+    onConfirmRestore: () -> Unit = {},
+    onDismissRestorePreview: () -> Unit = {},
+    onDismissOperationMessage: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     AnimatedContent(
@@ -159,6 +165,19 @@ fun MoreScreen(
                     onUpdateReminderEnabled = onUpdateReminderEnabled,
                     onUpdateReminderInterval = onUpdateReminderInterval,
                     onUpdateQuietHours = onUpdateQuietHours
+                )
+            }
+
+            MoreSubDestination.BACKUP_RESTORE -> {
+                BackHandler { onNavigateBack() }
+                BackupRestoreScreen(
+                    uiState = uiState,
+                    onNavigateBack = onNavigateBack,
+                    onExportBackup = onExportBackup,
+                    onReadBackupFile = onReadBackupFile,
+                    onConfirmRestore = onConfirmRestore,
+                    onDismissRestorePreview = onDismissRestorePreview,
+                    onDismissOperationMessage = onDismissOperationMessage
                 )
             }
         }
