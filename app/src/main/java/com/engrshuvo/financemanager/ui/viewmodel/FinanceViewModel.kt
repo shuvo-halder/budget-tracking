@@ -1103,6 +1103,7 @@ class FinanceViewModel(
     }
 
     fun exportBackupToUri(uri: android.net.Uri, context: Context) {
+        if (_isExportingBackup.value || _isRestoringBackup.value) return
         viewModelScope.launch {
             _isExportingBackup.value = true
             try {
@@ -1124,6 +1125,7 @@ class FinanceViewModel(
     }
 
     fun readBackupFile(uri: android.net.Uri, context: Context) {
+        if (_isRestoringBackup.value || _isExportingBackup.value) return
         viewModelScope.launch {
             try {
                 val jsonString = withContext(Dispatchers.IO) {
@@ -1144,6 +1146,7 @@ class FinanceViewModel(
 
     fun confirmRestoreBackup(context: Context) {
         val backupData = _pendingRestoreData.value ?: return
+        if (_isRestoringBackup.value || _isExportingBackup.value) return
         viewModelScope.launch {
             _isRestoringBackup.value = true
             try {

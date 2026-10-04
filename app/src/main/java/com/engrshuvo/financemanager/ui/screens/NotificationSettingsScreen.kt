@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -212,6 +213,7 @@ fun NotificationSettingsScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .heightIn(min = 48.dp)
                                     .clip(RoundedCornerShape(12.dp))
                                     .clickable {
                                         TimePickerDialog(
@@ -224,7 +226,7 @@ fun NotificationSettingsScreen(
                                             false
                                         ).show()
                                     }
-                                    .padding(vertical = 8.dp, horizontal = 4.dp),
+                                    .padding(vertical = 10.dp, horizontal = 8.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -419,7 +421,7 @@ fun NotificationSettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             OutlinedButton(
@@ -430,7 +432,9 @@ fun NotificationSettingsScreen(
                                         body = "You have ${CurrencyUtils.formatBDT(500.0)} available for today's planned spending."
                                     )
                                 },
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 44.dp)
                             ) {
                                 Text("Test Budget", fontSize = 13.sp)
                             }
@@ -440,7 +444,9 @@ fun NotificationSettingsScreen(
                                         context = context
                                     )
                                 },
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 44.dp)
                             ) {
                                 Text("Test Reminder", fontSize = 13.sp)
                             }

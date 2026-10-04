@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -192,6 +194,7 @@ fun UniversalTransactionSheet(
                 .padding(horizontal = 22.dp)
                 .padding(top = 20.dp, bottom = 12.dp)
                 .windowInsetsPadding(WindowInsets.navigationBars)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
         ) {
             Row(
@@ -206,7 +209,7 @@ fun UniversalTransactionSheet(
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
+                IconButton(onClick = onDismiss) {
                     Icon(imageVector = Icons.Default.Close, contentDescription = "Close sheet")
                 }
             }
@@ -325,20 +328,26 @@ fun UniversalTransactionSheet(
                     Surface(
                         shape = RoundedCornerShape(10.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                        modifier = Modifier.clickable {
-                            val current = amountText.toDoubleOrNull() ?: 0.0
-                            val updated = current + quickVal
-                            amountText = if (updated % 1.0 == 0.0) updated.toLong().toString() else updated.toString()
-                            errorMessage = null
-                        }
+                        modifier = Modifier
+                            .heightIn(min = 40.dp)
+                            .clickable {
+                                val current = amountText.toDoubleOrNull() ?: 0.0
+                                val updated = current + quickVal
+                                amountText = if (updated % 1.0 == 0.0) updated.toLong().toString() else updated.toString()
+                                errorMessage = null
+                            }
                     ) {
-                        Text(
-                            text = "+৳$quickVal",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                        )
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = "+৳$quickVal",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
             }
@@ -456,6 +465,7 @@ fun UniversalTransactionSheet(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .heightIn(min = 48.dp)
                         .clip(RoundedCornerShape(14.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
                         .clickable {
@@ -511,6 +521,7 @@ fun UniversalTransactionSheet(
                             color = if (isSelected) category.color.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                             border = if (isSelected) androidx.compose.foundation.BorderStroke(2.dp, category.color) else null,
                             modifier = Modifier
+                                .heightIn(min = 44.dp)
                                 .clickable {
                                     selectedCategory = category
                                     errorMessage = null
@@ -518,7 +529,7 @@ fun UniversalTransactionSheet(
                                 .testTag("cat_chip_${category.id}")
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box(
@@ -573,6 +584,7 @@ fun UniversalTransactionSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(min = 48.dp)
                     .clip(RoundedCornerShape(14.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
                     .clickable {

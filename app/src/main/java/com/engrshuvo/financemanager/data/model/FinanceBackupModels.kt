@@ -61,47 +61,7 @@ data class FinanceBackupData(
             val databaseVersion = root.optInt("databaseVersion", 3)
             val exportTimestamp = root.optLong("exportTimestamp", System.currentTimeMillis())
 
-            // 1. Parse Transactions
-            val txList = mutableListOf<TransactionEntity>()
-            if (root.has("transactions")) {
-                val txArray = root.getJSONArray("transactions")
-                for (i in 0 until txArray.length()) {
-                    val obj = txArray.getJSONObject(i)
-                    val id = obj.optLong("id", 0L)
-                    val typeStr = obj.optString("type")
-                    val type = try {
-                        TransactionType.valueOf(typeStr)
-                    } catch (e: Exception) {
-                        throw IllegalArgumentException("Invalid transaction type '$typeStr' at record index $i.")
-                    }
-                    val amount = obj.optDouble("amount", 0.0)
-                    if (amount <= 0.0) {
-                        throw IllegalArgumentException("Transaction amount must be greater than 0 (found $amount at index $i).")
-                    }
-                    val categoryId = obj.optString("categoryId", "other")
-                    val categoryName = obj.optString("categoryName", "Other")
-                    val note = obj.optString("note", "")
-                    val timestamp = obj.optLong("timestamp", System.currentTimeMillis())
-                    val loanId = if (obj.has("loanId") && !obj.isNull("loanId")) obj.getLong("loanId") else null
-                    val archivedAt = if (obj.has("archivedAt") && !obj.isNull("archivedAt")) obj.getLong("archivedAt") else null
-
-                    txList.add(
-                        TransactionEntity(
-                            id = id,
-                            type = type,
-                            amount = amount,
-                            categoryId = categoryId,
-                            categoryName = categoryName,
-                            note = note,
-                            timestamp = timestamp,
-                            loanId = loanId,
-                            archivedAt = archivedAt
-                        )
-                    )
-                }
-            }
-
-            // 2. Parse Loans
+            // 1. Parse Loans first to populate valid loanIdSet for FK validation
             val loanList = mutableListOf<LoanEntity>()
             val loanIdSet = mutableSetOf<Long>()
             if (root.has("loans")) {
@@ -109,6 +69,12 @@ data class FinanceBackupData(
                 for (i in 0 until loanArray.length()) {
                     val obj = loanArray.getJSONObject(i)
                     val id = obj.optLong("id", 0L)
+                    if (id <= 0L) {
+                        throw IllegalArgumentException("Loan ID must be a positive integer (found $id at record index $i).")
+                    }
+                    if (!loanIdSet.add(id)) {
+                        throw IllegalArgumentException("Duplicate loan ID $id found in backup file.")
+                    }
                     val typeStr = obj.optString("type")
                     val type = try {
                         LoanType.valueOf(typeStr)
@@ -150,19 +116,25 @@ data class FinanceBackupData(
                         archivedAt = archivedAt
                     )
                     loanList.add(loanEntity)
-                    if (id > 0) loanIdSet.add(id)
                 }
             }
 
-            // 3. Parse Loan Repayments
+            // 2. Parse Loan Repayments
             val repaymentList = mutableListOf<LoanRepaymentEntity>()
+            val repaymentIdSet = mutableSetOf<Long>()
             if (root.has("loanRepayments")) {
                 val repArray = root.getJSONArray("loanRepayments")
                 for (i in 0 until repArray.length()) {
                     val obj = repArray.getJSONObject(i)
                     val id = obj.optLong("id", 0L)
+                    if (id <= 0L) {
+                        throw IllegalArgumentException("Loan repayment ID must be a positive integer (found $id at repayment index $i).")
+                    }
+                    if (!repaymentIdSet.add(id)) {
+                        throw IllegalArgumentException("Duplicate loan repayment ID $id found in backup file.")
+                    }
                     val loanId = obj.optLong("loanId", -1L)
-                    if (loanIdSet.isNotEmpty() && !loanIdSet.contains(loanId)) {
+                    if (!loanIdSet.contains(loanId)) {
                         throw IllegalArgumentException("Repayment refers to non-existent loan ID $loanId at repayment index $i.")
                     }
                     val amount = obj.optDouble("amount", 0.0)
@@ -186,50 +158,111 @@ data class FinanceBackupData(
                 }
             }
 
+            // 3. Parse Transactions
+            val txList = mutableListOf<TransactionEntity>()
+            val txIdSet = mutableSetOf<Long>()
+            if (root.has("transactions")) {
+                val txArray = root.getJSONArray("transactions")
+                for (i in 0 until txArray.length()) {
+                    val obj = txArray.getJSONObject(i)
+                    val id = obj.optLong("id", 0L)
+                    if (id <= 0L) {
+                        throw IllegalArgumentException("Transaction ID must be a positive integer (found $id at record index $i).")
+                    }
+                    if (!txIdSet.add(id)) {
+                        throw IllegalArgumentException("Duplicate transaction ID $id found in backup file.")
+                    }
+                    val typeStr = obj.optString("type")
+                    val type = try {
+                        TransactionType.valueOf(typeStr)
+                    } catch (e: Exception) {
+                        throw IllegalArgumentException("Invalid transaction type '$typeStr' at record index $i.")
+                    }
+                    val amount = obj.optDouble("amount", 0.0)
+                    if (amount <= 0.0) {
+                        throw IllegalArgumentException("Transaction amount must be greater than 0 (found $amount at index $i).")
+                    }
+                    val categoryId = obj.optString("categoryId", "other")
+                    val categoryName = obj.optString("categoryName", "Other")
+                    val note = obj.optString("note", "")
+                    val timestamp = obj.optLong("timestamp", System.currentTimeMillis())
+                    val loanId = if (obj.has("loanId") && !obj.isNull("loanId")) obj.getLong("loanId") else null
+                    if (loanId != null && !loanIdSet.contains(loanId)) {
+                        throw IllegalArgumentException("Transaction ID $id references non-existent loan ID $loanId at record index $i.")
+                    }
+                    val archivedAt = if (obj.has("archivedAt") && !obj.isNull("archivedAt")) obj.getLong("archivedAt") else null
+
+                    txList.add(
+                        TransactionEntity(
+                            id = id,
+                            type = type,
+                            amount = amount,
+                            categoryId = categoryId,
+                            categoryName = categoryName,
+                            note = note,
+                            timestamp = timestamp,
+                            loanId = loanId,
+                            archivedAt = archivedAt
+                        )
+                    )
+                }
+            }
+
             // 4. Parse Budget Settings
             val settingsList = mutableListOf<BudgetSettingEntity>()
+            val settingKeySet = mutableSetOf<String>()
             if (root.has("budgetSettings")) {
                 val setArray = root.getJSONArray("budgetSettings")
                 for (i in 0 until setArray.length()) {
                     val obj = setArray.getJSONObject(i)
-                    val key = obj.optString("settingKey", "")
-                    if (key.isNotBlank()) {
-                        val amountLimit = obj.optDouble("amountLimit", 0.0)
-                        val currencyCode = obj.optString("currencyCode", "BDT")
-                        settingsList.add(
-                            BudgetSettingEntity(
-                                settingKey = key,
-                                amountLimit = amountLimit.coerceAtLeast(0.0),
-                                currencyCode = currencyCode
-                            )
-                        )
+                    val key = obj.optString("settingKey", "").trim()
+                    if (key.isBlank()) {
+                        throw IllegalArgumentException("Budget settingKey cannot be blank at index $i.")
                     }
+                    if (!settingKeySet.add(key)) {
+                        throw IllegalArgumentException("Duplicate budget setting key '$key' found in backup file.")
+                    }
+                    val amountLimit = obj.optDouble("amountLimit", 0.0)
+                    val currencyCode = obj.optString("currencyCode", "BDT")
+                    settingsList.add(
+                        BudgetSettingEntity(
+                            settingKey = key,
+                            amountLimit = amountLimit.coerceAtLeast(0.0),
+                            currencyCode = currencyCode
+                        )
+                    )
                 }
             }
 
             // 5. Parse Budget Allocations
             val allocationsList = mutableListOf<BudgetAllocationEntity>()
+            val allocationKeySet = mutableSetOf<Pair<String, String>>()
             if (root.has("budgetAllocations")) {
                 val allocArray = root.getJSONArray("budgetAllocations")
                 for (i in 0 until allocArray.length()) {
                     val obj = allocArray.getJSONObject(i)
-                    val monthKey = obj.optString("monthKey", "")
-                    val categoryId = obj.optString("categoryId", "")
-                    val categoryName = obj.optString("categoryName", "")
+                    val monthKey = obj.optString("monthKey", "").trim()
+                    val categoryId = obj.optString("categoryId", "").trim()
+                    val categoryName = obj.optString("categoryName", "").trim()
                     val allocatedAmount = obj.optDouble("allocatedAmount", 0.0)
                     val updatedAt = obj.optLong("updatedAt", System.currentTimeMillis())
 
-                    if (monthKey.isNotBlank() && categoryId.isNotBlank()) {
-                        allocationsList.add(
-                            BudgetAllocationEntity(
-                                monthKey = monthKey,
-                                categoryId = categoryId,
-                                categoryName = categoryName.ifBlank { categoryId },
-                                allocatedAmount = allocatedAmount.coerceAtLeast(0.0),
-                                updatedAt = updatedAt
-                            )
-                        )
+                    if (monthKey.isBlank() || categoryId.isBlank()) {
+                        throw IllegalArgumentException("Budget allocation must have non-blank monthKey and categoryId at index $i.")
                     }
+                    if (!allocationKeySet.add(monthKey to categoryId)) {
+                        throw IllegalArgumentException("Duplicate budget allocation for month '$monthKey' and category '$categoryId'.")
+                    }
+
+                    allocationsList.add(
+                        BudgetAllocationEntity(
+                            monthKey = monthKey,
+                            categoryId = categoryId,
+                            categoryName = categoryName.ifBlank { categoryId },
+                            allocatedAmount = allocatedAmount.coerceAtLeast(0.0),
+                            updatedAt = updatedAt
+                        )
+                    )
                 }
             }
 

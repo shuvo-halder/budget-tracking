@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -109,7 +110,7 @@ fun BudgetPlanningDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(440.dp)
+                    .heightIn(max = 440.dp)
             ) {
                 // Header summary stats
                 Card(
@@ -212,8 +213,9 @@ fun BudgetPlanningDialog(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
+                        .heightIn(min = 40.dp)
                         .testTag("copy_prev_month_button"),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.ContentCopy,

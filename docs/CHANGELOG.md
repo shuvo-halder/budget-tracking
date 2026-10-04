@@ -18,6 +18,12 @@ All notable changes to the **Budget & Loan Manager** application are documented 
   * Implemented pre-restore summary preview showing record counts for active/archived transactions, loans, repayments, and budget allocations.
   * Implemented atomic database restore in `FinanceRepository` inside Room's `withTransaction` block, guaranteeing rollback on any error or foreign key violation.
   * Added DAO queries and bulk insert/clear methods across all Room DAOs.
+* **Backup/Restore Data-Integrity Test Suite (Phase 6):**
+  * Added `BackupRestoreDataIntegrityTest.kt` with 10 comprehensive unit tests.
+  * Tested complete full-database JSON export/import round-trip comparing all 5 Room entities, null fields, and archive timestamps field-by-field.
+  * Tested atomic restore rollback using a fault-injecting DAO inside real Room `withTransaction`, verifying 100% preservation of pre-restore snapshot.
+  * Strengthened relationship and foreign key validation: rejected orphan repayments when loans collection is empty, validated transaction loan references, and enforced duplicate ID rejection.
+  * Added concurrency guards in `FinanceViewModel` to prevent concurrent export/restore executions.
 
 ### Changed
 * Updated `FinanceUiState` to include `MoreSubDestination.BACKUP_RESTORE` and backup preview state.

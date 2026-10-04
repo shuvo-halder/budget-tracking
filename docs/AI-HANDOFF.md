@@ -47,4 +47,8 @@ Key system capabilities:
   * All database operations MUST use `Dispatchers.IO`.
   * All list transformations, aggregation math, and calendar matrices MUST run on `Dispatchers.Default`.
   * Main thread renders immutable `FinanceUiState` via `collectAsStateWithLifecycle()`.
-* **Atomic Restore:** `FinanceRepository.restoreBackupData` runs inside `database.withTransaction { ... }` ensuring all-or-nothing data replacement with zero partial corruption.
+* **Atomic Restore & Rollback:** `FinanceRepository.restoreBackupData` runs inside `database.withTransaction { ... }` ensuring all-or-nothing data replacement with zero partial corruption.
+* **Backup Validation:** Strict schema and relational integrity validation in `FinanceBackupData.fromJsonString` parses loans first, enforces positive IDs, detects duplicate keys, rejects missing foreign key targets, and prevents orphan repayments even if the loans list is empty.
+* **Concurrency Guards:** `FinanceViewModel` prevents overlapping concurrent backup export, file reading, and restoration executions.
+* **Automated Test Coverage:** Verified with 68 automated unit and Robolectric tests in `app/src/test/`, including `BackupRestoreDataIntegrityTest.kt` verifying full database round-trip and fault-injected transaction rollback.
+

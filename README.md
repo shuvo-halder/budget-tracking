@@ -53,12 +53,18 @@ A modern, privacy-focused, offline-first personal finance, salary budgeting, and
 - **Partial Repayments:** Record installment payments with timestamped receipts and notes.
 - **Full Settlement:** One-tap loan settlement.
 
-### 📅 Interactive Monthly Calendar
+### 📅 Interactive Monthly Calendar (Primary Bottom Tab)
 - **42-Day Matrix:** Visual month calendar with colored activity dots:
   - 🟢 **Green Dot:** Income logged
   - 🔴 **Red Dot:** Expense logged
   - 🔵 **Blue Dot:** Loan activity logged
-- **Daily Activity Sheet:** Inspect daily breakdown and log entries directly from any day.
+- **Daily Spending Overview:** Inspect selected day's income, expenses, and loans with live comparison against the configured daily spending limit.
+
+### 💾 Versioned JSON Backup & Restore (Storage Access Framework)
+- **Zero Cloud Reliance:** 100% offline document export (`ACTION_CREATE_DOCUMENT`) and validated restore (`ACTION_OPEN_DOCUMENT`) via Android Storage Access Framework.
+- **Complete Schema Migration:** Exports and restores all 5 Room entities (Transactions, Loans, Repayments, Monthly Allocations, and Daily/Monthly Limits) including archive timestamps and foreign keys.
+- **Pre-Restore Summary Preview:** Displays record breakdown and requires user confirmation before executing.
+- **Atomic Rollback Guarantee:** Restoration executes inside a single Room database transaction with automatic rollback on any error.
 
 ### 🗑️ Archive, Recovery & 2-Month Retention
 - **Soft-Deletion with Undo:** Deleting any transaction or loan moves it to the archive, preserving relational links and original identifiers.
@@ -72,7 +78,8 @@ A modern, privacy-focused, offline-first personal finance, salary budgeting, and
 - **Offline & Battery-Friendly:** Powered by AndroidX WorkManager and DataStore Preferences. Zero cloud reliance, survives device reboots and timezone adjustments without duplicate alarms.
 
 ### 🧭 Center-Dashboard Bottom Navigation
-- **Balanced 5-Destination Layout:** Transactions, Budget, **Dashboard (Exact Center)**, Loans, More.
+- **Balanced 5-Destination Layout:** Transactions, Budget, **Dashboard (Exact Center)**, Calendar, Loans.
+- **Top Overflow Menu:** Quick access to Backup & Restore, Archive, Reports & Analytics, and Notification Settings.
 - **Edge-to-Edge & Gesture Navigation:** Fully compliant with Material 3 insets and predictive back handling.
 
 ---

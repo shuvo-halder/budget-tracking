@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -464,11 +465,11 @@ private fun LoanCardItem(
                     }
 
                     Box {
-                        IconButton(onClick = { showMenu = true }, modifier = Modifier.size(32.dp)) {
+                        IconButton(onClick = { showMenu = true }, modifier = Modifier.size(40.dp)) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
                                 contentDescription = "Options",
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                         DropdownMenu(
@@ -608,7 +609,7 @@ private fun LoanCardItem(
                 }
 
                 if (!isSettled) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = onRepayClick,
                             shape = RoundedCornerShape(10.dp),
@@ -616,19 +617,19 @@ private fun LoanCardItem(
                                 containerColor = themeColor,
                                 contentColor = Color.White
                             ),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                            modifier = Modifier.height(34.dp)
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                            modifier = Modifier.height(38.dp)
                         ) {
-                            Text("Repay", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            Text("Repay", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                         }
 
                         OutlinedButton(
                             onClick = onSettleClick,
                             shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                            modifier = Modifier.height(34.dp)
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                            modifier = Modifier.height(38.dp)
                         ) {
-                            Text("Settle", style = MaterialTheme.typography.labelSmall)
+                            Text("Settle", style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
@@ -706,24 +707,30 @@ fun AddRepaymentDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(10.dp),
                         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
-                        modifier = Modifier.clickable {
-                            amountText = if (loan.remainingAmount % 1.0 == 0.0) {
-                                loan.remainingAmount.toLong().toString()
-                            } else {
-                                loan.remainingAmount.toString()
+                        modifier = Modifier
+                            .heightIn(min = 40.dp)
+                            .clickable {
+                                amountText = if (loan.remainingAmount % 1.0 == 0.0) {
+                                    loan.remainingAmount.toLong().toString()
+                                } else {
+                                    loan.remainingAmount.toString()
+                                }
+                                errorMessage = null
                             }
-                            errorMessage = null
-                        }
                     ) {
-                        Text(
-                            text = "Full Balance (${CurrencyUtils.formatBDT(loan.remainingAmount)})",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                        )
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = "Full Balance (${CurrencyUtils.formatBDT(loan.remainingAmount)})",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
 

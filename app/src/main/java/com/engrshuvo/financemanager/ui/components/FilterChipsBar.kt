@@ -85,12 +85,13 @@ fun FilterChipsBar(
                         isSearchExpanded = !isSearchExpanded
                         if (!isSearchExpanded) onSearchQueryChange("")
                     },
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(44.dp)
                 ) {
                     Icon(
                         imageVector = if (isSearchExpanded) Icons.Default.Clear else Icons.Default.Search,
                         contentDescription = "Toggle Search",
-                        tint = if (isSearchExpanded || searchQuery.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = if (isSearchExpanded || searchQuery.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
