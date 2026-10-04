@@ -137,19 +137,10 @@ fun UniversalTransactionSheet(
         )
     }
 
+    var isSubmitting by remember(editingTransaction, isOpen) { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var isSelectingDueDate by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(selectedEntryType) {
-        if (selectedEntryType != TransactionType.LOAN) {
-            val currentCat = selectedCategory
-            if (currentCat == null || currentCat.type != selectedEntryType) {
-                val list = if (selectedEntryType == TransactionType.EXPENSE) CategoryCatalog.expenseCategories else CategoryCatalog.incomeCategories
-                selectedCategory = list.firstOrNull()
-            }
-        }
-    }
 
     if (showDatePicker) {
         val initialMillis = if (isSelectingDueDate) (dueDateTimestamp ?: System.currentTimeMillis()) else selectedTimestamp
@@ -233,7 +224,12 @@ fun UniversalTransactionSheet(
             ) {
                 Tab(
                     selected = selectedEntryType == TransactionType.EXPENSE,
-                    onClick = { selectedEntryType = TransactionType.EXPENSE },
+                    onClick = {
+                        selectedEntryType = TransactionType.EXPENSE
+                        if (selectedCategory == null || selectedCategory?.type != TransactionType.EXPENSE) {
+                            selectedCategory = CategoryCatalog.expenseCategories.firstOrNull()
+                        }
+                    },
                     text = {
                         Text(
                             text = "Expense",
@@ -244,7 +240,12 @@ fun UniversalTransactionSheet(
                 )
                 Tab(
                     selected = selectedEntryType == TransactionType.INCOME,
-                    onClick = { selectedEntryType = TransactionType.INCOME },
+                    onClick = {
+                        selectedEntryType = TransactionType.INCOME
+                        if (selectedCategory == null || selectedCategory?.type != TransactionType.INCOME) {
+                            selectedCategory = CategoryCatalog.incomeCategories.firstOrNull()
+                        }
+                    },
                     text = {
                         Text(
                             text = "Income",
@@ -255,7 +256,9 @@ fun UniversalTransactionSheet(
                 )
                 Tab(
                     selected = selectedEntryType == TransactionType.LOAN,
-                    onClick = { selectedEntryType = TransactionType.LOAN },
+                    onClick = {
+                        selectedEntryType = TransactionType.LOAN
+                    },
                     text = {
                         Text(
                             text = "Loan / Debt",
@@ -624,6 +627,7 @@ fun UniversalTransactionSheet(
 
             Button(
                 onClick = {
+                    if (isSubmitting) return@Button
                     val amount = amountText.toDoubleOrNull()
                     if (amount == null || amount <= 0.0) {
                         errorMessage = "Please enter a valid amount greater than 0"
@@ -635,6 +639,7 @@ fun UniversalTransactionSheet(
                             errorMessage = "Please enter the person's name"
                             return@Button
                         }
+                        isSubmitting = true
                         onSaveLoan(
                             selectedLoanType,
                             personNameText,
@@ -650,6 +655,7 @@ fun UniversalTransactionSheet(
                             errorMessage = "Please select a category"
                             return@Button
                         }
+                        isSubmitting = true
                         onSaveTransaction(
                             editingTransaction?.id ?: 0L,
                             selectedEntryType,
@@ -661,6 +667,7 @@ fun UniversalTransactionSheet(
                         )
                     }
                 },
+                enabled = !isSubmitting,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(54.dp)

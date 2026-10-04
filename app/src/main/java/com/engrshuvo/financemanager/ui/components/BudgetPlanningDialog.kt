@@ -32,9 +32,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,13 +61,27 @@ fun BudgetPlanningDialog(
     onSaveAllocations: (Map<String, Double>) -> Unit,
     onCopyFromPreviousMonth: () -> Unit
 ) {
-    val allocationInputs = remember(currentAllocations) {
+    var isCopyRequested by remember { mutableStateOf(false) }
+
+    val allocationInputs = remember(monthName) {
         mutableStateMapOf<String, String>().apply {
             currentAllocations.forEach { model ->
                 if (model.allocatedAmount > 0) {
                     put(model.category.id, if (model.allocatedAmount % 1.0 == 0.0) model.allocatedAmount.toLong().toString() else model.allocatedAmount.toString())
                 }
             }
+        }
+    }
+
+    LaunchedEffect(currentAllocations) {
+        if (isCopyRequested) {
+            allocationInputs.clear()
+            currentAllocations.forEach { model ->
+                if (model.allocatedAmount > 0) {
+                    allocationInputs[model.category.id] = if (model.allocatedAmount % 1.0 == 0.0) model.allocatedAmount.toLong().toString() else model.allocatedAmount.toString()
+                }
+            }
+            isCopyRequested = false
         }
     }
 
@@ -189,7 +206,10 @@ fun BudgetPlanningDialog(
 
                 // Copy from previous month option
                 OutlinedButton(
-                    onClick = onCopyFromPreviousMonth,
+                    onClick = {
+                        isCopyRequested = true
+                        onCopyFromPreviousMonth()
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("copy_prev_month_button"),

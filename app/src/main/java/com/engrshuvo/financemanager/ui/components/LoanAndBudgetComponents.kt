@@ -648,6 +648,7 @@ fun AddRepaymentDialog(
 
     var amountText by remember(loan) { mutableStateOf("") }
     var noteText by remember(loan) { mutableStateOf("") }
+    var isSubmitting by remember(loan, isOpen) { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val isLent = loan.type == LoanType.LENT
@@ -747,6 +748,7 @@ fun AddRepaymentDialog(
         confirmButton = {
             Button(
                 onClick = {
+                    if (isSubmitting) return@Button
                     val amount = amountText.toDoubleOrNull()
                     if (amount == null || amount <= 0.0) {
                         errorMessage = "Please enter a valid repayment amount"
@@ -756,8 +758,10 @@ fun AddRepaymentDialog(
                         errorMessage = "Amount cannot exceed remaining balance (${CurrencyUtils.formatBDT(loan.remainingAmount)})"
                         return@Button
                     }
+                    isSubmitting = true
                     onSubmitRepayment(loan.id, amount, noteText)
                 },
+                enabled = !isSubmitting,
                 modifier = Modifier.testTag("submit_repayment_button")
             ) {
                 Text("Confirm Repayment")

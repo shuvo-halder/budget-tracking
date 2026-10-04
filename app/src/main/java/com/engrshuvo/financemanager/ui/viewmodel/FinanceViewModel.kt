@@ -81,6 +81,10 @@ class FinanceViewModel(
     private val _notificationPrefs = MutableStateFlow(NotificationPreferences())
     private val _notificationPermissionGranted = MutableStateFlow(true)
 
+    // In-flight operation guards to prevent duplicate concurrent submissions
+    private val isTransactionSaving = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val isRepaymentSaving = java.util.concurrent.atomic.AtomicBoolean(false)
+
     init {
         // Automatic cleanup on app startup
         viewModelScope.launch {
@@ -183,40 +187,61 @@ class FinanceViewModel(
         params.copy(loanStatus = loanStatus)
     }.flowOn(Dispatchers.Default)
 
-    private val archiveRawDataFlow: Flow<ArchiveData> = combine(
-        repository.archivedTransactions,
-        repository.archivedLoans
-    ) { txs, loans ->
-        ArchiveData(txs, loans)
-    }.flowOn(Dispatchers.Default)
-
     private val archiveParamsFlow: Flow<ArchiveParams> = combine(
         _archiveFilterType,
         _archiveSearchQuery,
         _itemToPermanentlyDelete,
-        _moreSubDestination
-    ) { filterType, query, itemToDelete, moreDest ->
-        ArchiveParams(filterType, query, itemToDelete, moreDest, _recentlyArchivedNote.value)
-    }.combine(_recentlyArchivedNote) { params, note ->
-        params.copy(recentlyArchivedNote = note)
+        _moreSubDestination,
+        _recentlyArchivedNote
+    ) { filterType, searchQuery, itemToDelete, moreDest, recentlyArchivedNote ->
+        ArchiveParams(
+            filterType = filterType,
+            searchQuery = searchQuery,
+            itemToDelete = itemToDelete,
+            moreDest = moreDest,
+            recentlyArchivedNote = recentlyArchivedNote
+        )
     }.flowOn(Dispatchers.Default)
 
-    val uiState: StateFlow<FinanceUiState> = combine(
-        coreDataFlow,
-        calendarParamsFlow,
-        filterParamsFlow,
-        archiveRawDataFlow,
-        archiveParamsFlow
-    ) { coreData, calendarParams, filterParams, archiveRawData, archiveParams ->
+    private data class MonthlyFinancialSummary(
+        val selectedMonthKey: String,
+        val balance: Double,
+        val totalIncome: Double,
+        val totalExpense: Double,
+        val netOperatingCashChange: Double,
+        val totalActiveLent: Double,
+        val totalActiveBorrowed: Double,
+        val monthAllocations: List<CategoryAllocationUiModel>,
+        val isBudgetAllocationDraft: Boolean,
+        val totalAllocated: Double,
+        val unallocatedIncome: Double,
+        val plannedShortfall: Double,
+        val isShortfall: Boolean,
+        val plannedSavingsTotal: Double,
+        val todayExpenses: Double,
+        val dailyBudgetRemaining: Double,
+        val dailyBudgetProgress: Float,
+        val isDailyOverBudget: Boolean,
+        val suggestedDailyLimit: Double,
+        val monthlySpent: Double,
+        val budgetProgress: Float,
+        val budgetRemaining: Double,
+        val categoryBreakdown: List<CategorySpending>,
+        val startOfMonth: Long,
+        val endOfMonth: Long
+    )
+
+    private val monthlySummaryFlow: Flow<MonthlyFinancialSummary> = combine(
+        _displayedMonth,
+        coreDataFlow
+    ) { displayedMonth, coreData ->
         val allTransactions = coreData.allTransactions
         val allLoans = coreData.allLoans
         val monthlyLimit = coreData.monthlyLimit
         val dailyLimit = coreData.dailyLimit
         val allAllocations = coreData.allAllocations
-        val activeTab = coreData.activeTab
 
-        // 1. Month boundaries for displayedMonth
-        val cal = calendarParams.month.clone() as Calendar
+        val cal = displayedMonth.clone() as Calendar
         val year = cal.get(Calendar.YEAR)
         val monthZeroBased = cal.get(Calendar.MONTH)
         val selectedMonthKey = String.format(Locale.US, "%04d-%02d", year, monthZeroBased + 1)
@@ -238,33 +263,24 @@ class FinanceViewModel(
             set(Calendar.MILLISECOND, 999)
         }.timeInMillis
 
-        // Month-specific transactions (strictly bounded interval)
         val monthTransactions = allTransactions.filter { it.timestamp in startOfMonth..endOfMonth }
 
-        // Monthly Income: ordinary income (excluding loan collections to keep operating income clean)
         val totalIncome = monthTransactions
             .filter { it.type == TransactionType.INCOME && it.categoryId != "loan_collected" }
             .sumOf { it.amount }
 
-        // Monthly Expense: ordinary living expenses (excluding loan repayments to keep budget clean)
         val totalExpense = monthTransactions
             .filter { it.type == TransactionType.EXPENSE && it.categoryId != "loan_repaid" }
             .sumOf { it.amount }
 
         val netOperatingCashChange = totalIncome - totalExpense
 
-        // All-time available cash balance:
-        // Cash = Income (salary, other income, loan repayments collected)
-        //        - Expenses (living expenses, loan repayments paid)
-        //        + Borrowed loan principal received
-        //        - Lent loan principal disbursed
         val allTimeIncome = allTransactions.filter { it.type == TransactionType.INCOME }.sumOf { it.amount }
         val allTimeExpense = allTransactions.filter { it.type == TransactionType.EXPENSE }.sumOf { it.amount }
         val allTimeBorrowed = allTransactions.filter { it.type == TransactionType.LOAN && it.categoryId == "loan_borrowed" }.sumOf { it.amount }
         val allTimeLent = allTransactions.filter { it.type == TransactionType.LOAN && it.categoryId == "loan_lent" }.sumOf { it.amount }
         val balance = allTimeIncome - allTimeExpense + allTimeBorrowed - allTimeLent
 
-        // 2. Today's expenses & daily budget limit
         val startOfToday = DateUtils.getStartOfDay()
         val endOfToday = DateUtils.getEndOfDay()
         val todayExpenses = allTransactions
@@ -275,7 +291,6 @@ class FinanceViewModel(
         val dailyBudgetProgress = if (dailyLimit > 0) (todayExpenses / dailyLimit).toFloat().coerceIn(0f, 1f) else 0f
         val isDailyOverBudget = todayExpenses > dailyLimit && dailyLimit > 0
 
-        // 3. Month Allocations for selectedMonthKey (strictly stored per-month)
         val savedMonthAllocations = allAllocations.filter { it.monthKey == selectedMonthKey }
         val prevCal = (cal.clone() as Calendar).apply { add(Calendar.MONTH, -1) }
         val prevMonthKey = String.format(Locale.US, "%04d-%02d", prevCal.get(Calendar.YEAR), prevCal.get(Calendar.MONTH) + 1)
@@ -329,16 +344,13 @@ class FinanceViewModel(
             .filter { it.category.id == "savings" || it.category.id == "emergency" }
             .sumOf { it.allocatedAmount }
 
-        // Calculate suggested daily limit from Daily Expenses allocation without mutating state
         val dailyExpenseAlloc = monthCategoryAllocations.find { it.category.id == "daily_expenses" }?.allocatedAmount ?: 0.0
         val suggestedDailyLimit = if (dailyExpenseAlloc > 0 && daysInMonth > 0) dailyExpenseAlloc / daysInMonth else 0.0
 
-        // 4. Loans summary
         val activeLoans = allLoans.filter { it.status == LoanStatus.ACTIVE }
         val totalActiveLent = activeLoans.filter { it.type == LoanType.LENT }.sumOf { it.remainingAmount }
         val totalActiveBorrowed = activeLoans.filter { it.type == LoanType.BORROWED }.sumOf { it.remainingAmount }
 
-        // 5. Category Breakdown for selected month (ordinary expenses only)
         val monthOrdinaryExpenses = monthTransactions.filter { it.type == TransactionType.EXPENSE && it.categoryId != "loan_repaid" }
         val totalMonthExpense = monthOrdinaryExpenses.sumOf { it.amount }
         val categoryBreakdown = if (totalMonthExpense > 0) {
@@ -361,12 +373,110 @@ class FinanceViewModel(
         val budgetProgress = if (monthlyLimit > 0) (monthlySpent / monthlyLimit).toFloat() else 0f
         val budgetRemaining = (monthlyLimit - monthlySpent).coerceAtLeast(0.0)
 
-        // 6. Calendar Days
-        val calendarDays = generateCalendarGrid(
-            calendarMonth = calendarParams.month,
-            selectedDateTs = calendarParams.selectedDate,
-            transactions = allTransactions
+        MonthlyFinancialSummary(
+            selectedMonthKey = selectedMonthKey,
+            balance = balance,
+            totalIncome = totalIncome,
+            totalExpense = totalExpense,
+            netOperatingCashChange = netOperatingCashChange,
+            totalActiveLent = totalActiveLent,
+            totalActiveBorrowed = totalActiveBorrowed,
+            monthAllocations = monthCategoryAllocations,
+            isBudgetAllocationDraft = isBudgetAllocationDraft,
+            totalAllocated = totalAllocated,
+            unallocatedIncome = unallocatedIncome,
+            plannedShortfall = plannedShortfall,
+            isShortfall = isShortfall,
+            plannedSavingsTotal = plannedSavingsTotal,
+            todayExpenses = todayExpenses,
+            dailyBudgetRemaining = dailyBudgetRemaining,
+            dailyBudgetProgress = dailyBudgetProgress,
+            isDailyOverBudget = isDailyOverBudget,
+            suggestedDailyLimit = suggestedDailyLimit,
+            monthlySpent = monthlySpent,
+            budgetProgress = budgetProgress,
+            budgetRemaining = budgetRemaining,
+            categoryBreakdown = categoryBreakdown,
+            startOfMonth = startOfMonth,
+            endOfMonth = endOfMonth
         )
+    }.flowOn(Dispatchers.Default)
+
+    private val calendarGridFlow: Flow<List<CalendarDayCell>> = combine(
+        _displayedMonth,
+        _selectedDateTimestamp,
+        repository.allTransactions
+    ) { month, selectedDate, transactions ->
+        generateCalendarGrid(month, selectedDate, transactions)
+    }.flowOn(Dispatchers.Default)
+
+    private val archiveWrappersFlow: Flow<List<ArchiveItemWrapper>> = combine(
+        repository.archivedTransactions,
+        repository.archivedLoans
+    ) { archivedTxs, archivedLoans ->
+        val now = System.currentTimeMillis()
+        val txWrappers = archivedTxs.map { entity ->
+            val calArchive = Calendar.getInstance().apply {
+                timeInMillis = entity.archivedAt ?: now
+                add(Calendar.MONTH, 2)
+            }
+            val daysRemaining = ((calArchive.timeInMillis - now) / (1000L * 60 * 60 * 24)).coerceAtLeast(0).toInt()
+            val retentionText = if (daysRemaining <= 0) "Eligible for auto-purge" else "Permanent deletion in $daysRemaining days"
+            ArchiveItemWrapper.Transaction(
+                entity = entity,
+                daysRemaining = daysRemaining,
+                formattedRetentionRemaining = retentionText
+            )
+        }
+
+        val loanWrappers = archivedLoans.map { entity ->
+            val calArchive = Calendar.getInstance().apply {
+                timeInMillis = entity.archivedAt ?: now
+                add(Calendar.MONTH, 2)
+            }
+            val daysRemaining = ((calArchive.timeInMillis - now) / (1000L * 60 * 60 * 24)).coerceAtLeast(0).toInt()
+            val retentionText = if (daysRemaining <= 0) "Eligible for auto-purge" else "Permanent deletion in $daysRemaining days"
+            ArchiveItemWrapper.Loan(
+                entity = entity,
+                daysRemaining = daysRemaining,
+                formattedRetentionRemaining = retentionText
+            )
+        }
+
+        (txWrappers + loanWrappers).sortedByDescending { it.archivedAt }
+    }.flowOn(Dispatchers.Default)
+
+    private data class IntermediateData(
+        val coreData: CoreData,
+        val monthlySummary: MonthlyFinancialSummary,
+        val calendarDays: List<CalendarDayCell>,
+        val allArchivedItems: List<ArchiveItemWrapper>
+    )
+
+    private val intermediateDataFlow: Flow<IntermediateData> = combine(
+        coreDataFlow,
+        monthlySummaryFlow,
+        calendarGridFlow,
+        archiveWrappersFlow
+    ) { coreData, monthlySummary, calendarDays, allArchivedItems ->
+        IntermediateData(coreData, monthlySummary, calendarDays, allArchivedItems)
+    }.flowOn(Dispatchers.Default)
+
+    val uiState: StateFlow<FinanceUiState> = combine(
+        intermediateDataFlow,
+        calendarParamsFlow,
+        filterParamsFlow,
+        archiveParamsFlow
+    ) { intermediate, calendarParams, filterParams, archiveParams ->
+        val coreData = intermediate.coreData
+        val monthlySummary = intermediate.monthlySummary
+        val allTransactions = coreData.allTransactions
+        val allLoans = coreData.allLoans
+        val calendarDays = intermediate.calendarDays
+        val allArchivedItems = intermediate.allArchivedItems
+
+        val startOfMonth = monthlySummary.startOfMonth
+        val endOfMonth = monthlySummary.endOfMonth
 
         val selectedDayStart = DateUtils.getStartOfDay(calendarParams.selectedDate)
         val selectedDayEnd = DateUtils.getEndOfDay(calendarParams.selectedDate)
@@ -433,36 +543,6 @@ class FinanceViewModel(
             matchesType && matchesStatus
         }
 
-        val now = System.currentTimeMillis()
-        val txWrappers = archiveRawData.archivedTransactions.map { entity ->
-            val calArchive = Calendar.getInstance().apply {
-                timeInMillis = entity.archivedAt ?: now
-                add(Calendar.MONTH, 2)
-            }
-            val daysRemaining = ((calArchive.timeInMillis - now) / (1000L * 60 * 60 * 24)).coerceAtLeast(0).toInt()
-            val retentionText = if (daysRemaining <= 0) "Eligible for auto-purge" else "Permanent deletion in $daysRemaining days"
-            ArchiveItemWrapper.Transaction(
-                entity = entity,
-                daysRemaining = daysRemaining,
-                formattedRetentionRemaining = retentionText
-            )
-        }
-
-        val loanWrappers = archiveRawData.archivedLoans.map { entity ->
-            val calArchive = Calendar.getInstance().apply {
-                timeInMillis = entity.archivedAt ?: now
-                add(Calendar.MONTH, 2)
-            }
-            val daysRemaining = ((calArchive.timeInMillis - now) / (1000L * 60 * 60 * 24)).coerceAtLeast(0).toInt()
-            val retentionText = if (daysRemaining <= 0) "Eligible for auto-purge" else "Permanent deletion in $daysRemaining days"
-            ArchiveItemWrapper.Loan(
-                entity = entity,
-                daysRemaining = daysRemaining,
-                formattedRetentionRemaining = retentionText
-            )
-        }
-
-        val allArchivedItems = (txWrappers + loanWrappers).sortedByDescending { it.archivedAt }
         val filteredArchivedItems = allArchivedItems.filter { item ->
             val matchesType = when (archiveParams.filterType) {
                 ArchiveFilterType.ALL -> true
@@ -478,7 +558,7 @@ class FinanceViewModel(
         }
 
         FinanceUiState(
-            activeTab = activeTab,
+            activeTab = coreData.activeTab,
             moreSubDestination = archiveParams.moreDest,
             displayedMonth = calendarParams.month,
             selectedDateTimestamp = calendarParams.selectedDate,
@@ -486,33 +566,33 @@ class FinanceViewModel(
             selectedDayTransactions = selectedDayTransactions,
             selectedDaySummary = selectedDaySummary,
             isDayDetailSheetOpen = calendarParams.isSheetOpen,
-            selectedMonthKey = selectedMonthKey,
-            balance = balance,
-            totalIncome = totalIncome,
-            totalExpense = totalExpense,
-            netOperatingCashChange = netOperatingCashChange,
-            totalActiveLent = totalActiveLent,
-            totalActiveBorrowed = totalActiveBorrowed,
-            monthAllocations = monthCategoryAllocations,
-            isBudgetAllocationDraft = isBudgetAllocationDraft,
-            totalAllocated = totalAllocated,
-            unallocatedIncome = unallocatedIncome,
-            plannedShortfall = plannedShortfall,
-            isShortfall = isShortfall,
-            plannedSavingsTotal = plannedSavingsTotal,
-            todayExpenses = todayExpenses,
-            dailyBudgetLimit = dailyLimit,
-            dailyBudgetRemaining = dailyBudgetRemaining,
-            dailyBudgetProgress = dailyBudgetProgress,
-            isDailyOverBudget = isDailyOverBudget,
-            suggestedDailyLimit = suggestedDailyLimit,
-            monthlyLimit = monthlyLimit,
-            monthlySpent = monthlySpent,
-            budgetProgress = budgetProgress,
-            budgetRemaining = budgetRemaining,
+            selectedMonthKey = monthlySummary.selectedMonthKey,
+            balance = monthlySummary.balance,
+            totalIncome = monthlySummary.totalIncome,
+            totalExpense = monthlySummary.totalExpense,
+            netOperatingCashChange = monthlySummary.netOperatingCashChange,
+            totalActiveLent = monthlySummary.totalActiveLent,
+            totalActiveBorrowed = monthlySummary.totalActiveBorrowed,
+            monthAllocations = monthlySummary.monthAllocations,
+            isBudgetAllocationDraft = monthlySummary.isBudgetAllocationDraft,
+            totalAllocated = monthlySummary.totalAllocated,
+            unallocatedIncome = monthlySummary.unallocatedIncome,
+            plannedShortfall = monthlySummary.plannedShortfall,
+            isShortfall = monthlySummary.isShortfall,
+            plannedSavingsTotal = monthlySummary.plannedSavingsTotal,
+            todayExpenses = monthlySummary.todayExpenses,
+            dailyBudgetLimit = coreData.dailyLimit,
+            dailyBudgetRemaining = monthlySummary.dailyBudgetRemaining,
+            dailyBudgetProgress = monthlySummary.dailyBudgetProgress,
+            isDailyOverBudget = monthlySummary.isDailyOverBudget,
+            suggestedDailyLimit = monthlySummary.suggestedDailyLimit,
+            monthlyLimit = coreData.monthlyLimit,
+            monthlySpent = monthlySummary.monthlySpent,
+            budgetProgress = monthlySummary.budgetProgress,
+            budgetRemaining = monthlySummary.budgetRemaining,
             allTransactions = allTransactions,
             filteredTransactions = filteredTransactions,
-            categorySpendBreakdown = categoryBreakdown,
+            categorySpendBreakdown = monthlySummary.categoryBreakdown,
             searchQuery = search,
             selectedTypeFilter = typeFilter,
             selectedCategoryFilterId = categoryFilter,
@@ -688,22 +768,29 @@ class FinanceViewModel(
         note: String,
         timestamp: Long
     ) {
+        if (!isTransactionSaving.compareAndSet(false, true)) {
+            return
+        }
         viewModelScope.launch {
-            val entity = TransactionEntity(
-                id = id,
-                type = type,
-                amount = amount,
-                categoryId = categoryId,
-                categoryName = categoryName,
-                note = note.trim(),
-                timestamp = timestamp
-            )
-            if (id == 0L) {
-                repository.insertTransaction(entity)
-            } else {
-                repository.updateTransaction(entity)
+            try {
+                val entity = TransactionEntity(
+                    id = id,
+                    type = type,
+                    amount = amount,
+                    categoryId = categoryId,
+                    categoryName = categoryName,
+                    note = note.trim(),
+                    timestamp = timestamp
+                )
+                if (id == 0L) {
+                    repository.insertTransaction(entity)
+                } else {
+                    repository.updateTransaction(entity)
+                }
+                closeAddTransactionSheet()
+            } finally {
+                isTransactionSaving.set(false)
             }
-            closeAddTransactionSheet()
         }
     }
 
@@ -716,21 +803,28 @@ class FinanceViewModel(
         dueDate: Long?,
         note: String
     ) {
+        if (!isTransactionSaving.compareAndSet(false, true)) {
+            return
+        }
         viewModelScope.launch {
-            val loan = LoanEntity(
-                id = 0,
-                type = type,
-                personName = personName.trim(),
-                phoneNumber = phoneNumber.trim(),
-                initialAmount = amount,
-                remainingAmount = amount,
-                status = LoanStatus.ACTIVE,
-                startDate = startDate,
-                dueDate = dueDate,
-                note = note.trim()
-            )
-            repository.insertLoanWithTransaction(loan)
-            closeAddTransactionSheet()
+            try {
+                val loan = LoanEntity(
+                    id = 0,
+                    type = type,
+                    personName = personName.trim(),
+                    phoneNumber = phoneNumber.trim(),
+                    initialAmount = amount,
+                    remainingAmount = amount,
+                    status = LoanStatus.ACTIVE,
+                    startDate = startDate,
+                    dueDate = dueDate,
+                    note = note.trim()
+                )
+                repository.insertLoanWithTransaction(loan)
+                closeAddTransactionSheet()
+            } finally {
+                isTransactionSaving.set(false)
+            }
         }
     }
 
@@ -757,9 +851,16 @@ class FinanceViewModel(
     }
 
     fun submitLoanRepayment(loanId: Long, amount: Double, note: String) {
+        if (!isRepaymentSaving.compareAndSet(false, true)) {
+            return
+        }
         viewModelScope.launch {
-            repository.recordLoanRepayment(loanId, amount, note)
-            closeRepayDialog()
+            try {
+                repository.recordLoanRepayment(loanId, amount, note)
+                closeRepayDialog()
+            } finally {
+                isRepaymentSaving.set(false)
+            }
         }
     }
 
