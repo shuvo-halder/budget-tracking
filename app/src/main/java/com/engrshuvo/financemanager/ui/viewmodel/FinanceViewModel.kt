@@ -212,6 +212,98 @@ class FinanceViewModel(
         )
     }.flowOn(Dispatchers.Default)
 
+    private data class DialogParams(
+        val isAddTransactionSheetOpen: Boolean,
+        val editingTransaction: TransactionEntity?,
+        val defaultEntryType: TransactionType,
+        val defaultLoanType: LoanType,
+        val isRepayDialogOpen: Boolean,
+        val repayingLoan: LoanEntity?,
+        val isBudgetLimitDialogOpen: Boolean,
+        val isBudgetPlanningDialogOpen: Boolean,
+        val isDailyLimitDialogOpen: Boolean
+    )
+
+    private val dialogParamsFlow: Flow<DialogParams> = combine(
+        _isAddTransactionSheetOpen,
+        _editingTransaction,
+        _defaultEntryType,
+        _defaultLoanType,
+        _isRepayDialogOpen
+    ) { isAddOpen, editingTx, defaultEntryType, defaultLoanType, isRepayOpen ->
+        DialogParams(
+            isAddTransactionSheetOpen = isAddOpen,
+            editingTransaction = editingTx,
+            defaultEntryType = defaultEntryType,
+            defaultLoanType = defaultLoanType,
+            isRepayDialogOpen = isRepayOpen,
+            repayingLoan = _repayingLoan.value,
+            isBudgetLimitDialogOpen = _isBudgetLimitDialogOpen.value,
+            isBudgetPlanningDialogOpen = _isBudgetPlanningDialogOpen.value,
+            isDailyLimitDialogOpen = _isDailyLimitDialogOpen.value
+        )
+    }.combine(
+        combine(
+            _repayingLoan,
+            _isBudgetLimitDialogOpen,
+            _isBudgetPlanningDialogOpen,
+            _isDailyLimitDialogOpen
+        ) { repayingLoan, isBudgetLimit, isBudgetPlanning, isDailyLimit ->
+            arrayOf(repayingLoan, isBudgetLimit, isBudgetPlanning, isDailyLimit)
+        }
+    ) { params, extra ->
+        params.copy(
+            repayingLoan = extra[0] as? LoanEntity,
+            isBudgetLimitDialogOpen = extra[1] as Boolean,
+            isBudgetPlanningDialogOpen = extra[2] as Boolean,
+            isDailyLimitDialogOpen = extra[3] as Boolean
+        )
+    }.flowOn(Dispatchers.Default)
+
+    private data class BackupNotificationParams(
+        val isExportingBackup: Boolean,
+        val isRestoringBackup: Boolean,
+        val backupPreview: com.engrshuvo.financemanager.data.model.BackupSummaryPreview?,
+        val pendingRestoreData: com.engrshuvo.financemanager.data.model.FinanceBackupData?,
+        val backupOperationMessage: String?,
+        val backupOperationError: String?,
+        val notificationPreferences: NotificationPreferences,
+        val notificationPermissionGranted: Boolean
+    )
+
+    private val backupNotificationParamsFlow: Flow<BackupNotificationParams> = combine(
+        _isExportingBackup,
+        _isRestoringBackup,
+        _backupPreview,
+        _pendingRestoreData,
+        _backupOperationMessage
+    ) { exporting, restoring, preview, pending, msg ->
+        BackupNotificationParams(
+            isExportingBackup = exporting,
+            isRestoringBackup = restoring,
+            backupPreview = preview,
+            pendingRestoreData = pending,
+            backupOperationMessage = msg,
+            backupOperationError = _backupOperationError.value,
+            notificationPreferences = _notificationPrefs.value,
+            notificationPermissionGranted = _notificationPermissionGranted.value
+        )
+    }.combine(
+        combine(
+            _backupOperationError,
+            _notificationPrefs,
+            _notificationPermissionGranted
+        ) { error, prefs, granted ->
+            Triple(error, prefs, granted)
+        }
+    ) { params, extra ->
+        params.copy(
+            backupOperationError = extra.first,
+            notificationPreferences = extra.second,
+            notificationPermissionGranted = extra.third
+        )
+    }.flowOn(Dispatchers.Default)
+
     private data class MonthlyFinancialSummary(
         val selectedMonthKey: String,
         val balance: Double,
@@ -475,8 +567,9 @@ class FinanceViewModel(
         intermediateDataFlow,
         calendarParamsFlow,
         filterParamsFlow,
-        archiveParamsFlow
-    ) { intermediate, calendarParams, filterParams, archiveParams ->
+        archiveParamsFlow,
+        dialogParamsFlow
+    ) { intermediate, calendarParams, filterParams, archiveParams, dialogParams ->
         val coreData = intermediate.coreData
         val monthlySummary = intermediate.monthlySummary
         val allTransactions = coreData.allTransactions
@@ -610,30 +703,33 @@ class FinanceViewModel(
             filteredLoans = filteredLoans,
             selectedLoanFilter = loanTypeFilter,
             selectedLoanStatusFilter = loanStatusFilter,
-            repayingLoan = _repayingLoan.value,
-            isRepayDialogOpen = _isRepayDialogOpen.value,
+            repayingLoan = dialogParams.repayingLoan,
+            isRepayDialogOpen = dialogParams.isRepayDialogOpen,
             archivedItems = allArchivedItems,
             filteredArchivedItems = filteredArchivedItems,
             archiveFilterType = archiveParams.filterType,
             archiveSearchQuery = archiveParams.searchQuery,
             itemToPermanentlyDelete = archiveParams.itemToDelete,
             recentlyArchivedNote = archiveParams.recentlyArchivedNote,
-            isAddTransactionSheetOpen = _isAddTransactionSheetOpen.value,
-            editingTransaction = _editingTransaction.value,
-            defaultEntryType = _defaultEntryType.value,
-            defaultLoanType = _defaultLoanType.value,
-            isBudgetLimitDialogOpen = _isBudgetLimitDialogOpen.value,
-            isBudgetPlanningDialogOpen = _isBudgetPlanningDialogOpen.value,
-            isDailyLimitDialogOpen = _isDailyLimitDialogOpen.value,
-            currencySymbol = "৳",
-            notificationPreferences = _notificationPrefs.value,
-            notificationPermissionGranted = _notificationPermissionGranted.value,
-            isExportingBackup = _isExportingBackup.value,
-            isRestoringBackup = _isRestoringBackup.value,
-            backupPreview = _backupPreview.value,
-            pendingRestoreData = _pendingRestoreData.value,
-            backupOperationMessage = _backupOperationMessage.value,
-            backupOperationError = _backupOperationError.value
+            isAddTransactionSheetOpen = dialogParams.isAddTransactionSheetOpen,
+            editingTransaction = dialogParams.editingTransaction,
+            defaultEntryType = dialogParams.defaultEntryType,
+            defaultLoanType = dialogParams.defaultLoanType,
+            isBudgetLimitDialogOpen = dialogParams.isBudgetLimitDialogOpen,
+            isBudgetPlanningDialogOpen = dialogParams.isBudgetPlanningDialogOpen,
+            isDailyLimitDialogOpen = dialogParams.isDailyLimitDialogOpen,
+            currencySymbol = "৳"
+        )
+    }.combine(backupNotificationParamsFlow) { state, backupParams ->
+        state.copy(
+            isExportingBackup = backupParams.isExportingBackup,
+            isRestoringBackup = backupParams.isRestoringBackup,
+            backupPreview = backupParams.backupPreview,
+            pendingRestoreData = backupParams.pendingRestoreData,
+            backupOperationMessage = backupParams.backupOperationMessage,
+            backupOperationError = backupParams.backupOperationError,
+            notificationPreferences = backupParams.notificationPreferences,
+            notificationPermissionGranted = backupParams.notificationPermissionGranted
         )
     }.flowOn(Dispatchers.Default)
     .stateIn(

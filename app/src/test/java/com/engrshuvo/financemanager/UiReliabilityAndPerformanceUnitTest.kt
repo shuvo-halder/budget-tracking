@@ -703,4 +703,91 @@ class UiReliabilityAndPerformanceUnitTest {
         assertTrue(wrapper.daysRemaining >= 58 && wrapper.daysRemaining <= 62)
         assertEquals("Permanent deletion in $expectedDays days", wrapper.formattedRetentionRemaining)
     }
+
+    @Test
+    fun `12 - Add New Entry sheet state transitions emit immediately without UI thread hang or state desynchronization`() = testScope.runTest {
+        backgroundScope.launch(kotlinx.coroutines.test.UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect {}
+        }
+        advanceUntilIdle()
+
+        // 1. Initial State: Sheet is closed
+        assertFalse("Initial state must have sheet closed", viewModel.uiState.value.isAddTransactionSheetOpen)
+
+        // 2. Tap '+' / 'Add New Entry' for Expense
+        viewModel.openAddTransactionSheet(TransactionType.EXPENSE)
+        advanceUntilIdle()
+        waitUntil { viewModel.uiState.value.isAddTransactionSheetOpen }
+
+        val openStateExpense = viewModel.uiState.value
+        assertTrue("Sheet must be open after openAddTransactionSheet", openStateExpense.isAddTransactionSheetOpen)
+        assertEquals(TransactionType.EXPENSE, openStateExpense.defaultEntryType)
+        assertNull(openStateExpense.editingTransaction)
+
+        // 3. Dismiss Sheet
+        viewModel.closeAddTransactionSheet()
+        advanceUntilIdle()
+        waitUntil { !viewModel.uiState.value.isAddTransactionSheetOpen }
+        assertFalse("Sheet must be closed after closeAddTransactionSheet", viewModel.uiState.value.isAddTransactionSheetOpen)
+
+        // 4. Tap '+ Salary / Income'
+        viewModel.openAddTransactionSheet(TransactionType.INCOME)
+        advanceUntilIdle()
+        waitUntil { viewModel.uiState.value.isAddTransactionSheetOpen }
+
+        val openStateIncome = viewModel.uiState.value
+        assertTrue("Sheet must be open for Income", openStateIncome.isAddTransactionSheetOpen)
+        assertEquals(TransactionType.INCOME, openStateIncome.defaultEntryType)
+
+        viewModel.closeAddTransactionSheet()
+        advanceUntilIdle()
+        waitUntil { !viewModel.uiState.value.isAddTransactionSheetOpen }
+
+        // 5. Tap 'Add Loan / Debt' (Borrowing)
+        viewModel.openAddTransactionSheet(TransactionType.LOAN, LoanType.BORROWED)
+        advanceUntilIdle()
+        waitUntil { viewModel.uiState.value.isAddTransactionSheetOpen }
+
+        val openStateLoan = viewModel.uiState.value
+        assertTrue("Sheet must be open for Loan", openStateLoan.isAddTransactionSheetOpen)
+        assertEquals(TransactionType.LOAN, openStateLoan.defaultEntryType)
+        assertEquals(LoanType.BORROWED, openStateLoan.defaultLoanType)
+
+        viewModel.closeAddTransactionSheet()
+        advanceUntilIdle()
+        waitUntil { !viewModel.uiState.value.isAddTransactionSheetOpen }
+        assertFalse(viewModel.uiState.value.isAddTransactionSheetOpen)
+    }
+
+    @Test
+    fun `13 - Budget planning and daily limit dialogs open and close reactively in uiState`() = testScope.runTest {
+        backgroundScope.launch(kotlinx.coroutines.test.UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect {}
+        }
+        advanceUntilIdle()
+
+        // Budget Planning Dialog
+        assertFalse(viewModel.uiState.value.isBudgetPlanningDialogOpen)
+        viewModel.openBudgetPlanningDialog()
+        advanceUntilIdle()
+        waitUntil { viewModel.uiState.value.isBudgetPlanningDialogOpen }
+        assertTrue(viewModel.uiState.value.isBudgetPlanningDialogOpen)
+
+        viewModel.closeBudgetPlanningDialog()
+        advanceUntilIdle()
+        waitUntil { !viewModel.uiState.value.isBudgetPlanningDialogOpen }
+        assertFalse(viewModel.uiState.value.isBudgetPlanningDialogOpen)
+
+        // Daily Limit Dialog
+        assertFalse(viewModel.uiState.value.isDailyLimitDialogOpen)
+        viewModel.openDailyLimitDialog()
+        advanceUntilIdle()
+        waitUntil { viewModel.uiState.value.isDailyLimitDialogOpen }
+        assertTrue(viewModel.uiState.value.isDailyLimitDialogOpen)
+
+        viewModel.closeDailyLimitDialog()
+        advanceUntilIdle()
+        waitUntil { !viewModel.uiState.value.isDailyLimitDialogOpen }
+        assertFalse(viewModel.uiState.value.isDailyLimitDialogOpen)
+    }
 }
