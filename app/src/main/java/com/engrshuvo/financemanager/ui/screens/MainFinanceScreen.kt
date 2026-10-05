@@ -588,35 +588,39 @@ fun MainFinanceScreen(
         }
     }
 
-    DaySummarySheet(
-        isOpen = uiState.isDayDetailSheetOpen,
-        onDismiss = { viewModel.closeDayDetailSheet() },
-        daySummary = uiState.selectedDaySummary,
-        transactions = uiState.selectedDayTransactions,
-        onAddEntryForDay = {
-            viewModel.closeDayDetailSheet()
-            viewModel.openAddTransactionSheet(TransactionType.EXPENSE)
-        },
-        onEditTransaction = {
-            viewModel.closeDayDetailSheet()
-            viewModel.openEditTransactionSheet(it)
-        },
-        onDeleteTransaction = { transactionToDelete = it }
-    )
+    if (uiState.isDayDetailSheetOpen && uiState.selectedDaySummary != null) {
+        DaySummarySheet(
+            isOpen = true,
+            onDismiss = { viewModel.closeDayDetailSheet() },
+            daySummary = uiState.selectedDaySummary,
+            transactions = uiState.selectedDayTransactions,
+            onAddEntryForDay = {
+                viewModel.closeDayDetailSheet()
+                viewModel.openAddTransactionSheet(TransactionType.EXPENSE)
+            },
+            onEditTransaction = {
+                viewModel.closeDayDetailSheet()
+                viewModel.openEditTransactionSheet(it)
+            },
+            onDeleteTransaction = { transactionToDelete = it }
+        )
+    }
 
-    UniversalTransactionSheet(
-        isOpen = uiState.isAddTransactionSheetOpen,
-        onDismiss = { viewModel.closeAddTransactionSheet() },
-        editingTransaction = uiState.editingTransaction,
-        defaultEntryType = uiState.defaultEntryType,
-        defaultLoanType = uiState.defaultLoanType,
-        onSaveTransaction = { id, type, amount, catId, catName, note, timestamp ->
-            viewModel.saveTransaction(id, type, amount, catId, catName, note, timestamp)
-        },
-        onSaveLoan = { type, personName, phone, amount, startDate, dueDate, note ->
-            viewModel.saveLoanTransaction(type, personName, phone, amount, startDate, dueDate, note)
-        }
-    )
+    if (uiState.isAddTransactionSheetOpen) {
+        UniversalTransactionSheet(
+            isOpen = true,
+            onDismiss = { viewModel.closeAddTransactionSheet() },
+            editingTransaction = uiState.editingTransaction,
+            defaultEntryType = uiState.defaultEntryType,
+            defaultLoanType = uiState.defaultLoanType,
+            onSaveTransaction = { id, type, amount, catId, catName, note, timestamp ->
+                viewModel.saveTransaction(id, type, amount, catId, catName, note, timestamp)
+            },
+            onSaveLoan = { type, personName, phone, amount, startDate, dueDate, note ->
+                viewModel.saveLoanTransaction(type, personName, phone, amount, startDate, dueDate, note)
+            }
+        )
+    }
 
     AddRepaymentDialog(
         isOpen = uiState.isRepayDialogOpen,

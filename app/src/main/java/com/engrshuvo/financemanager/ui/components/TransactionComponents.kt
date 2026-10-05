@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -75,6 +76,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -98,10 +100,11 @@ fun DaySummarySheet(
     transactions: List<TransactionEntity>,
     onAddEntryForDay: () -> Unit,
     onEditTransaction: (TransactionEntity) -> Unit,
-    onDeleteTransaction: (TransactionEntity) -> Unit,
-    sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    onDeleteTransaction: (TransactionEntity) -> Unit
 ) {
     if (!isOpen || daySummary == null) return
+
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -416,6 +419,7 @@ fun TransactionItemCard(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
+                .heightIn(min = 74.dp)
                 .clickable { onClick() },
             shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(
@@ -426,7 +430,8 @@ fun TransactionItemCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(14.dp),
+                    .heightIn(min = 74.dp)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -436,7 +441,7 @@ fun TransactionItemCard(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(46.dp)
+                            .size(44.dp)
                             .clip(CircleShape)
                             .background(category.color.copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center
@@ -449,9 +454,12 @@ fun TransactionItemCard(
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(14.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
 
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.Center
+                    ) {
                         val displayTitle = transaction.note.ifBlank { transaction.categoryName }
                         Text(
                             text = displayTitle,
@@ -462,14 +470,20 @@ fun TransactionItemCard(
                             overflow = TextOverflow.Ellipsis
                         )
 
+                        Spacer(modifier = Modifier.height(2.dp))
+
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
                                 text = transaction.categoryName,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
                             )
                             Text(
                                 text = "•",
@@ -479,13 +493,14 @@ fun TransactionItemCard(
                             Text(
                                 text = formattedTimeText,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(8.dp))
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically
@@ -494,9 +509,12 @@ fun TransactionItemCard(
                         text = formattedAmountText,
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
+                            fontSize = 15.sp
                         ),
-                        color = amountColor
+                        color = amountColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.End
                     )
 
                     Box {

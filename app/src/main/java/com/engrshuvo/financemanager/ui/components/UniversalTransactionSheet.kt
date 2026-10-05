@@ -88,10 +88,11 @@ fun UniversalTransactionSheet(
     defaultEntryType: TransactionType,
     defaultLoanType: LoanType,
     onSaveTransaction: (id: Long, type: TransactionType, amount: Double, categoryId: String, categoryName: String, note: String, timestamp: Long) -> Unit,
-    onSaveLoan: (type: LoanType, personName: String, phone: String, amount: Double, startDate: Long, dueDate: Long?, note: String) -> Unit,
-    sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    onSaveLoan: (type: LoanType, personName: String, phone: String, amount: Double, startDate: Long, dueDate: Long?, note: String) -> Unit
 ) {
     if (!isOpen) return
+
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var selectedEntryType by remember(editingTransaction, defaultEntryType) {
         mutableStateOf(editingTransaction?.type ?: defaultEntryType)

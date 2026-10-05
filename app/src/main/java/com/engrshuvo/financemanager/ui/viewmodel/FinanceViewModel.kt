@@ -225,38 +225,28 @@ class FinanceViewModel(
     )
 
     private val dialogParamsFlow: Flow<DialogParams> = combine(
-        _isAddTransactionSheetOpen,
-        _editingTransaction,
-        _defaultEntryType,
-        _defaultLoanType,
-        _isRepayDialogOpen
-    ) { isAddOpen, editingTx, defaultEntryType, defaultLoanType, isRepayOpen ->
-        DialogParams(
-            isAddTransactionSheetOpen = isAddOpen,
-            editingTransaction = editingTx,
-            defaultEntryType = defaultEntryType,
-            defaultLoanType = defaultLoanType,
-            isRepayDialogOpen = isRepayOpen,
-            repayingLoan = _repayingLoan.value,
-            isBudgetLimitDialogOpen = _isBudgetLimitDialogOpen.value,
-            isBudgetPlanningDialogOpen = _isBudgetPlanningDialogOpen.value,
-            isDailyLimitDialogOpen = _isDailyLimitDialogOpen.value
-        )
-    }.combine(
-        combine(
+        listOf(
+            _isAddTransactionSheetOpen,
+            _editingTransaction,
+            _defaultEntryType,
+            _defaultLoanType,
+            _isRepayDialogOpen,
             _repayingLoan,
             _isBudgetLimitDialogOpen,
             _isBudgetPlanningDialogOpen,
             _isDailyLimitDialogOpen
-        ) { repayingLoan, isBudgetLimit, isBudgetPlanning, isDailyLimit ->
-            arrayOf(repayingLoan, isBudgetLimit, isBudgetPlanning, isDailyLimit)
-        }
-    ) { params, extra ->
-        params.copy(
-            repayingLoan = extra[0] as? LoanEntity,
-            isBudgetLimitDialogOpen = extra[1] as Boolean,
-            isBudgetPlanningDialogOpen = extra[2] as Boolean,
-            isDailyLimitDialogOpen = extra[3] as Boolean
+        )
+    ) { array ->
+        DialogParams(
+            isAddTransactionSheetOpen = array[0] as Boolean,
+            editingTransaction = array[1] as? TransactionEntity,
+            defaultEntryType = array[2] as TransactionType,
+            defaultLoanType = array[3] as LoanType,
+            isRepayDialogOpen = array[4] as Boolean,
+            repayingLoan = array[5] as? LoanEntity,
+            isBudgetLimitDialogOpen = array[6] as Boolean,
+            isBudgetPlanningDialogOpen = array[7] as Boolean,
+            isDailyLimitDialogOpen = array[8] as Boolean
         )
     }.flowOn(Dispatchers.Default)
 
@@ -272,35 +262,26 @@ class FinanceViewModel(
     )
 
     private val backupNotificationParamsFlow: Flow<BackupNotificationParams> = combine(
-        _isExportingBackup,
-        _isRestoringBackup,
-        _backupPreview,
-        _pendingRestoreData,
-        _backupOperationMessage
-    ) { exporting, restoring, preview, pending, msg ->
-        BackupNotificationParams(
-            isExportingBackup = exporting,
-            isRestoringBackup = restoring,
-            backupPreview = preview,
-            pendingRestoreData = pending,
-            backupOperationMessage = msg,
-            backupOperationError = _backupOperationError.value,
-            notificationPreferences = _notificationPrefs.value,
-            notificationPermissionGranted = _notificationPermissionGranted.value
-        )
-    }.combine(
-        combine(
+        listOf(
+            _isExportingBackup,
+            _isRestoringBackup,
+            _backupPreview,
+            _pendingRestoreData,
+            _backupOperationMessage,
             _backupOperationError,
             _notificationPrefs,
             _notificationPermissionGranted
-        ) { error, prefs, granted ->
-            Triple(error, prefs, granted)
-        }
-    ) { params, extra ->
-        params.copy(
-            backupOperationError = extra.first,
-            notificationPreferences = extra.second,
-            notificationPermissionGranted = extra.third
+        )
+    ) { array ->
+        BackupNotificationParams(
+            isExportingBackup = array[0] as Boolean,
+            isRestoringBackup = array[1] as Boolean,
+            backupPreview = array[2] as? com.engrshuvo.financemanager.data.model.BackupSummaryPreview,
+            pendingRestoreData = array[3] as? com.engrshuvo.financemanager.data.model.FinanceBackupData,
+            backupOperationMessage = array[4] as? String,
+            backupOperationError = array[5] as? String,
+            notificationPreferences = array[6] as NotificationPreferences,
+            notificationPermissionGranted = array[7] as Boolean
         )
     }.flowOn(Dispatchers.Default)
 

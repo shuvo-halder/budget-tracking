@@ -790,4 +790,26 @@ class UiReliabilityAndPerformanceUnitTest {
         waitUntil { !viewModel.uiState.value.isDailyLimitDialogOpen }
         assertFalse(viewModel.uiState.value.isDailyLimitDialogOpen)
     }
+
+    @Test
+    fun `14 - Rapid Add New Entry open close reopen cycles maintain clean UI state without lock`() = testScope.runTest {
+        backgroundScope.launch(kotlinx.coroutines.test.UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect {}
+        }
+        advanceUntilIdle()
+
+        for (i in 1..5) {
+            // Open
+            viewModel.openAddTransactionSheet(TransactionType.EXPENSE)
+            advanceUntilIdle()
+            waitUntil { viewModel.uiState.value.isAddTransactionSheetOpen }
+            assertTrue("Iteration $i: Sheet must be open", viewModel.uiState.value.isAddTransactionSheetOpen)
+
+            // Close
+            viewModel.closeAddTransactionSheet()
+            advanceUntilIdle()
+            waitUntil { !viewModel.uiState.value.isAddTransactionSheetOpen }
+            assertFalse("Iteration $i: Sheet must be closed", viewModel.uiState.value.isAddTransactionSheetOpen)
+        }
+    }
 }
