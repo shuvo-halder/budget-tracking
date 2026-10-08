@@ -9,6 +9,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.engrshuvo.financemanager.data.model.BudgetAllocationEntity
 import com.engrshuvo.financemanager.data.model.BudgetSettingEntity
+import com.engrshuvo.financemanager.data.model.FinancialGoalEntity
+import com.engrshuvo.financemanager.data.model.GoalContributionEntity
 import com.engrshuvo.financemanager.data.model.LoanEntity
 import com.engrshuvo.financemanager.data.model.LoanRepaymentEntity
 import com.engrshuvo.financemanager.data.model.TransactionEntity
@@ -19,9 +21,11 @@ import com.engrshuvo.financemanager.data.model.TransactionEntity
         BudgetSettingEntity::class,
         LoanEntity::class,
         LoanRepaymentEntity::class,
-        BudgetAllocationEntity::class
+        BudgetAllocationEntity::class,
+        FinancialGoalEntity::class,
+        GoalContributionEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(RoomConverters::class)
@@ -30,6 +34,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun budgetSettingDao(): BudgetSettingDao
     abstract fun loanDao(): LoanDao
     abstract fun budgetAllocationDao(): BudgetAllocationDao
+    abstract fun financialGoalDao(): FinancialGoalDao
+    abstract fun goalContributionDao(): GoalContributionDao
 
     companion object {
         @Volatile
@@ -66,6 +72,49 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `financial_goals` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `category` TEXT NOT NULL,
+                        `targetAmount` REAL NOT NULL,
+                        `initialSavedAmount` REAL NOT NULL,
+                        `targetDate` INTEGER,
+                        `priority` TEXT NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `targetMonthlyContribution` REAL,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        `archivedAt` INTEGER
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_financial_goals_archivedAt` ON `financial_goals` (`archivedAt`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_financial_goals_status` ON `financial_goals` (`status`)")
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `goal_contributions` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `goalId` INTEGER NOT NULL,
+                        `amount` REAL NOT NULL,
+                        `contributionDate` INTEGER NOT NULL,
+                        `note` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `archivedAt` INTEGER,
+                        FOREIGN KEY(`goalId`) REFERENCES `financial_goals`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_goal_contributions_goalId` ON `goal_contributions` (`goalId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_goal_contributions_archivedAt` ON `goal_contributions` (`archivedAt`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_goal_contributions_contributionDate` ON `goal_contributions` (`contributionDate`)")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -73,7 +122,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "finance_manager_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                 INSTANCE = instance
                 instance

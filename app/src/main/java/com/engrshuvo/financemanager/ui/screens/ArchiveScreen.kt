@@ -287,11 +287,13 @@ private fun ArchivedItemCard(
             TransactionType.LOAN -> LoanBlue
         }
         is ArchiveItemWrapper.Loan -> LoanBlue
+        is ArchiveItemWrapper.Goal -> item.entity.category.color
     }
 
     val iconVector = when (item) {
         is ArchiveItemWrapper.Transaction -> CategoryCatalog.getCategoryById(item.entity.categoryId).icon
         is ArchiveItemWrapper.Loan -> Icons.Default.Handshake
+        is ArchiveItemWrapper.Goal -> item.entity.category.icon
     }
 
     Card(

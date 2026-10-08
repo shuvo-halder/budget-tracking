@@ -33,8 +33,10 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Tune
+import com.engrshuvo.financemanager.ui.theme.IncomeGreen
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -268,6 +270,21 @@ fun MainFinanceScreen(
                                 onDismissRequest = { showMoreMenu = false }
                             ) {
                                 DropdownMenuItem(
+                                    text = { Text("Financial Goals") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Savings,
+                                            contentDescription = null,
+                                            tint = IncomeGreen
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        viewModel.navigateToMoreSubDestination(MoreSubDestination.GOALS)
+                                    },
+                                    modifier = Modifier.testTag("overflow_menu_goals")
+                                )
+                                DropdownMenuItem(
                                     text = { Text("Backup & Restore") },
                                     leadingIcon = {
                                         Icon(
@@ -438,6 +455,12 @@ fun MainFinanceScreen(
                                 snackbarHostState.showSnackbar("Loan and repayments restored")
                             }
                         }
+                        is com.engrshuvo.financemanager.ui.state.ArchiveItemWrapper.Goal -> {
+                            viewModel.restoreGoal(item.id)
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("Goal restored")
+                            }
+                        }
                     }
                 },
                 onRequestPermanentDelete = { viewModel.openPermanentDeleteDialog(it) },
@@ -453,6 +476,21 @@ fun MainFinanceScreen(
                 onConfirmRestore = { viewModel.confirmRestoreBackup(context) },
                 onDismissRestorePreview = { viewModel.dismissRestorePreview() },
                 onDismissOperationMessage = { viewModel.dismissBackupOperationMessage() },
+                onOpenCreateGoalDialog = { viewModel.openCreateGoalDialog() },
+                onOpenEditGoalDialog = { viewModel.openEditGoalDialog(it) },
+                onDismissGoalDialog = { viewModel.dismissGoalDialog() },
+                onSaveGoal = { name, cat, target, initial, targetDate, prio, monthly ->
+                    viewModel.saveGoal(name, cat, target, initial, targetDate, prio, monthly)
+                },
+                onUpdateGoalStatus = { goal, status -> viewModel.updateGoalStatus(goal, status) },
+                onArchiveGoal = { viewModel.archiveGoal(it) },
+                onOpenAddContributionDialog = { viewModel.openAddContributionDialog(it) },
+                onDismissAddContributionDialog = { viewModel.dismissAddContributionDialog() },
+                onSaveGoalContribution = { goalId, amount, date, note ->
+                    viewModel.saveGoalContribution(goalId, amount, date, note)
+                },
+                onDeleteGoalContribution = { viewModel.deleteGoalContribution(it) },
+                onSetGoalFilterStatus = { viewModel.setGoalFilterStatus(it) },
                 modifier = Modifier.padding(innerPadding)
             )
         } else {
@@ -505,7 +543,11 @@ fun MainFinanceScreen(
                             onAddIncomeClick = { viewModel.openAddTransactionSheet(TransactionType.INCOME) },
                             onAddExpenseClick = { viewModel.openAddTransactionSheet(TransactionType.EXPENSE) },
                             onEditTransaction = { viewModel.openEditTransactionSheet(it) },
-                            onDeleteTransaction = { transactionToDelete = it }
+                            onDeleteTransaction = { transactionToDelete = it },
+                            activeGoalsCount = uiState.activeGoals.size,
+                            totalGoalSaved = uiState.totalGoalSaved,
+                            totalGoalTarget = uiState.totalGoalTarget,
+                            onOpenGoals = { viewModel.navigateToMoreSubDestination(MoreSubDestination.GOALS) }
                         )
                     }
 

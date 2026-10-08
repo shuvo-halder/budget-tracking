@@ -16,6 +16,8 @@ data class BackupSummaryPreview(
     val totalRepayments: Int,
     val totalAllocations: Int,
     val totalSettings: Int,
+    val totalGoals: Int = 0,
+    val totalContributions: Int = 0,
     val exportTimestamp: Long,
     val formattedDate: String
 )
@@ -31,7 +33,9 @@ data class FinanceBackupData(
     val loans: List<LoanEntity> = emptyList(),
     val loanRepayments: List<LoanRepaymentEntity> = emptyList(),
     val budgetSettings: List<BudgetSettingEntity> = emptyList(),
-    val budgetAllocations: List<BudgetAllocationEntity> = emptyList()
+    val budgetAllocations: List<BudgetAllocationEntity> = emptyList(),
+    val financialGoals: List<FinancialGoalEntity> = emptyList(),
+    val goalContributions: List<GoalContributionEntity> = emptyList()
 ) {
     companion object {
         const val BACKUP_FORMAT_IDENTIFIER = "BUDGET_AND_LOAN_MANAGER_BACKUP"
@@ -58,7 +62,7 @@ data class FinanceBackupData(
             }
 
             val appVersion = root.optString("appVersion", "1.0")
-            val databaseVersion = root.optInt("databaseVersion", 3)
+            val databaseVersion = root.optInt("databaseVersion", 4)
             val exportTimestamp = root.optLong("exportTimestamp", System.currentTimeMillis())
 
             // 1. Parse Loans first to populate valid loanIdSet for FK validation
@@ -167,7 +171,7 @@ data class FinanceBackupData(
                     val obj = txArray.getJSONObject(i)
                     val id = obj.optLong("id", 0L)
                     if (id <= 0L) {
-                        throw IllegalArgumentException("Transaction ID must be a positive integer (found $id at record index $i).")
+                        throw IllegalArgumentException("Transaction ID must be a positive integer (found $id at transaction index $i).")
                     }
                     if (!txIdSet.add(id)) {
                         throw IllegalArgumentException("Duplicate transaction ID $id found in backup file.")
@@ -176,19 +180,19 @@ data class FinanceBackupData(
                     val type = try {
                         TransactionType.valueOf(typeStr)
                     } catch (e: Exception) {
-                        throw IllegalArgumentException("Invalid transaction type '$typeStr' at record index $i.")
+                        throw IllegalArgumentException("Invalid transaction type '$typeStr' at index $i.")
                     }
                     val amount = obj.optDouble("amount", 0.0)
                     if (amount <= 0.0) {
-                        throw IllegalArgumentException("Transaction amount must be greater than 0 (found $amount at index $i).")
+                        throw IllegalArgumentException("Transaction amount must be greater than zero at index $i.")
                     }
-                    val categoryId = obj.optString("categoryId", "other")
-                    val categoryName = obj.optString("categoryName", "Other")
+                    val categoryId = obj.optString("categoryId", "other_expense")
+                    val categoryName = obj.optString("categoryName", categoryId)
                     val note = obj.optString("note", "")
                     val timestamp = obj.optLong("timestamp", System.currentTimeMillis())
                     val loanId = if (obj.has("loanId") && !obj.isNull("loanId")) obj.getLong("loanId") else null
                     if (loanId != null && !loanIdSet.contains(loanId)) {
-                        throw IllegalArgumentException("Transaction ID $id references non-existent loan ID $loanId at record index $i.")
+                        throw IllegalArgumentException("Transaction references non-existent loan ID $loanId at index $i.")
                     }
                     val archivedAt = if (obj.has("archivedAt") && !obj.isNull("archivedAt")) obj.getLong("archivedAt") else null
 
@@ -210,25 +214,19 @@ data class FinanceBackupData(
 
             // 4. Parse Budget Settings
             val settingsList = mutableListOf<BudgetSettingEntity>()
-            val settingKeySet = mutableSetOf<String>()
             if (root.has("budgetSettings")) {
                 val setArray = root.getJSONArray("budgetSettings")
                 for (i in 0 until setArray.length()) {
                     val obj = setArray.getJSONObject(i)
-                    val key = obj.optString("settingKey", "").trim()
-                    if (key.isBlank()) {
-                        throw IllegalArgumentException("Budget settingKey cannot be blank at index $i.")
-                    }
-                    if (!settingKeySet.add(key)) {
-                        throw IllegalArgumentException("Duplicate budget setting key '$key' found in backup file.")
-                    }
-                    val amountLimit = obj.optDouble("amountLimit", 0.0)
-                    val currencyCode = obj.optString("currencyCode", "BDT")
+                    val key = obj.optString("settingKey", "")
+                    if (key.isBlank()) continue
+                    val limit = obj.optDouble("amountLimit", 30000.0)
+                    val currency = obj.optString("currencyCode", "BDT")
                     settingsList.add(
                         BudgetSettingEntity(
                             settingKey = key,
-                            amountLimit = amountLimit.coerceAtLeast(0.0),
-                            currencyCode = currencyCode
+                            amountLimit = limit.coerceAtLeast(0.0),
+                            currencyCode = currency
                         )
                     )
                 }
@@ -243,7 +241,7 @@ data class FinanceBackupData(
                     val obj = allocArray.getJSONObject(i)
                     val monthKey = obj.optString("monthKey", "").trim()
                     val categoryId = obj.optString("categoryId", "").trim()
-                    val categoryName = obj.optString("categoryName", "").trim()
+                    val categoryName = obj.optString("categoryName", categoryId)
                     val allocatedAmount = obj.optDouble("allocatedAmount", 0.0)
                     val updatedAt = obj.optLong("updatedAt", System.currentTimeMillis())
 
@@ -266,6 +264,113 @@ data class FinanceBackupData(
                 }
             }
 
+            // 6. Parse Financial Goals
+            val goalList = mutableListOf<FinancialGoalEntity>()
+            val goalIdSet = mutableSetOf<Long>()
+            if (root.has("financialGoals")) {
+                val goalArray = root.getJSONArray("financialGoals")
+                for (i in 0 until goalArray.length()) {
+                    val obj = goalArray.getJSONObject(i)
+                    val id = obj.optLong("id", 0L)
+                    if (id <= 0L) {
+                        throw IllegalArgumentException("Goal ID must be a positive integer (found $id at goal index $i).")
+                    }
+                    if (!goalIdSet.add(id)) {
+                        throw IllegalArgumentException("Duplicate goal ID $id found in backup file.")
+                    }
+                    val name = obj.optString("name", "").trim()
+                    if (name.isBlank()) {
+                        throw IllegalArgumentException("Goal name cannot be blank at goal index $i.")
+                    }
+                    val categoryStr = obj.optString("category", "OTHER")
+                    val category = try {
+                        GoalCategory.valueOf(categoryStr)
+                    } catch (e: Exception) {
+                        GoalCategory.OTHER
+                    }
+                    val targetAmount = obj.optDouble("targetAmount", 0.0)
+                    if (targetAmount <= 0.0) {
+                        throw IllegalArgumentException("Goal target amount must be greater than 0 at goal index $i.")
+                    }
+                    val initialSaved = obj.optDouble("initialSavedAmount", 0.0)
+                    val targetDate = if (obj.has("targetDate") && !obj.isNull("targetDate")) obj.getLong("targetDate") else null
+                    val priorityStr = obj.optString("priority", "MEDIUM")
+                    val priority = try {
+                        GoalPriority.valueOf(priorityStr)
+                    } catch (e: Exception) {
+                        GoalPriority.MEDIUM
+                    }
+                    val statusStr = obj.optString("status", "ACTIVE")
+                    val status = try {
+                        GoalStatus.valueOf(statusStr)
+                    } catch (e: Exception) {
+                        GoalStatus.ACTIVE
+                    }
+                    val targetMonthly = if (obj.has("targetMonthlyContribution") && !obj.isNull("targetMonthlyContribution")) obj.getDouble("targetMonthlyContribution") else null
+                    val createdAt = obj.optLong("createdAt", System.currentTimeMillis())
+                    val updatedAt = obj.optLong("updatedAt", System.currentTimeMillis())
+                    val archivedAt = if (obj.has("archivedAt") && !obj.isNull("archivedAt")) obj.getLong("archivedAt") else null
+
+                    goalList.add(
+                        FinancialGoalEntity(
+                            id = id,
+                            name = name,
+                            category = category,
+                            targetAmount = targetAmount,
+                            initialSavedAmount = initialSaved.coerceAtLeast(0.0),
+                            targetDate = targetDate,
+                            priority = priority,
+                            status = status,
+                            targetMonthlyContribution = targetMonthly,
+                            createdAt = createdAt,
+                            updatedAt = updatedAt,
+                            archivedAt = archivedAt
+                        )
+                    )
+                }
+            }
+
+            // 7. Parse Goal Contributions
+            val contributionList = mutableListOf<GoalContributionEntity>()
+            val contributionIdSet = mutableSetOf<Long>()
+            if (root.has("goalContributions")) {
+                val contribArray = root.getJSONArray("goalContributions")
+                for (i in 0 until contribArray.length()) {
+                    val obj = contribArray.getJSONObject(i)
+                    val id = obj.optLong("id", 0L)
+                    if (id <= 0L) {
+                        throw IllegalArgumentException("Goal contribution ID must be a positive integer (found $id at index $i).")
+                    }
+                    if (!contributionIdSet.add(id)) {
+                        throw IllegalArgumentException("Duplicate goal contribution ID $id found in backup file.")
+                    }
+                    val goalId = obj.optLong("goalId", -1L)
+                    if (!goalIdSet.contains(goalId)) {
+                        throw IllegalArgumentException("Goal contribution refers to non-existent goal ID $goalId at index $i.")
+                    }
+                    val amount = obj.optDouble("amount", 0.0)
+                    if (amount <= 0.0) {
+                        throw IllegalArgumentException("Goal contribution amount must be greater than zero at index $i.")
+                    }
+                    val contribDate = obj.optLong("contributionDate", System.currentTimeMillis())
+                    val note = obj.optString("note", "")
+                    val createdAt = obj.optLong("createdAt", System.currentTimeMillis())
+                    val archivedAt = if (obj.has("archivedAt") && !obj.isNull("archivedAt")) obj.getLong("archivedAt") else null
+
+                    contributionList.add(
+                        GoalContributionEntity(
+                            id = id,
+                            goalId = goalId,
+                            amount = amount,
+                            contributionDate = contribDate,
+                            note = note,
+                            createdAt = createdAt,
+                            archivedAt = archivedAt
+                        )
+                    )
+                }
+            }
+
             return FinanceBackupData(
                 backupFormat = format,
                 backupVersion = version,
@@ -276,7 +381,9 @@ data class FinanceBackupData(
                 loans = loanList,
                 loanRepayments = repaymentList,
                 budgetSettings = settingsList,
-                budgetAllocations = allocationsList
+                budgetAllocations = allocationsList,
+                financialGoals = goalList,
+                goalContributions = contributionList
             )
         }
     }
@@ -363,6 +470,41 @@ data class FinanceBackupData(
         }
         root.put("budgetAllocations", allocArray)
 
+        // Financial Goals
+        val goalArray = JSONArray()
+        financialGoals.forEach { goal ->
+            val obj = JSONObject()
+            obj.put("id", goal.id)
+            obj.put("name", goal.name)
+            obj.put("category", goal.category.name)
+            obj.put("targetAmount", goal.targetAmount)
+            obj.put("initialSavedAmount", goal.initialSavedAmount)
+            if (goal.targetDate != null) obj.put("targetDate", goal.targetDate)
+            obj.put("priority", goal.priority.name)
+            obj.put("status", goal.status.name)
+            if (goal.targetMonthlyContribution != null) obj.put("targetMonthlyContribution", goal.targetMonthlyContribution)
+            obj.put("createdAt", goal.createdAt)
+            obj.put("updatedAt", goal.updatedAt)
+            if (goal.archivedAt != null) obj.put("archivedAt", goal.archivedAt)
+            goalArray.put(obj)
+        }
+        root.put("financialGoals", goalArray)
+
+        // Goal Contributions
+        val contribArray = JSONArray()
+        goalContributions.forEach { contrib ->
+            val obj = JSONObject()
+            obj.put("id", contrib.id)
+            obj.put("goalId", contrib.goalId)
+            obj.put("amount", contrib.amount)
+            obj.put("contributionDate", contrib.contributionDate)
+            obj.put("note", contrib.note)
+            obj.put("createdAt", contrib.createdAt)
+            if (contrib.archivedAt != null) obj.put("archivedAt", contrib.archivedAt)
+            contribArray.put(obj)
+        }
+        root.put("goalContributions", contribArray)
+
         return root.toString(2)
     }
 
@@ -382,6 +524,8 @@ data class FinanceBackupData(
             totalRepayments = loanRepayments.size,
             totalAllocations = budgetAllocations.size,
             totalSettings = budgetSettings.size,
+            totalGoals = financialGoals.size,
+            totalContributions = goalContributions.size,
             exportTimestamp = exportTimestamp,
             formattedDate = DateUtils.formatHeaderDate(exportTimestamp)
         )

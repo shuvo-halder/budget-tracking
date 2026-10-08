@@ -95,3 +95,48 @@ data class BudgetAllocationEntity(
     val updatedAt: Long = System.currentTimeMillis()
 )
 
+@Immutable
+@Entity(
+    tableName = "financial_goals",
+    indices = [Index("archivedAt"), Index("status")]
+)
+data class FinancialGoalEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val name: String,
+    val category: GoalCategory = GoalCategory.OTHER,
+    val targetAmount: Double,
+    val initialSavedAmount: Double = 0.0,
+    val targetDate: Long? = null,
+    val priority: GoalPriority = GoalPriority.MEDIUM,
+    val status: GoalStatus = GoalStatus.ACTIVE,
+    val targetMonthlyContribution: Double? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+    val archivedAt: Long? = null
+)
+
+@Immutable
+@Entity(
+    tableName = "goal_contributions",
+    foreignKeys = [
+        ForeignKey(
+            entity = FinancialGoalEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["goalId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index("goalId"), Index("archivedAt"), Index("contributionDate")]
+)
+data class GoalContributionEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val goalId: Long,
+    val amount: Double,
+    val contributionDate: Long = System.currentTimeMillis(),
+    val note: String = "",
+    val createdAt: Long = System.currentTimeMillis(),
+    val archivedAt: Long? = null
+)
+

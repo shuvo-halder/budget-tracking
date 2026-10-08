@@ -33,6 +33,8 @@ class MainActivity : ComponentActivity() {
             budgetSettingDao = database.budgetSettingDao(),
             loanDao = database.loanDao(),
             budgetAllocationDao = database.budgetAllocationDao(),
+            financialGoalDao = database.financialGoalDao(),
+            goalContributionDao = database.goalContributionDao(),
             database = database
         )
         val notificationRepo = NotificationPreferencesRepository(applicationContext)

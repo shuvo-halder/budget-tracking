@@ -1,6 +1,7 @@
 package com.engrshuvo.financemanager.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -110,6 +111,10 @@ fun DashboardOverviewView(
     onAddExpenseClick: () -> Unit,
     onEditTransaction: (TransactionEntity) -> Unit,
     onDeleteTransaction: (TransactionEntity) -> Unit,
+    activeGoalsCount: Int = 0,
+    totalGoalSaved: Double = 0.0,
+    totalGoalTarget: Double = 0.0,
+    onOpenGoals: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -283,6 +288,16 @@ fun DashboardOverviewView(
                 totalAllocated = totalAllocated,
                 plannedSavingsTotal = plannedSavingsTotal,
                 onPlanBudgetClick = onPlanBudgetClick
+            )
+        }
+
+        // Financial Goals Summary Card
+        item(key = "dashboard_goals_card", contentType = "goals_card") {
+            DashboardGoalsSummaryCard(
+                activeGoalsCount = activeGoalsCount,
+                totalGoalSaved = totalGoalSaved,
+                totalGoalTarget = totalGoalTarget,
+                onOpenGoals = onOpenGoals
             )
         }
 
@@ -1004,3 +1019,124 @@ private fun MiniStatPill(
         }
     }
 }
+
+@Composable
+private fun DashboardGoalsSummaryCard(
+    activeGoalsCount: Int,
+    totalGoalSaved: Double,
+    totalGoalTarget: Double,
+    onOpenGoals: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .clickable(onClick = onOpenGoals)
+            .testTag("dashboard_goals_summary_card"),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(IncomeGreen.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Savings,
+                            contentDescription = null,
+                            tint = IncomeGreen,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = "Financial Goals",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = if (activeGoalsCount > 0) "$activeGoalsCount active savings targets" else "Dedicated savings accumulation",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (activeGoalsCount > 0) IncomeGreen.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Text(
+                        text = if (activeGoalsCount > 0) "$activeGoalsCount Active" else "Setup",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (activeGoalsCount > 0) IncomeGreen else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            if (activeGoalsCount > 0) {
+                val progress = if (totalGoalTarget > 0) (totalGoalSaved / totalGoalTarget).toFloat().coerceIn(0f, 1f) else 0f
+                val percent = if (totalGoalTarget > 0) ((totalGoalSaved / totalGoalTarget) * 100).coerceIn(0.0, 100.0) else 0.0
+
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(CircleShape),
+                    color = IncomeGreen,
+                    trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Saved ${CurrencyUtils.formatBDT(totalGoalSaved)} of ${CurrencyUtils.formatBDT(totalGoalTarget)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "${String.format("%.1f", percent)}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = IncomeGreen
+                    )
+                }
+            } else {
+                Text(
+                    text = "Track savings for vehicle, laptop, home, wedding, or emergency fund.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+

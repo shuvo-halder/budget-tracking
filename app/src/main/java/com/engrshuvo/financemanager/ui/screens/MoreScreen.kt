@@ -100,6 +100,26 @@ fun MoreScreen(
     onConfirmRestore: () -> Unit = {},
     onDismissRestorePreview: () -> Unit = {},
     onDismissOperationMessage: () -> Unit = {},
+    // Financial Goals actions
+    onOpenCreateGoalDialog: () -> Unit = {},
+    onOpenEditGoalDialog: (com.engrshuvo.financemanager.data.model.FinancialGoalEntity) -> Unit = {},
+    onDismissGoalDialog: () -> Unit = {},
+    onSaveGoal: (
+        name: String,
+        category: com.engrshuvo.financemanager.data.model.GoalCategory,
+        targetAmount: Double,
+        initialSavedAmount: Double,
+        targetDate: Long?,
+        priority: com.engrshuvo.financemanager.data.model.GoalPriority,
+        targetMonthlyContribution: Double?
+    ) -> Unit = { _, _, _, _, _, _, _ -> },
+    onUpdateGoalStatus: (com.engrshuvo.financemanager.data.model.FinancialGoalEntity, com.engrshuvo.financemanager.data.model.GoalStatus) -> Unit = { _, _ -> },
+    onArchiveGoal: (Long) -> Unit = {},
+    onOpenAddContributionDialog: (com.engrshuvo.financemanager.data.model.FinancialGoalEntity) -> Unit = {},
+    onDismissAddContributionDialog: () -> Unit = {},
+    onSaveGoalContribution: (goalId: Long, amount: Double, date: Long, note: String) -> Unit = { _, _, _, _ -> },
+    onDeleteGoalContribution: (Long) -> Unit = {},
+    onSetGoalFilterStatus: (com.engrshuvo.financemanager.data.model.GoalStatus?) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     AnimatedContent(
@@ -112,6 +132,7 @@ fun MoreScreen(
             MoreSubDestination.NONE -> {
                 MoreHubView(
                     archivedCount = uiState.archivedItems.size,
+                    activeGoalsCount = uiState.activeGoals.size,
                     onNavigateToSubDestination = onNavigateToSubDestination
                 )
             }
@@ -183,6 +204,25 @@ fun MoreScreen(
                     onDismissOperationMessage = onDismissOperationMessage
                 )
             }
+
+            MoreSubDestination.GOALS -> {
+                BackHandler { onNavigateBack() }
+                FinancialGoalsScreen(
+                    uiState = uiState,
+                    onNavigateBack = onNavigateBack,
+                    onOpenCreateGoalDialog = onOpenCreateGoalDialog,
+                    onOpenEditGoalDialog = onOpenEditGoalDialog,
+                    onDismissGoalDialog = onDismissGoalDialog,
+                    onSaveGoal = onSaveGoal,
+                    onUpdateGoalStatus = onUpdateGoalStatus,
+                    onArchiveGoal = onArchiveGoal,
+                    onOpenAddContributionDialog = onOpenAddContributionDialog,
+                    onDismissAddContributionDialog = onDismissAddContributionDialog,
+                    onSaveGoalContribution = onSaveGoalContribution,
+                    onDeleteGoalContribution = onDeleteGoalContribution,
+                    onSetGoalFilterStatus = onSetGoalFilterStatus
+                )
+            }
         }
     }
 }
@@ -190,6 +230,7 @@ fun MoreScreen(
 @Composable
 private fun MoreHubView(
     archivedCount: Int,
+    activeGoalsCount: Int,
     onNavigateToSubDestination: (MoreSubDestination) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -258,6 +299,20 @@ private fun MoreHubView(
             )
         }
 
+        item(key = "more_item_goals") {
+            MoreDestinationCard(
+                icon = Icons.Default.Savings,
+                iconColor = Color(0xFF059669),
+                iconBg = Color(0xFFD1FAE5),
+                title = "Financial Goals",
+                subtitle = "Set dedicated savings targets, track deposits & progress, and monitor monthly contribution capacity",
+                badgeText = if (activeGoalsCount > 0) "$activeGoalsCount active" else "Targets",
+                badgeColor = Color(0xFF059669),
+                onClick = { onNavigateToSubDestination(MoreSubDestination.GOALS) },
+                testTag = "more_goals_card"
+            )
+        }
+
         item(key = "more_item_reports") {
             MoreDestinationCard(
                 icon = Icons.Default.Analytics,
@@ -269,6 +324,20 @@ private fun MoreHubView(
                 badgeColor = Color(0xFF2563EB),
                 onClick = { onNavigateToSubDestination(MoreSubDestination.REPORTS) },
                 testTag = "more_reports_card"
+            )
+        }
+
+        item(key = "more_item_backup") {
+            MoreDestinationCard(
+                icon = Icons.Default.Security,
+                iconColor = Color(0xFF6366F1),
+                iconBg = Color(0xFFEEF2FF),
+                title = "Backup & Restore",
+                subtitle = "Export JSON backup with cryptographic validation or restore your full financial database safely",
+                badgeText = "Offline JSON",
+                badgeColor = Color(0xFF6366F1),
+                onClick = { onNavigateToSubDestination(MoreSubDestination.BACKUP_RESTORE) },
+                testTag = "more_backup_restore_card"
             )
         }
 

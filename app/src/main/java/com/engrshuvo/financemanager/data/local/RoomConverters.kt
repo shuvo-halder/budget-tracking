@@ -41,4 +41,40 @@ class RoomConverters {
             LoanStatus.ACTIVE
         }
     }
+
+    @TypeConverter
+    fun fromGoalCategory(value: com.engrshuvo.financemanager.data.model.GoalCategory): String = value.name
+
+    @TypeConverter
+    fun toGoalCategory(value: String): com.engrshuvo.financemanager.data.model.GoalCategory {
+        return try {
+            com.engrshuvo.financemanager.data.model.GoalCategory.valueOf(value)
+        } catch (e: Exception) {
+            com.engrshuvo.financemanager.data.model.GoalCategory.OTHER
+        }
+    }
+
+    @TypeConverter
+    fun fromGoalPriority(value: com.engrshuvo.financemanager.data.model.GoalPriority): String = value.name
+
+    @TypeConverter
+    fun toGoalPriority(value: String): com.engrshuvo.financemanager.data.model.GoalPriority {
+        return try {
+            com.engrshuvo.financemanager.data.model.GoalPriority.valueOf(value)
+        } catch (e: Exception) {
+            com.engrshuvo.financemanager.data.model.GoalPriority.MEDIUM
+        }
+    }
+
+    @TypeConverter
+    fun fromGoalStatus(value: com.engrshuvo.financemanager.data.model.GoalStatus): String = value.name
+
+    @TypeConverter
+    fun toGoalStatus(value: String): com.engrshuvo.financemanager.data.model.GoalStatus {
+        return try {
+            com.engrshuvo.financemanager.data.model.GoalStatus.valueOf(value)
+        } catch (e: Exception) {
+            com.engrshuvo.financemanager.data.model.GoalStatus.ACTIVE
+        }
+    }
 }

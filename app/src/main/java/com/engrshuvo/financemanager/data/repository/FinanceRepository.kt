@@ -4,11 +4,15 @@ import androidx.room.withTransaction
 import com.engrshuvo.financemanager.data.local.AppDatabase
 import com.engrshuvo.financemanager.data.local.BudgetAllocationDao
 import com.engrshuvo.financemanager.data.local.BudgetSettingDao
+import com.engrshuvo.financemanager.data.local.FinancialGoalDao
+import com.engrshuvo.financemanager.data.local.GoalContributionDao
 import com.engrshuvo.financemanager.data.local.LoanDao
 import com.engrshuvo.financemanager.data.local.TransactionDao
 import com.engrshuvo.financemanager.data.model.BudgetAllocationEntity
 import com.engrshuvo.financemanager.data.model.BudgetSettingEntity
 import com.engrshuvo.financemanager.data.model.FinanceBackupData
+import com.engrshuvo.financemanager.data.model.FinancialGoalEntity
+import com.engrshuvo.financemanager.data.model.GoalContributionEntity
 import com.engrshuvo.financemanager.data.model.LoanEntity
 import com.engrshuvo.financemanager.data.model.LoanRepaymentEntity
 import com.engrshuvo.financemanager.data.model.LoanStatus
@@ -17,6 +21,7 @@ import com.engrshuvo.financemanager.data.model.TransactionEntity
 import com.engrshuvo.financemanager.data.model.TransactionType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -27,6 +32,8 @@ class FinanceRepository(
     private val budgetSettingDao: BudgetSettingDao,
     private val loanDao: LoanDao,
     private val budgetAllocationDao: BudgetAllocationDao,
+    private val financialGoalDao: FinancialGoalDao? = null,
+    private val goalContributionDao: GoalContributionDao? = null,
     private val database: AppDatabase? = null
 ) {
     // Transaction streams strictly on Dispatchers.IO
@@ -66,6 +73,28 @@ class FinanceRepository(
 
     val archivedLoans: Flow<List<LoanEntity>> =
         loanDao.getArchivedLoans().flowOn(Dispatchers.IO)
+
+    // Financial Goals & Contributions streams strictly on Dispatchers.IO
+    val allGoals: Flow<List<FinancialGoalEntity>> =
+        (financialGoalDao?.getAllGoalsFlow() ?: flowOf(emptyList())).flowOn(Dispatchers.IO)
+
+    val activeGoals: Flow<List<FinancialGoalEntity>> =
+        (financialGoalDao?.getActiveGoalsFlow() ?: flowOf(emptyList())).flowOn(Dispatchers.IO)
+
+    val archivedGoals: Flow<List<FinancialGoalEntity>> =
+        (financialGoalDao?.getArchivedGoalsFlow() ?: flowOf(emptyList())).flowOn(Dispatchers.IO)
+
+    val allGoalContributions: Flow<List<GoalContributionEntity>> =
+        (goalContributionDao?.getAllContributionsFlow() ?: flowOf(emptyList())).flowOn(Dispatchers.IO)
+
+    val archivedGoalContributions: Flow<List<GoalContributionEntity>> =
+        (goalContributionDao?.getArchivedContributionsFlow() ?: flowOf(emptyList())).flowOn(Dispatchers.IO)
+
+    fun getContributionsForGoal(goalId: Long): Flow<List<GoalContributionEntity>> =
+        (goalContributionDao?.getContributionsForGoalFlow(goalId) ?: flowOf(emptyList())).flowOn(Dispatchers.IO)
+
+    fun getGoalById(id: Long): Flow<FinancialGoalEntity?> =
+        (financialGoalDao?.getGoalByIdFlow(id) ?: flowOf(null)).flowOn(Dispatchers.IO)
 
     suspend fun insertTransaction(transaction: TransactionEntity): Long = withContext(Dispatchers.IO) {
         transactionDao.insertTransaction(transaction)
@@ -148,16 +177,6 @@ class FinanceRepository(
         loanDao.updateLoan(loan)
     }
 
-    /**
-     * Soft-deletes (archives) a loan, cascading to its repayments and linked transaction.
-     */
-    suspend fun deleteLoan(
-        loan: LoanEntity,
-        archiveTimestamp: Long = System.currentTimeMillis()
-    ) = withContext(Dispatchers.IO) {
-        archiveLoan(loan.id, archiveTimestamp)
-    }
-
     suspend fun archiveLoan(
         loanId: Long,
         archiveTimestamp: Long = System.currentTimeMillis()
@@ -185,100 +204,152 @@ class FinanceRepository(
         }
     }
 
-    suspend fun recordLoanRepayment(
-        loanId: Long,
-        amount: Double,
-        note: String,
-        timestamp: Long = System.currentTimeMillis()
-    ): Boolean = withContext(Dispatchers.IO) {
-        if (amount <= 0.0) {
+    suspend fun deleteLoan(loan: LoanEntity) = withContext(Dispatchers.IO) {
+        archiveLoan(loan.id)
+    }
+
+    suspend fun addLoanRepayment(repayment: LoanRepaymentEntity): Long = withContext(Dispatchers.IO) {
+        runInTransaction {
+            val repId = loanDao.insertRepayment(repayment)
+            val currentLoan = loanDao.getLoanByIdDirect(repayment.loanId)
+            if (currentLoan != null) {
+                val updatedRemaining = (currentLoan.remainingAmount - repayment.amount).coerceAtLeast(0.0)
+                val updatedStatus = if (updatedRemaining == 0.0) LoanStatus.SETTLED else currentLoan.status
+                loanDao.updateLoan(
+                    currentLoan.copy(
+                        remainingAmount = updatedRemaining,
+                        status = updatedStatus
+                    )
+                )
+
+                val transType = TransactionType.LOAN
+                val catId = if (currentLoan.type == LoanType.LENT) "loan_collected" else "loan_repaid"
+                val catName = if (currentLoan.type == LoanType.LENT) "Collection from ${currentLoan.personName}" else "Repayment to ${currentLoan.personName}"
+                transactionDao.insertTransaction(
+                    TransactionEntity(
+                        id = 0,
+                        type = transType,
+                        amount = repayment.amount,
+                        categoryId = catId,
+                        categoryName = catName,
+                        note = repayment.note.ifBlank { "Loan repayment #${repId}" },
+                        timestamp = repayment.timestamp,
+                        loanId = currentLoan.id
+                    )
+                )
+            }
+            repId
+        }
+    }
+
+    fun getRepaymentsForLoan(loanId: Long): Flow<List<LoanRepaymentEntity>> =
+        loanDao.getRepaymentsForLoanFlow(loanId).flowOn(Dispatchers.IO)
+
+    suspend fun recordLoanRepayment(loanId: Long, amount: Double, note: String): Boolean = withContext(Dispatchers.IO) {
+        val currentLoan = loanDao.getLoanByIdDirect(loanId) ?: return@withContext false
+        if (amount <= 0.0 || amount > currentLoan.remainingAmount) {
             return@withContext false
         }
-        runInTransaction {
-            // Re-read fresh loan state inside the database transaction to prevent race conditions
-            val loan = loanDao.getLoanByIdDirect(loanId) ?: return@runInTransaction false
-
-            // Ineligible for repayment if settled, archived, or zero/negative remaining balance
-            if (loan.status != LoanStatus.ACTIVE || loan.archivedAt != null || loan.remainingAmount <= 0.0) {
-                return@runInTransaction false
-            }
-
-            // Overpayment rejected
-            if (amount > loan.remainingAmount) {
-                return@runInTransaction false
-            }
-
-            val newRemaining = (loan.remainingAmount - amount).coerceAtLeast(0.0)
-            val newStatus = if (newRemaining <= 0.0) LoanStatus.SETTLED else LoanStatus.ACTIVE
-
-            val updatedLoan = loan.copy(
-                remainingAmount = newRemaining,
-                status = newStatus
-            )
-            loanDao.updateLoan(updatedLoan)
-
-            val repayment = LoanRepaymentEntity(
-                id = 0,
-                loanId = loanId,
-                amount = amount,
-                note = note,
-                timestamp = timestamp
-            )
-            loanDao.insertRepayment(repayment)
-
-            val repaymentType = if (loan.type == LoanType.LENT) TransactionType.INCOME else TransactionType.EXPENSE
-            val catId = if (loan.type == LoanType.LENT) "loan_collected" else "loan_repaid"
-            val catName = if (loan.type == LoanType.LENT) "Repayment from ${loan.personName}" else "Repaid to ${loan.personName}"
-
-            transactionDao.insertTransaction(
-                TransactionEntity(
-                    id = 0,
-                    type = repaymentType,
-                    amount = amount,
-                    categoryId = catId,
-                    categoryName = catName,
-                    note = note.ifBlank { "Loan repayment (${loan.personName})" },
-                    timestamp = timestamp,
-                    loanId = loanId
-                )
-            )
-            true
-        }
+        val repayment = LoanRepaymentEntity(
+            loanId = loanId,
+            amount = amount,
+            timestamp = System.currentTimeMillis(),
+            note = note
+        )
+        val repId = addLoanRepayment(repayment)
+        repId > 0L
     }
 
     suspend fun markLoanSettled(loanId: Long): Boolean = withContext(Dispatchers.IO) {
+        val currentLoan = loanDao.getLoanByIdDirect(loanId) ?: return@withContext false
+        loanDao.updateLoan(
+            currentLoan.copy(
+                remainingAmount = 0.0,
+                status = LoanStatus.SETTLED
+            )
+        )
+        true
+    }
+
+    // Financial Goals repository methods
+    suspend fun insertGoal(goal: FinancialGoalEntity): Long = withContext(Dispatchers.IO) {
+        financialGoalDao?.insertGoal(goal) ?: 0L
+    }
+
+    suspend fun updateGoal(goal: FinancialGoalEntity) = withContext(Dispatchers.IO) {
+        financialGoalDao?.updateGoal(goal.copy(updatedAt = System.currentTimeMillis()))
+    }
+
+    suspend fun archiveGoal(
+        goalId: Long,
+        archiveTimestamp: Long = System.currentTimeMillis()
+    ) = withContext(Dispatchers.IO) {
         runInTransaction {
-            val loan = loanDao.getLoanByIdDirect(loanId) ?: return@runInTransaction false
-            if (loan.remainingAmount > 0 && loan.status == LoanStatus.ACTIVE && loan.archivedAt == null) {
-                recordLoanRepayment(
-                    loanId = loanId,
-                    amount = loan.remainingAmount,
-                    note = "Full Settlement"
-                )
-            } else if (loan.status != LoanStatus.SETTLED) {
-                loanDao.updateLoan(loan.copy(status = LoanStatus.SETTLED))
-                true
-            } else {
-                true
-            }
+            financialGoalDao?.archiveGoal(goalId, archiveTimestamp)
+            goalContributionDao?.archiveContributionsForGoal(goalId, archiveTimestamp)
         }
     }
 
-    fun getRepaymentsForLoan(loanId: Long): Flow<List<LoanRepaymentEntity>> {
-        return loanDao.getRepaymentsForLoanFlow(loanId).flowOn(Dispatchers.IO)
+    suspend fun restoreGoal(goalId: Long) = withContext(Dispatchers.IO) {
+        runInTransaction {
+            financialGoalDao?.restoreGoal(goalId)
+            goalContributionDao?.restoreContributionsForGoal(goalId)
+        }
     }
 
-    suspend fun setMonthlyBudgetLimit(limit: Double) = withContext(Dispatchers.IO) {
+    suspend fun permanentlyDeleteGoal(goalId: Long) = withContext(Dispatchers.IO) {
+        runInTransaction {
+            goalContributionDao?.permanentlyDeleteContributionsForGoal(goalId)
+            financialGoalDao?.permanentlyDeleteGoalById(goalId)
+        }
+    }
+
+    suspend fun addGoalContribution(contribution: GoalContributionEntity): Long = withContext(Dispatchers.IO) {
+        runInTransaction {
+            val contribId = goalContributionDao?.insertContribution(contribution) ?: 0L
+            val goal = financialGoalDao?.getGoalByIdDirect(contribution.goalId)
+            if (goal != null) {
+                financialGoalDao.updateGoal(goal.copy(updatedAt = System.currentTimeMillis()))
+            }
+            contribId
+        }
+    }
+
+    suspend fun updateGoalContribution(contribution: GoalContributionEntity) = withContext(Dispatchers.IO) {
+        goalContributionDao?.updateContribution(contribution)
+    }
+
+    suspend fun deleteGoalContribution(contributionId: Long) = withContext(Dispatchers.IO) {
+        goalContributionDao?.deleteContribution(contributionId)
+    }
+
+    suspend fun archiveGoalContribution(
+        id: Long,
+        archiveTimestamp: Long = System.currentTimeMillis()
+    ) = withContext(Dispatchers.IO) {
+        goalContributionDao?.archiveContribution(id, archiveTimestamp)
+    }
+
+    suspend fun restoreGoalContribution(id: Long) = withContext(Dispatchers.IO) {
+        goalContributionDao?.restoreContribution(id)
+    }
+
+    suspend fun getGoalByIdDirect(id: Long): FinancialGoalEntity? = withContext(Dispatchers.IO) {
+        financialGoalDao?.getGoalByIdDirect(id)
+    }
+
+    // Budget Limits
+    suspend fun updateMonthlyBudgetLimit(limit: Double) = withContext(Dispatchers.IO) {
         budgetSettingDao.insertOrUpdateSetting(
             BudgetSettingEntity(
                 settingKey = BudgetSettingEntity.KEY_MONTHLY_BUDGET,
-                amountLimit = limit,
-                currencyCode = "BDT"
+                amountLimit = limit
             )
         )
     }
 
-    // Daily Budget Limit stream strictly on Dispatchers.IO
+    suspend fun setMonthlyBudgetLimit(limit: Double) = updateMonthlyBudgetLimit(limit)
+
     val dailyBudgetSetting: Flow<BudgetSettingEntity?> =
         budgetSettingDao.getSettingFlow(BudgetSettingEntity.KEY_DAILY_BUDGET).flowOn(Dispatchers.IO)
 
@@ -286,46 +357,38 @@ class FinanceRepository(
         setting?.amountLimit ?: 500.0
     }.flowOn(Dispatchers.IO)
 
-    suspend fun setDailyBudgetLimit(limit: Double) = withContext(Dispatchers.IO) {
+    suspend fun updateDailyBudgetLimit(limit: Double) = withContext(Dispatchers.IO) {
         budgetSettingDao.insertOrUpdateSetting(
             BudgetSettingEntity(
                 settingKey = BudgetSettingEntity.KEY_DAILY_BUDGET,
-                amountLimit = limit,
-                currencyCode = "BDT"
+                amountLimit = limit
             )
         )
     }
 
-    // Budget Allocations streams strictly on Dispatchers.IO
+    suspend fun setDailyBudgetLimit(limit: Double) = updateDailyBudgetLimit(limit)
+
+    // Budget Allocations
+    fun getAllocationsForMonth(monthKey: String): Flow<List<BudgetAllocationEntity>> =
+        budgetAllocationDao.getAllocationsForMonth(monthKey).flowOn(Dispatchers.IO)
+
     val allBudgetAllocations: Flow<List<BudgetAllocationEntity>> =
         budgetAllocationDao.getAllAllocations().flowOn(Dispatchers.IO)
 
-    fun getAllocationsForMonth(monthKey: String): Flow<List<BudgetAllocationEntity>> {
-        return budgetAllocationDao.getAllocationsForMonth(monthKey).flowOn(Dispatchers.IO)
-    }
-
-    suspend fun getAllocationsForMonthDirect(monthKey: String): List<BudgetAllocationEntity> =
-        withContext(Dispatchers.IO) {
-            budgetAllocationDao.getAllocationsForMonthDirect(monthKey)
-        }
-
-    suspend fun saveBudgetAllocation(allocation: BudgetAllocationEntity) = withContext(Dispatchers.IO) {
+    suspend fun setBudgetAllocation(allocation: BudgetAllocationEntity) = withContext(Dispatchers.IO) {
         budgetAllocationDao.insertOrUpdateAllocation(allocation)
     }
 
-    suspend fun saveBudgetAllocations(allocations: List<BudgetAllocationEntity>) = withContext(Dispatchers.IO) {
+    suspend fun setBudgetAllocations(allocations: List<BudgetAllocationEntity>) = withContext(Dispatchers.IO) {
         budgetAllocationDao.insertOrUpdateAllocations(allocations)
     }
+
+    suspend fun saveBudgetAllocations(allocations: List<BudgetAllocationEntity>) = setBudgetAllocations(allocations)
 
     suspend fun deleteBudgetAllocation(monthKey: String, categoryId: String) = withContext(Dispatchers.IO) {
         budgetAllocationDao.deleteAllocation(monthKey, categoryId)
     }
 
-    /**
-     * Copies budget allocation targets from one month to another month.
-     * CRITICAL: Strictly copies budget allocation plans only!
-     * NEVER copies transactions, expenses, income, savings transfers, or loans.
-     */
     suspend fun copyAllocations(fromMonthKey: String, toMonthKey: String) = withContext(Dispatchers.IO) {
         val previousAllocations = budgetAllocationDao.getAllocationsForMonthDirect(fromMonthKey)
         if (previousAllocations.isNotEmpty()) {
@@ -337,10 +400,6 @@ class FinanceRepository(
         }
     }
 
-    /**
-     * Calculates the expiration cutoff timestamp exactly 2 calendar months before [currentTimeMillis]
-     * using calendar-month arithmetic.
-     */
     fun getTwoMonthsExpirationCutoff(currentTimeMillis: Long = System.currentTimeMillis()): Long {
         val cal = Calendar.getInstance().apply {
             timeInMillis = currentTimeMillis
@@ -349,30 +408,26 @@ class FinanceRepository(
         return cal.timeInMillis
     }
 
-    /**
-     * Permanently deletes archived records whose retention period (2 calendar months) has expired.
-     * Idempotent and safe to run on startup, on resume, and on demand.
-     */
-     suspend fun purgeExpiredArchivedRecords(
+    suspend fun purgeExpiredArchivedRecords(
         currentTimeMillis: Long = System.currentTimeMillis()
     ): Int = withContext(Dispatchers.IO) {
         val cutoff = getTwoMonthsExpirationCutoff(currentTimeMillis)
         val purgedTransactions = transactionDao.purgeExpiredTransactions(cutoff)
         val purgedRepayments = loanDao.purgeExpiredRepayments(cutoff)
         val purgedLoans = loanDao.purgeExpiredLoans(cutoff)
-        purgedTransactions + purgedRepayments + purgedLoans
+        val purgedGoals = financialGoalDao?.purgeExpiredGoals(cutoff) ?: 0
+        val purgedContributions = goalContributionDao?.purgeExpiredContributions(cutoff) ?: 0
+        purgedTransactions + purgedRepayments + purgedLoans + purgedGoals + purgedContributions
     }
 
-    /**
-     * Exports all user financial data into a versioned FinanceBackupData model.
-     * Must be called on Dispatchers.IO.
-     */
     suspend fun exportBackupData(): FinanceBackupData = withContext(Dispatchers.IO) {
         val txs = transactionDao.getAllTransactionsForBackup()
         val loans = loanDao.getAllLoansForBackup()
         val repayments = loanDao.getAllRepaymentsForBackup()
         val settings = budgetSettingDao.getAllSettingsForBackup()
         val allocations = budgetAllocationDao.getAllAllocationsDirect()
+        val goals = financialGoalDao?.getAllGoalsForBackup() ?: emptyList()
+        val contributions = goalContributionDao?.getAllContributionsForBackup() ?: emptyList()
 
         FinanceBackupData(
             exportTimestamp = System.currentTimeMillis(),
@@ -380,19 +435,18 @@ class FinanceRepository(
             loans = loans,
             loanRepayments = repayments,
             budgetSettings = settings,
-            budgetAllocations = allocations
+            budgetAllocations = allocations,
+            financialGoals = goals,
+            goalContributions = contributions
         )
     }
 
-    /**
-     * Atomically restores all database tables from [backupData] within a single Room transaction.
-     * Deletes existing data and inserts backup data in strict relation order.
-     * Completely rolls back if any insertion fails.
-     */
     suspend fun restoreBackupData(backupData: FinanceBackupData): Result<Int> = withContext(Dispatchers.IO) {
         try {
             runInTransaction {
                 // 1. Clear tables in child-to-parent order
+                goalContributionDao?.clearAllContributions()
+                financialGoalDao?.clearAllGoals()
                 loanDao.clearAllRepayments()
                 transactionDao.clearAllTransactions()
                 loanDao.clearAllLoans()
@@ -415,8 +469,16 @@ class FinanceRepository(
                 if (backupData.budgetAllocations.isNotEmpty()) {
                     budgetAllocationDao.insertOrUpdateAllocations(backupData.budgetAllocations)
                 }
+                if (backupData.financialGoals.isNotEmpty()) {
+                    financialGoalDao?.insertAllGoals(backupData.financialGoals)
+                }
+                if (backupData.goalContributions.isNotEmpty()) {
+                    goalContributionDao?.insertAllContributions(backupData.goalContributions)
+                }
             }
-            val totalRestored = backupData.transactions.size + backupData.loans.size + backupData.loanRepayments.size + backupData.budgetAllocations.size
+            val totalRestored = backupData.transactions.size + backupData.loans.size +
+                    backupData.loanRepayments.size + backupData.budgetAllocations.size +
+                    backupData.financialGoals.size + backupData.goalContributions.size
             Result.success(totalRestored)
         } catch (e: Exception) {
             Result.failure(e)

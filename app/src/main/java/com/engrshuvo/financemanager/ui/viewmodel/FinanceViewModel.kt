@@ -5,6 +5,12 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.engrshuvo.financemanager.data.model.BudgetAllocationEntity
 import com.engrshuvo.financemanager.data.model.CategoryCatalog
+import com.engrshuvo.financemanager.data.model.FinancialGoalEntity
+import com.engrshuvo.financemanager.data.model.FinancialGoalUiModel
+import com.engrshuvo.financemanager.data.model.GoalCategory
+import com.engrshuvo.financemanager.data.model.GoalContributionEntity
+import com.engrshuvo.financemanager.data.model.GoalPriority
+import com.engrshuvo.financemanager.data.model.GoalStatus
 import com.engrshuvo.financemanager.data.model.LoanEntity
 import com.engrshuvo.financemanager.data.model.LoanStatus
 import com.engrshuvo.financemanager.data.model.LoanType
@@ -71,6 +77,17 @@ class FinanceViewModel(
     private val _isBudgetLimitDialogOpen = MutableStateFlow(false)
     private val _isBudgetPlanningDialogOpen = MutableStateFlow(false)
     private val _isDailyLimitDialogOpen = MutableStateFlow(false)
+
+    // Financial Goals State
+    private val _selectedGoalFilterStatus = MutableStateFlow<GoalStatus?>(null)
+    private val _selectedGoalDetailsId = MutableStateFlow<Long?>(null)
+    private val _isCreateGoalDialogOpen = MutableStateFlow(false)
+    private val _editingGoal = MutableStateFlow<FinancialGoalEntity?>(null)
+    private val _contributingGoal = MutableStateFlow<FinancialGoalEntity?>(null)
+    private val _isAddContributionDialogOpen = MutableStateFlow(false)
+
+    private val isGoalSaving = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val isContributionSaving = java.util.concurrent.atomic.AtomicBoolean(false)
 
     // Archive & Recovery state flows
     private val _archiveFilterType = MutableStateFlow(ArchiveFilterType.ALL)
@@ -492,10 +509,47 @@ class FinanceViewModel(
         generateCalendarGrid(month, selectedDate, transactions)
     }.flowOn(Dispatchers.Default)
 
+    private data class GoalParams(
+        val filterStatus: GoalStatus?,
+        val detailsId: Long?,
+        val isCreateOpen: Boolean,
+        val editingGoal: FinancialGoalEntity?,
+        val contributingGoal: FinancialGoalEntity?,
+        val isAddContributionOpen: Boolean
+    )
+
+    private val goalsDataFlow: Flow<Pair<List<FinancialGoalEntity>, List<GoalContributionEntity>>> = combine(
+        repository.allGoals,
+        repository.allGoalContributions
+    ) { goals, contributions ->
+        goals to contributions
+    }.flowOn(Dispatchers.Default)
+
+    private val goalParamsFlow: Flow<GoalParams> = combine(
+        listOf(
+            _selectedGoalFilterStatus,
+            _selectedGoalDetailsId,
+            _isCreateGoalDialogOpen,
+            _editingGoal,
+            _contributingGoal,
+            _isAddContributionDialogOpen
+        )
+    ) { array ->
+        GoalParams(
+            filterStatus = array[0] as? GoalStatus,
+            detailsId = array[1] as? Long,
+            isCreateOpen = array[2] as Boolean,
+            editingGoal = array[3] as? FinancialGoalEntity,
+            contributingGoal = array[4] as? FinancialGoalEntity,
+            isAddContributionOpen = array[5] as Boolean
+        )
+    }.flowOn(Dispatchers.Default)
+
     private val archiveWrappersFlow: Flow<List<ArchiveItemWrapper>> = combine(
         repository.archivedTransactions,
-        repository.archivedLoans
-    ) { archivedTxs, archivedLoans ->
+        repository.archivedLoans,
+        repository.archivedGoals
+    ) { archivedTxs, archivedLoans, archivedGoals ->
         val now = System.currentTimeMillis()
         val txWrappers = archivedTxs.map { entity ->
             val calArchive = Calendar.getInstance().apply {
@@ -525,23 +579,39 @@ class FinanceViewModel(
             )
         }
 
-        (txWrappers + loanWrappers).sortedByDescending { it.archivedAt }
+        val goalWrappers = archivedGoals.map { entity ->
+            val calArchive = Calendar.getInstance().apply {
+                timeInMillis = entity.archivedAt ?: now
+                add(Calendar.MONTH, 2)
+            }
+            val daysRemaining = ((calArchive.timeInMillis - now) / (1000L * 60 * 60 * 24)).coerceAtLeast(0).toInt()
+            val retentionText = if (daysRemaining <= 0) "Eligible for auto-purge" else "Permanent deletion in $daysRemaining days"
+            ArchiveItemWrapper.Goal(
+                entity = entity,
+                daysRemaining = daysRemaining,
+                formattedRetentionRemaining = retentionText
+            )
+        }
+
+        (txWrappers + loanWrappers + goalWrappers).sortedByDescending { it.archivedAt }
     }.flowOn(Dispatchers.Default)
 
     private data class IntermediateData(
         val coreData: CoreData,
         val monthlySummary: MonthlyFinancialSummary,
         val calendarDays: List<CalendarDayCell>,
-        val allArchivedItems: List<ArchiveItemWrapper>
+        val allArchivedItems: List<ArchiveItemWrapper>,
+        val goalsPair: Pair<List<FinancialGoalEntity>, List<GoalContributionEntity>>
     )
 
     private val intermediateDataFlow: Flow<IntermediateData> = combine(
         coreDataFlow,
         monthlySummaryFlow,
         calendarGridFlow,
-        archiveWrappersFlow
-    ) { coreData, monthlySummary, calendarDays, allArchivedItems ->
-        IntermediateData(coreData, monthlySummary, calendarDays, allArchivedItems)
+        archiveWrappersFlow,
+        goalsDataFlow
+    ) { coreData, monthlySummary, calendarDays, allArchivedItems, goalsPair ->
+        IntermediateData(coreData, monthlySummary, calendarDays, allArchivedItems, goalsPair)
     }.flowOn(Dispatchers.Default)
 
     val uiState: StateFlow<FinanceUiState> = combine(
@@ -632,6 +702,7 @@ class FinanceViewModel(
                 ArchiveFilterType.INCOME -> item is ArchiveItemWrapper.Transaction && item.entity.type == TransactionType.INCOME
                 ArchiveFilterType.EXPENSE -> item is ArchiveItemWrapper.Transaction && item.entity.type == TransactionType.EXPENSE
                 ArchiveFilterType.LOANS -> item is ArchiveItemWrapper.Loan
+                ArchiveFilterType.GOALS -> item is ArchiveItemWrapper.Goal
             }
             val matchesQuery = if (archiveParams.searchQuery.isBlank()) true else {
                 val q = archiveParams.searchQuery.trim().lowercase()
@@ -639,6 +710,89 @@ class FinanceViewModel(
             }
             matchesType && matchesQuery
         }
+
+        // Financial Goals processing
+        val (rawGoals, rawContributions) = intermediate.goalsPair
+        val activeRawGoals = rawGoals.filter { it.archivedAt == null }
+
+        val allGoalUiModels = activeRawGoals.map { goal ->
+            val contributionsForGoal = rawContributions.filter { it.goalId == goal.id && it.archivedAt == null }
+                .sortedByDescending { it.contributionDate }
+            val savedFromContributions = contributionsForGoal.sumOf { it.amount }
+            val totalSaved = goal.initialSavedAmount + savedFromContributions
+            val remainingAmount = maxOf(0.0, goal.targetAmount - totalSaved)
+            val progress = if (goal.targetAmount > 0) (totalSaved / goal.targetAmount).toFloat().coerceIn(0f, 1f) else 0f
+            val progressPercent = if (goal.targetAmount > 0) ((totalSaved / goal.targetAmount) * 100).coerceAtLeast(0.0) else 0.0
+            val isCompleted = totalSaved >= goal.targetAmount || goal.status == GoalStatus.COMPLETED
+
+            val isOverdue: Boolean
+            val remainingMonths: Int?
+            val requiredMonthly: Double?
+
+            if (goal.targetDate != null && !isCompleted) {
+                val nowCal = calendarParams.month.clone() as Calendar
+                val targetCal = Calendar.getInstance().apply { timeInMillis = goal.targetDate }
+                val yearDiff = targetCal.get(Calendar.YEAR) - nowCal.get(Calendar.YEAR)
+                val monthDiff = targetCal.get(Calendar.MONTH) - nowCal.get(Calendar.MONTH)
+                val totalMonthsDiff = yearDiff * 12 + monthDiff
+                if (totalMonthsDiff < 0) {
+                    isOverdue = true
+                    remainingMonths = 0
+                    requiredMonthly = null
+                } else if (totalMonthsDiff == 0) {
+                    isOverdue = false
+                    remainingMonths = 1
+                    requiredMonthly = remainingAmount
+                } else {
+                    isOverdue = false
+                    val months = totalMonthsDiff + 1
+                    remainingMonths = months
+                    requiredMonthly = if (remainingAmount > 0) remainingAmount / months else 0.0
+                }
+            } else {
+                isOverdue = false
+                remainingMonths = null
+                requiredMonthly = if (!isCompleted) goal.targetMonthlyContribution else null
+            }
+
+            val thisMonthSaved = contributionsForGoal
+                .filter { it.contributionDate in startOfMonth..endOfMonth }
+                .sumOf { it.amount }
+
+            FinancialGoalUiModel(
+                goal = goal,
+                totalSaved = totalSaved,
+                remainingAmount = remainingAmount,
+                progress = progress,
+                progressPercent = progressPercent,
+                isCompleted = isCompleted,
+                isOverdue = isOverdue,
+                remainingMonths = remainingMonths,
+                requiredMonthlySaving = requiredMonthly,
+                thisMonthSaved = thisMonthSaved,
+                contributions = contributionsForGoal
+            )
+        }
+
+        val activeGoalModels = allGoalUiModels.filter { it.goal.status == GoalStatus.ACTIVE }
+        val totalGoalTarget = activeGoalModels.sumOf { it.goal.targetAmount }
+        val totalGoalSaved = activeGoalModels.sumOf { it.totalSaved }
+        val overallGoalProgressPercent = if (totalGoalTarget > 0) ((totalGoalSaved / totalGoalTarget) * 100).coerceIn(0.0, 100.0) else 0.0
+        val thisMonthGoalSaved = rawContributions.filter { it.archivedAt == null && it.contributionDate in startOfMonth..endOfMonth }.sumOf { it.amount }
+        val totalMonthlyGoalRequired = activeGoalModels.filter { !it.isCompleted }.sumOf { it.requiredMonthlySaving ?: it.goal.targetMonthlyContribution ?: 0.0 }
+
+        val nonSavingsAllocated = monthlySummary.monthAllocations
+            .filter { it.category.id != "savings" && it.category.id != "emergency" }
+            .sumOf { it.allocatedAmount }
+
+        val monthlyGoalSavingCapacity = if (monthlySummary.totalAllocated > 0) {
+            maxOf(0.0, monthlySummary.totalIncome - nonSavingsAllocated)
+        } else {
+            maxOf(0.0, monthlySummary.totalIncome - monthlySummary.totalExpense)
+        }
+
+        val isGoalCapacityDeficit = totalMonthlyGoalRequired > monthlyGoalSavingCapacity && totalMonthlyGoalRequired > 0.0
+        val goalCapacityDifference = monthlyGoalSavingCapacity - totalMonthlyGoalRequired
 
         FinanceUiState(
             activeTab = coreData.activeTab,
@@ -686,6 +840,16 @@ class FinanceViewModel(
             selectedLoanStatusFilter = loanStatusFilter,
             repayingLoan = dialogParams.repayingLoan,
             isRepayDialogOpen = dialogParams.isRepayDialogOpen,
+            allGoals = allGoalUiModels,
+            activeGoals = activeGoalModels,
+            totalGoalTarget = totalGoalTarget,
+            totalGoalSaved = totalGoalSaved,
+            overallGoalProgressPercent = overallGoalProgressPercent,
+            thisMonthGoalSaved = thisMonthGoalSaved,
+            totalMonthlyGoalRequired = totalMonthlyGoalRequired,
+            monthlyGoalSavingCapacity = monthlyGoalSavingCapacity,
+            isGoalCapacityDeficit = isGoalCapacityDeficit,
+            goalCapacityDifference = goalCapacityDifference,
             archivedItems = allArchivedItems,
             filteredArchivedItems = filteredArchivedItems,
             archiveFilterType = archiveParams.filterType,
@@ -700,6 +864,21 @@ class FinanceViewModel(
             isBudgetPlanningDialogOpen = dialogParams.isBudgetPlanningDialogOpen,
             isDailyLimitDialogOpen = dialogParams.isDailyLimitDialogOpen,
             currencySymbol = "৳"
+        )
+    }.combine(goalParamsFlow) { state, goalParams ->
+        val filteredGoals = if (goalParams.filterStatus != null) {
+            state.allGoals.filter { it.goal.status == goalParams.filterStatus }
+        } else {
+            state.allGoals
+        }
+        state.copy(
+            allGoals = filteredGoals,
+            selectedGoalFilterStatus = goalParams.filterStatus,
+            selectedGoalDetailsId = goalParams.detailsId,
+            isCreateGoalDialogOpen = goalParams.isCreateOpen,
+            editingGoal = goalParams.editingGoal,
+            contributingGoal = goalParams.contributingGoal,
+            isAddContributionDialogOpen = goalParams.isAddContributionOpen
         )
     }.combine(backupNotificationParamsFlow) { state, backupParams ->
         state.copy(
@@ -1107,9 +1286,158 @@ class FinanceViewModel(
             when (item) {
                 is ArchiveItemWrapper.Transaction -> repository.permanentlyDeleteTransaction(item.id)
                 is ArchiveItemWrapper.Loan -> repository.permanentlyDeleteLoan(item.id)
+                is ArchiveItemWrapper.Goal -> repository.permanentlyDeleteGoal(item.id)
             }
             closePermanentDeleteDialog()
         }
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Financial Goals Actions
+    // ---------------------------------------------------------------------------------------------
+
+    fun openCreateGoalDialog() {
+        _editingGoal.value = null
+        _isCreateGoalDialogOpen.value = true
+    }
+
+    fun openEditGoalDialog(goal: FinancialGoalEntity) {
+        _editingGoal.value = goal
+        _isCreateGoalDialogOpen.value = true
+    }
+
+    fun dismissGoalDialog() {
+        _isCreateGoalDialogOpen.value = false
+        _editingGoal.value = null
+    }
+
+    fun saveGoal(
+        name: String,
+        category: GoalCategory,
+        targetAmount: Double,
+        initialSavedAmount: Double,
+        targetDate: Long?,
+        priority: GoalPriority,
+        targetMonthlyContribution: Double?
+    ) {
+        if (isGoalSaving.compareAndSet(false, true)) {
+            viewModelScope.launch {
+                try {
+                    val currentEditing = _editingGoal.value
+                    if (currentEditing != null) {
+                        repository.updateGoal(
+                            currentEditing.copy(
+                                name = name.trim(),
+                                category = category,
+                                targetAmount = targetAmount,
+                                initialSavedAmount = initialSavedAmount,
+                                targetDate = targetDate,
+                                priority = priority,
+                                targetMonthlyContribution = targetMonthlyContribution,
+                                updatedAt = System.currentTimeMillis()
+                            )
+                        )
+                    } else {
+                        repository.insertGoal(
+                            FinancialGoalEntity(
+                                name = name.trim(),
+                                category = category,
+                                targetAmount = targetAmount,
+                                initialSavedAmount = initialSavedAmount,
+                                targetDate = targetDate,
+                                priority = priority,
+                                status = GoalStatus.ACTIVE,
+                                targetMonthlyContribution = targetMonthlyContribution
+                            )
+                        )
+                    }
+                    _isCreateGoalDialogOpen.value = false
+                    _editingGoal.value = null
+                } finally {
+                    isGoalSaving.set(false)
+                }
+            }
+        }
+    }
+
+    fun updateGoalStatus(goal: FinancialGoalEntity, newStatus: GoalStatus) {
+        viewModelScope.launch {
+            repository.updateGoal(goal.copy(status = newStatus))
+        }
+    }
+
+    fun archiveGoal(goalId: Long) {
+        viewModelScope.launch {
+            repository.archiveGoal(goalId)
+            if (_selectedGoalDetailsId.value == goalId) {
+                _selectedGoalDetailsId.value = null
+            }
+        }
+    }
+
+    fun restoreGoal(goalId: Long) {
+        viewModelScope.launch {
+            repository.restoreGoal(goalId)
+        }
+    }
+
+    fun permanentlyDeleteGoal(goalId: Long) {
+        viewModelScope.launch {
+            repository.permanentlyDeleteGoal(goalId)
+            if (_selectedGoalDetailsId.value == goalId) {
+                _selectedGoalDetailsId.value = null
+            }
+        }
+    }
+
+    fun selectGoalDetails(goalId: Long?) {
+        _selectedGoalDetailsId.value = goalId
+    }
+
+    fun openAddContributionDialog(goal: FinancialGoalEntity) {
+        _contributingGoal.value = goal
+        _isAddContributionDialogOpen.value = true
+    }
+
+    fun dismissAddContributionDialog() {
+        _isAddContributionDialogOpen.value = false
+        _contributingGoal.value = null
+    }
+
+    fun saveGoalContribution(
+        goalId: Long,
+        amount: Double,
+        date: Long,
+        note: String
+    ) {
+        if (isContributionSaving.compareAndSet(false, true)) {
+            viewModelScope.launch {
+                try {
+                    repository.addGoalContribution(
+                        GoalContributionEntity(
+                            goalId = goalId,
+                            amount = amount,
+                            contributionDate = date,
+                            note = note.trim()
+                        )
+                    )
+                    _isAddContributionDialogOpen.value = false
+                    _contributingGoal.value = null
+                } finally {
+                    isContributionSaving.set(false)
+                }
+            }
+        }
+    }
+
+    fun deleteGoalContribution(contributionId: Long) {
+        viewModelScope.launch {
+            repository.deleteGoalContribution(contributionId)
+        }
+    }
+
+    fun setGoalFilterStatus(status: GoalStatus?) {
+        _selectedGoalFilterStatus.value = status
     }
 
     fun setArchiveFilterType(filterType: ArchiveFilterType) {

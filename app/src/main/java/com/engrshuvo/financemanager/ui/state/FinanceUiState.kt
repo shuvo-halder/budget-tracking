@@ -1,6 +1,9 @@
 package com.engrshuvo.financemanager.ui.state
 
 import androidx.compose.runtime.Immutable
+import com.engrshuvo.financemanager.data.model.FinancialGoalEntity
+import com.engrshuvo.financemanager.data.model.FinancialGoalUiModel
+import com.engrshuvo.financemanager.data.model.GoalStatus
 import com.engrshuvo.financemanager.data.model.LoanEntity
 import com.engrshuvo.financemanager.data.model.LoanStatus
 import com.engrshuvo.financemanager.data.model.LoanType
@@ -25,14 +28,16 @@ enum class MoreSubDestination {
     ARCHIVE,
     REPORTS,
     NOTIFICATION_SETTINGS,
-    BACKUP_RESTORE
+    BACKUP_RESTORE,
+    GOALS
 }
 
 enum class ArchiveFilterType(val label: String) {
     ALL("All"),
     INCOME("Income"),
     EXPENSE("Expense"),
-    LOANS("Loans")
+    LOANS("Loans"),
+    GOALS("Goals")
 }
 
 @Immutable
@@ -62,6 +67,17 @@ sealed interface ArchiveItemWrapper {
         override val title: String = "${if (entity.type == LoanType.LENT) "Loan to" else "Loan from"} ${entity.personName}",
         override val amount: Double = entity.initialAmount,
         override val originalDate: Long = entity.startDate,
+        override val archivedAt: Long = entity.archivedAt ?: System.currentTimeMillis(),
+        override val daysRemaining: Int,
+        override val formattedRetentionRemaining: String
+    ) : ArchiveItemWrapper
+
+    data class Goal(
+        val entity: FinancialGoalEntity,
+        override val id: Long = entity.id,
+        override val title: String = "Goal: ${entity.name}",
+        override val amount: Double = entity.targetAmount,
+        override val originalDate: Long = entity.createdAt,
         override val archivedAt: Long = entity.archivedAt ?: System.currentTimeMillis(),
         override val daysRemaining: Int,
         override val formattedRetentionRemaining: String
@@ -172,6 +188,24 @@ data class FinanceUiState(
     val repayingLoan: LoanEntity? = null,
     val isRepayDialogOpen: Boolean = false,
 
+    // Financial Goals State
+    val allGoals: List<FinancialGoalUiModel> = emptyList(),
+    val activeGoals: List<FinancialGoalUiModel> = emptyList(),
+    val totalGoalTarget: Double = 0.0,
+    val totalGoalSaved: Double = 0.0,
+    val overallGoalProgressPercent: Double = 0.0,
+    val thisMonthGoalSaved: Double = 0.0,
+    val totalMonthlyGoalRequired: Double = 0.0,
+    val monthlyGoalSavingCapacity: Double = 0.0,
+    val isGoalCapacityDeficit: Boolean = false,
+    val goalCapacityDifference: Double = 0.0,
+    val selectedGoalFilterStatus: GoalStatus? = null,
+    val selectedGoalDetailsId: Long? = null,
+    val isCreateGoalDialogOpen: Boolean = false,
+    val editingGoal: FinancialGoalEntity? = null,
+    val contributingGoal: FinancialGoalEntity? = null,
+    val isAddContributionDialogOpen: Boolean = false,
+
     // Archive & Recovery State
     val archivedItems: List<ArchiveItemWrapper> = emptyList(),
     val filteredArchivedItems: List<ArchiveItemWrapper> = emptyList(),
@@ -202,4 +236,3 @@ data class FinanceUiState(
     val backupOperationMessage: String? = null,
     val backupOperationError: String? = null
 )
-

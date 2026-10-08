@@ -239,4 +239,129 @@ class RoomMigrationTest {
 
         db.close()
     }
+
+    @Test
+    fun `migration from v3 to v4 creates financial_goals and goal_contributions tables`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val openHelper = FrameworkSQLiteOpenHelperFactory().create(
+            androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
+                .name("test_migration_v3_v4.db")
+                .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(3) {
+                    override fun onCreate(db: SupportSQLiteDatabase) {
+                        // Version 3 Schema
+                        db.execSQL(
+                            """
+                            CREATE TABLE IF NOT EXISTS `transactions` (
+                                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                `type` TEXT NOT NULL,
+                                `amount` REAL NOT NULL,
+                                `categoryId` TEXT NOT NULL,
+                                `categoryName` TEXT NOT NULL,
+                                `note` TEXT NOT NULL,
+                                `timestamp` INTEGER NOT NULL,
+                                `loanId` INTEGER,
+                                `archivedAt` INTEGER
+                            )
+                            """.trimIndent()
+                        )
+                        db.execSQL(
+                            """
+                            CREATE TABLE IF NOT EXISTS `loans` (
+                                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                `type` TEXT NOT NULL,
+                                `personName` TEXT NOT NULL,
+                                `phoneNumber` TEXT NOT NULL,
+                                `initialAmount` REAL NOT NULL,
+                                `remainingAmount` REAL NOT NULL,
+                                `status` TEXT NOT NULL,
+                                `startDate` INTEGER NOT NULL,
+                                `dueDate` INTEGER,
+                                `note` TEXT NOT NULL,
+                                `archivedAt` INTEGER
+                            )
+                            """.trimIndent()
+                        )
+                        db.execSQL(
+                            """
+                            CREATE TABLE IF NOT EXISTS `loan_repayments` (
+                                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                `loanId` INTEGER NOT NULL,
+                                `amount` REAL NOT NULL,
+                                `note` TEXT NOT NULL,
+                                `timestamp` INTEGER NOT NULL,
+                                `archivedAt` INTEGER,
+                                FOREIGN KEY(`loanId`) REFERENCES `loans`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                            )
+                            """.trimIndent()
+                        )
+                        db.execSQL(
+                            """
+                            CREATE TABLE IF NOT EXISTS `budget_settings` (
+                                `settingKey` TEXT PRIMARY KEY NOT NULL,
+                                `amountLimit` REAL NOT NULL,
+                                `currencyCode` TEXT NOT NULL
+                            )
+                            """.trimIndent()
+                        )
+                        db.execSQL(
+                            """
+                            CREATE TABLE IF NOT EXISTS `budget_allocations` (
+                                `monthKey` TEXT NOT NULL,
+                                `categoryId` TEXT NOT NULL,
+                                `categoryName` TEXT NOT NULL,
+                                `allocatedAmount` REAL NOT NULL,
+                                `updatedAt` INTEGER NOT NULL,
+                                PRIMARY KEY(`monthKey`, `categoryId`)
+                            )
+                            """.trimIndent()
+                        )
+                    }
+
+                    override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) {}
+                })
+                .build()
+        )
+
+        val db = openHelper.writableDatabase
+
+        // Run Migration 3 -> 4
+        AppDatabase.MIGRATION_3_4.migrate(db)
+
+        // Insert into financial_goals
+        db.execSQL(
+            """
+            INSERT INTO financial_goals (
+                id, name, category, targetAmount, initialSavedAmount, targetDate, priority, status, targetMonthlyContribution, createdAt, updatedAt, archivedAt
+            ) VALUES (
+                1, 'New Laptop', 'COMPUTER', 80000.0, 20000.0, 1735689600000, 'HIGH', 'ACTIVE', 10000.0, 1728390000000, 1728390000000, NULL
+            )
+            """.trimIndent()
+        )
+
+        // Insert into goal_contributions
+        db.execSQL(
+            """
+            INSERT INTO goal_contributions (
+                id, goalId, amount, contributionDate, note, createdAt, archivedAt
+            ) VALUES (
+                1, 1, 5000.0, 1728395000000, 'October saving deposit', 1728395000000, NULL
+            )
+            """.trimIndent()
+        )
+
+        val goalCursor = db.query("SELECT name, targetAmount, initialSavedAmount FROM financial_goals WHERE id = 1")
+        assertTrue(goalCursor.moveToFirst())
+        assertEquals("New Laptop", goalCursor.getString(0))
+        assertEquals(80000.0, goalCursor.getDouble(1), 0.001)
+        assertEquals(20000.0, goalCursor.getDouble(2), 0.001)
+        goalCursor.close()
+
+        val contCursor = db.query("SELECT amount, note FROM goal_contributions WHERE goalId = 1")
+        assertTrue(contCursor.moveToFirst())
+        assertEquals(5000.0, contCursor.getDouble(0), 0.001)
+        assertEquals("October saving deposit", contCursor.getString(1))
+        contCursor.close()
+
+        db.close()
+    }
 }
