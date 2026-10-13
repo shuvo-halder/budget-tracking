@@ -29,7 +29,8 @@ enum class MoreSubDestination {
     REPORTS,
     NOTIFICATION_SETTINGS,
     BACKUP_RESTORE,
-    GOALS
+    GOALS,
+    PDF_EXPORT
 }
 
 enum class ArchiveFilterType(val label: String) {
@@ -234,5 +235,12 @@ data class FinanceUiState(
     val backupPreview: com.engrshuvo.financemanager.data.model.BackupSummaryPreview? = null,
     val pendingRestoreData: com.engrshuvo.financemanager.data.model.FinanceBackupData? = null,
     val backupOperationMessage: String? = null,
-    val backupOperationError: String? = null
+    val backupOperationError: String? = null,
+
+    // PDF Export Center State
+    val pdfFilterState: com.engrshuvo.financemanager.data.model.PdfExportFilterState = com.engrshuvo.financemanager.data.model.PdfExportFilterState(),
+    val isGeneratingPdf: Boolean = false,
+    val pdfExportMessage: String? = null,
+    val pdfExportError: String? = null,
+    val pdfExportFileUri: android.net.Uri? = null
 )

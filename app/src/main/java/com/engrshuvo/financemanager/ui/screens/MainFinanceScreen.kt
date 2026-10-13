@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Savings
@@ -330,6 +331,21 @@ fun MainFinanceScreen(
                                     modifier = Modifier.testTag("overflow_menu_reports")
                                 )
                                 DropdownMenuItem(
+                                    text = { Text("PDF Export Center") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.PictureAsPdf,
+                                            contentDescription = null,
+                                            tint = ExpenseRed
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        viewModel.navigateToMoreSubDestination(MoreSubDestination.PDF_EXPORT)
+                                    },
+                                    modifier = Modifier.testTag("overflow_menu_pdf_export")
+                                )
+                                DropdownMenuItem(
                                     text = { Text("Notification Reminders") },
                                     leadingIcon = {
                                         Icon(
@@ -491,6 +507,12 @@ fun MainFinanceScreen(
                 },
                 onDeleteGoalContribution = { viewModel.deleteGoalContribution(it) },
                 onSetGoalFilterStatus = { viewModel.setGoalFilterStatus(it) },
+                onUpdatePdfFilterState = { transform -> viewModel.updatePdfFilterState(transform) },
+                onResetPdfFilterState = { viewModel.resetPdfFilterState() },
+                onGeneratePdfToUri = { uri, ctx -> viewModel.generatePdfToUri(uri, ctx) },
+                onSharePdfReport = { ctx -> viewModel.sharePdfReport(ctx) },
+                onOpenPdfReport = { ctx, uri -> viewModel.openPdfReport(ctx, uri) },
+                onDismissPdfMessage = { viewModel.dismissPdfExportMessage() },
                 modifier = Modifier.padding(innerPadding)
             )
         } else {

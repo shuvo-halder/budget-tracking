@@ -107,6 +107,13 @@ class FinanceViewModel(
     private val _backupOperationMessage = MutableStateFlow<String?>(null)
     private val _backupOperationError = MutableStateFlow<String?>(null)
 
+    // PDF Export Center State
+    private val _pdfFilterState = MutableStateFlow(com.engrshuvo.financemanager.data.model.PdfExportFilterState())
+    private val _isGeneratingPdf = MutableStateFlow(false)
+    private val _pdfExportMessage = MutableStateFlow<String?>(null)
+    private val _pdfExportError = MutableStateFlow<String?>(null)
+    private val _pdfExportFileUri = MutableStateFlow<android.net.Uri?>(null)
+
     // In-flight operation guards to prevent duplicate concurrent submissions
     private val isTransactionSaving = java.util.concurrent.atomic.AtomicBoolean(false)
     private val isRepaymentSaving = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -299,6 +306,32 @@ class FinanceViewModel(
             backupOperationError = array[5] as? String,
             notificationPreferences = array[6] as NotificationPreferences,
             notificationPermissionGranted = array[7] as Boolean
+        )
+    }.flowOn(Dispatchers.Default)
+
+    private data class PdfParams(
+        val filterState: com.engrshuvo.financemanager.data.model.PdfExportFilterState,
+        val isGenerating: Boolean,
+        val message: String?,
+        val error: String?,
+        val fileUri: android.net.Uri?
+    )
+
+    private val pdfParamsFlow: Flow<PdfParams> = combine(
+        listOf(
+            _pdfFilterState,
+            _isGeneratingPdf,
+            _pdfExportMessage,
+            _pdfExportError,
+            _pdfExportFileUri
+        )
+    ) { array ->
+        PdfParams(
+            filterState = array[0] as com.engrshuvo.financemanager.data.model.PdfExportFilterState,
+            isGenerating = array[1] as Boolean,
+            message = array[2] as? String,
+            error = array[3] as? String,
+            fileUri = array[4] as? android.net.Uri
         )
     }.flowOn(Dispatchers.Default)
 
@@ -890,6 +923,14 @@ class FinanceViewModel(
             backupOperationError = backupParams.backupOperationError,
             notificationPreferences = backupParams.notificationPreferences,
             notificationPermissionGranted = backupParams.notificationPermissionGranted
+        )
+    }.combine(pdfParamsFlow) { state, pdfParams ->
+        state.copy(
+            pdfFilterState = pdfParams.filterState,
+            isGeneratingPdf = pdfParams.isGenerating,
+            pdfExportMessage = pdfParams.message,
+            pdfExportError = pdfParams.error,
+            pdfExportFileUri = pdfParams.fileUri
         )
     }.flowOn(Dispatchers.Default)
     .stateIn(
@@ -1579,6 +1620,110 @@ class FinanceViewModel(
     fun dismissBackupOperationMessage() {
         _backupOperationMessage.value = null
         _backupOperationError.value = null
+    }
+
+    // PDF Export Center Actions
+    fun updatePdfFilterState(transform: (com.engrshuvo.financemanager.data.model.PdfExportFilterState) -> com.engrshuvo.financemanager.data.model.PdfExportFilterState) {
+        _pdfFilterState.value = transform(_pdfFilterState.value)
+    }
+
+    fun resetPdfFilterState() {
+        _pdfFilterState.value = com.engrshuvo.financemanager.data.model.PdfExportFilterState()
+    }
+
+    fun dismissPdfExportMessage() {
+        _pdfExportMessage.value = null
+        _pdfExportError.value = null
+    }
+
+    fun generatePdfToUri(uri: android.net.Uri, context: Context) {
+        if (_isGeneratingPdf.value) return
+        viewModelScope.launch {
+            _isGeneratingPdf.value = true
+            _pdfExportError.value = null
+            try {
+                val filterState = _pdfFilterState.value
+                val backupData = repository.exportBackupData()
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                        com.engrshuvo.financemanager.data.export.PdfReportGenerator.generatePdf(
+                            filterState = filterState,
+                            transactions = backupData.transactions,
+                            loans = backupData.loans,
+                            repayments = backupData.loanRepayments,
+                            allocations = backupData.budgetAllocations,
+                            budgetSetting = backupData.budgetSettings.find { it.settingKey == com.engrshuvo.financemanager.data.model.BudgetSettingEntity.KEY_MONTHLY_BUDGET },
+                            goals = backupData.financialGoals,
+                            goalContributions = backupData.goalContributions,
+                            outputStream = outputStream
+                        )
+                        outputStream.flush()
+                    } ?: throw IllegalStateException("Unable to open output stream for selected file.")
+                }
+                _pdfExportFileUri.value = uri
+                _pdfExportMessage.value = "${filterState.selectedReportType.title} exported successfully!"
+            } catch (e: Exception) {
+                _pdfExportError.value = "PDF Export failed: ${e.message ?: "Unknown error"}"
+            } finally {
+                _isGeneratingPdf.value = false
+            }
+        }
+    }
+
+    fun sharePdfReport(context: Context) {
+        if (_isGeneratingPdf.value) return
+        viewModelScope.launch {
+            _isGeneratingPdf.value = true
+            _pdfExportError.value = null
+            try {
+                val filterState = _pdfFilterState.value
+                val backupData = repository.exportBackupData()
+                val fileUri = withContext(Dispatchers.IO) {
+                    val exportDir = java.io.File(context.cacheDir, "pdf_exports").apply { if (!exists()) mkdirs() }
+                    val tempFile = java.io.File(exportDir, filterState.getSuggestedFileName())
+                    tempFile.outputStream().use { outputStream ->
+                        com.engrshuvo.financemanager.data.export.PdfReportGenerator.generatePdf(
+                            filterState = filterState,
+                            transactions = backupData.transactions,
+                            loans = backupData.loans,
+                            repayments = backupData.loanRepayments,
+                            allocations = backupData.budgetAllocations,
+                            budgetSetting = backupData.budgetSettings.find { it.settingKey == com.engrshuvo.financemanager.data.model.BudgetSettingEntity.KEY_MONTHLY_BUDGET },
+                            goals = backupData.financialGoals,
+                            goalContributions = backupData.goalContributions,
+                            outputStream = outputStream
+                        )
+                        outputStream.flush()
+                    }
+                    val authority = "${context.packageName}.fileprovider"
+                    androidx.core.content.FileProvider.getUriForFile(context, authority, tempFile)
+                }
+                _pdfExportFileUri.value = fileUri
+                val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "application/pdf"
+                    putExtra(android.content.Intent.EXTRA_STREAM, fileUri)
+                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(android.content.Intent.createChooser(shareIntent, "Share ${filterState.selectedReportType.title}"))
+            } catch (e: Exception) {
+                _pdfExportError.value = "Failed to share PDF: ${e.message ?: "Unknown error"}"
+            } finally {
+                _isGeneratingPdf.value = false
+            }
+        }
+    }
+
+    fun openPdfReport(context: Context, uri: android.net.Uri) {
+        try {
+            val viewIntent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/pdf")
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(viewIntent)
+        } catch (e: Exception) {
+            _pdfExportError.value = "No PDF viewer app found on device. Please install a PDF viewer."
+        }
     }
 }
 

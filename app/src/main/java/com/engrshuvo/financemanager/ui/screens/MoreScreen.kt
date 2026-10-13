@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.Card
@@ -120,6 +121,13 @@ fun MoreScreen(
     onSaveGoalContribution: (goalId: Long, amount: Double, date: Long, note: String) -> Unit = { _, _, _, _ -> },
     onDeleteGoalContribution: (Long) -> Unit = {},
     onSetGoalFilterStatus: (com.engrshuvo.financemanager.data.model.GoalStatus?) -> Unit = {},
+    // PDF Export actions
+    onUpdatePdfFilterState: ((com.engrshuvo.financemanager.data.model.PdfExportFilterState) -> com.engrshuvo.financemanager.data.model.PdfExportFilterState) -> Unit = {},
+    onResetPdfFilterState: () -> Unit = {},
+    onGeneratePdfToUri: (android.net.Uri, android.content.Context) -> Unit = { _, _ -> },
+    onSharePdfReport: (android.content.Context) -> Unit = {},
+    onOpenPdfReport: (android.content.Context, android.net.Uri) -> Unit = { _, _ -> },
+    onDismissPdfMessage: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     AnimatedContent(
@@ -223,6 +231,20 @@ fun MoreScreen(
                     onSetGoalFilterStatus = onSetGoalFilterStatus
                 )
             }
+
+            MoreSubDestination.PDF_EXPORT -> {
+                BackHandler { onNavigateBack() }
+                PdfExportScreen(
+                    uiState = uiState,
+                    onNavigateBack = onNavigateBack,
+                    onUpdateFilterState = onUpdatePdfFilterState,
+                    onResetFilterState = onResetPdfFilterState,
+                    onGeneratePdfToUri = onGeneratePdfToUri,
+                    onSharePdfReport = onSharePdfReport,
+                    onOpenPdfReport = onOpenPdfReport,
+                    onDismissMessage = onDismissPdfMessage
+                )
+            }
         }
     }
 }
@@ -324,6 +346,20 @@ private fun MoreHubView(
                 badgeColor = Color(0xFF2563EB),
                 onClick = { onNavigateToSubDestination(MoreSubDestination.REPORTS) },
                 testTag = "more_reports_card"
+            )
+        }
+
+        item(key = "more_item_pdf_export") {
+            MoreDestinationCard(
+                icon = Icons.Default.PictureAsPdf,
+                iconColor = ExpenseRed,
+                iconBg = ExpenseRed.copy(alpha = 0.15f),
+                title = "PDF Export Center",
+                subtitle = "Generate offline PDF reports across 12 report types with date & category filters",
+                badgeText = "12 Reports",
+                badgeColor = ExpenseRed,
+                onClick = { onNavigateToSubDestination(MoreSubDestination.PDF_EXPORT) },
+                testTag = "more_pdf_export_card"
             )
         }
 

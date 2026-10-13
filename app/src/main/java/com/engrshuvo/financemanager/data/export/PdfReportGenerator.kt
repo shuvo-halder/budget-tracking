@@ -77,6 +77,8 @@ object PdfReportGenerator {
             isLandscape = isLandscape
         )
 
+        context.startNewPage()
+
         when (filterState.selectedReportType) {
             ReportType.MONTHLY_EXPENSE -> buildMonthlyExpenseReport(context, transactions, allocations)
             ReportType.MONTHLY_INCOME -> buildMonthlyIncomeReport(context, transactions)
