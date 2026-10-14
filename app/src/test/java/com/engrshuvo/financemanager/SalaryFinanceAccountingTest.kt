@@ -392,4 +392,70 @@ class SalaryFinanceAccountingTest {
                 activeList3.filter { it.type == TransactionType.EXPENSE }.sumOf { it.amount }
         assertEquals(15000.0, balance3, 0.001)
     }
+
+    @Test
+    fun `borrowing money increases current balance and repaying borrowed money decreases current balance exactly once`() {
+        // Starting cash: ৳10,000 (Income)
+        val t1 = TransactionEntity(id = 1, type = TransactionType.INCOME, amount = 10000.0, categoryId = "salary", categoryName = "Salary", note = "")
+        // Borrow ৳5,000 from lender
+        val t2 = TransactionEntity(id = 2, type = TransactionType.LOAN, amount = 5000.0, categoryId = "loan_borrowed", categoryName = "Borrowed from Friend", note = "", loanId = 100L)
+        
+        var list = listOf(t1, t2)
+        fun calcBalance(txs: List<TransactionEntity>): Double {
+            val inc = txs.filter { it.type == TransactionType.INCOME && it.categoryId != "loan_collected" }.sumOf { it.amount }
+            val exp = txs.filter { it.type == TransactionType.EXPENSE && it.categoryId != "loan_repaid" }.sumOf { it.amount }
+            val bor = txs.filter { it.categoryId == "loan_borrowed" }.sumOf { it.amount }
+            val len = txs.filter { it.categoryId == "loan_lent" }.sumOf { it.amount }
+            val rep = txs.filter { it.categoryId == "loan_repaid" }.sumOf { it.amount }
+            val col = txs.filter { it.categoryId == "loan_collected" }.sumOf { it.amount }
+            return inc - exp + bor - len - rep + col
+        }
+
+        // Cash after borrowing 5,000: 10,000 + 5,000 = 15,000
+        assertEquals(15000.0, calcBalance(list), 0.001)
+
+        // Repay ৳2,000 to lender
+        val t3 = TransactionEntity(id = 3, type = TransactionType.LOAN, amount = 2000.0, categoryId = "loan_repaid", categoryName = "Repayment to Friend", note = "", loanId = 100L)
+        list = list + t3
+
+        // Cash after repaying 2,000: 15,000 - 2,000 = 13,000
+        assertEquals(13000.0, calcBalance(list), 0.001)
+
+        // Ordinary expense remains 0.0 (excludes loan_repaid)
+        val ordinaryExp = list.filter { it.type == TransactionType.EXPENSE && it.categoryId != "loan_repaid" }.sumOf { it.amount }
+        assertEquals(0.0, ordinaryExp, 0.001)
+    }
+
+    @Test
+    fun `lending money decreases current balance and collecting lent money increases current balance exactly once`() {
+        // Starting cash: ৳10,000 (Income)
+        val t1 = TransactionEntity(id = 1, type = TransactionType.INCOME, amount = 10000.0, categoryId = "salary", categoryName = "Salary", note = "")
+        // Lend ৳4,000 to colleague
+        val t2 = TransactionEntity(id = 2, type = TransactionType.LOAN, amount = 4000.0, categoryId = "loan_lent", categoryName = "Lent to Colleague", note = "", loanId = 101L)
+
+        var list = listOf(t1, t2)
+        fun calcBalance(txs: List<TransactionEntity>): Double {
+            val inc = txs.filter { it.type == TransactionType.INCOME && it.categoryId != "loan_collected" }.sumOf { it.amount }
+            val exp = txs.filter { it.type == TransactionType.EXPENSE && it.categoryId != "loan_repaid" }.sumOf { it.amount }
+            val bor = txs.filter { it.categoryId == "loan_borrowed" }.sumOf { it.amount }
+            val len = txs.filter { it.categoryId == "loan_lent" }.sumOf { it.amount }
+            val rep = txs.filter { it.categoryId == "loan_repaid" }.sumOf { it.amount }
+            val col = txs.filter { it.categoryId == "loan_collected" }.sumOf { it.amount }
+            return inc - exp + bor - len - rep + col
+        }
+
+        // Cash after lending 4,000: 10,000 - 4,000 = 6,000
+        assertEquals(6000.0, calcBalance(list), 0.001)
+
+        // Collect ৳1,500 from colleague
+        val t3 = TransactionEntity(id = 3, type = TransactionType.LOAN, amount = 15000.0, categoryId = "loan_collected", categoryName = "Collection from Colleague", note = "", loanId = 101L).copy(amount = 1500.0)
+        list = list + t3
+
+        // Cash after collecting 1,500: 6,000 + 1,500 = 7,500
+        assertEquals(7500.0, calcBalance(list), 0.001)
+
+        // Ordinary income remains 10,000.0 (excludes loan_collected)
+        val ordinaryInc = list.filter { it.type == TransactionType.INCOME && it.categoryId != "loan_collected" }.sumOf { it.amount }
+        assertEquals(10000.0, ordinaryInc, 0.001)
+    }
 }

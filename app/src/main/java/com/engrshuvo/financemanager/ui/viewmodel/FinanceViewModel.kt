@@ -407,11 +407,13 @@ class FinanceViewModel(
 
         val netOperatingCashChange = totalIncome - totalExpense
 
-        val allTimeIncome = allTransactions.filter { it.type == TransactionType.INCOME }.sumOf { it.amount }
-        val allTimeExpense = allTransactions.filter { it.type == TransactionType.EXPENSE }.sumOf { it.amount }
-        val allTimeBorrowed = allTransactions.filter { it.type == TransactionType.LOAN && it.categoryId == "loan_borrowed" }.sumOf { it.amount }
-        val allTimeLent = allTransactions.filter { it.type == TransactionType.LOAN && it.categoryId == "loan_lent" }.sumOf { it.amount }
-        val balance = allTimeIncome - allTimeExpense + allTimeBorrowed - allTimeLent
+        val allTimeIncome = allTransactions.filter { it.type == TransactionType.INCOME && it.categoryId != "loan_collected" }.sumOf { it.amount }
+        val allTimeExpense = allTransactions.filter { it.type == TransactionType.EXPENSE && it.categoryId != "loan_repaid" }.sumOf { it.amount }
+        val allTimeBorrowed = allTransactions.filter { it.categoryId == "loan_borrowed" }.sumOf { it.amount }
+        val allTimeLent = allTransactions.filter { it.categoryId == "loan_lent" }.sumOf { it.amount }
+        val allTimeRepaid = allTransactions.filter { it.categoryId == "loan_repaid" }.sumOf { it.amount }
+        val allTimeCollected = allTransactions.filter { it.categoryId == "loan_collected" }.sumOf { it.amount }
+        val balance = allTimeIncome - allTimeExpense + allTimeBorrowed - allTimeLent - allTimeRepaid + allTimeCollected
 
         val startOfToday = DateUtils.getStartOfDay()
         val endOfToday = DateUtils.getEndOfDay()

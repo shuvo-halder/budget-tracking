@@ -2,9 +2,9 @@
 
 **Project:** Daily Budget & Loan Manager  
 **Package:** `com.engrshuvo.financemanager`  
-**Current Phase:** Phase 6 — Backup/Restore Data-Integrity Tests and Documentation Completion  
+**Current Phase:** Phase 12 — Loan Accounting & Current Balance Bug Fix Completed  
 **Room Database Schema Version:** 3 (Preserved with strict non-destructive migrations)  
-**Date:** October 4, 2026  
+**Date:** October 14, 2026  
 
 ---
 
@@ -88,8 +88,20 @@ Automated testing covers 68 unit and integration tests across 7 test suites, ach
 - [x] Transactional rollback verified on deliberate SQLite failure.
 - [x] Concurrency guards added to prevent concurrent export/restore operations.
 - [x] Reactive UI flows refresh automatically on database commit.
+- [x] Phase 12 Loan Accounting & Current Balance Bug Fix verified (Current Balance correctly accounts for loan repayments and collections without double counting).
+
+---
+
+## 5. Phase 12 — Loan Accounting & Current Balance Verification
+
+- **Status:** `FIXED — TESTS PASS`
+- **Root Cause Identified:** Current Balance formula in `FinanceViewModel.kt` previously subtracted only `allTimeExpense` (which excluded `loan_repaid`) and added `allTimeBorrowed` (full initial principal), causing repayments to be omitted from cash reduction.
+- **Fix Applied:** Updated `balance` calculation in `FinanceViewModel.kt` to:
+  `allTimeIncome - allTimeExpense + allTimeBorrowed - allTimeLent - allTimeRepaid + allTimeCollected`
+- **Settlement Enhancement:** Updated `markLoanSettled` in `FinanceRepository.kt` to invoke `recordLoanRepayment` when `remainingAmount > 0`, ensuring remaining balance settlement generates a recorded repayment transaction and updates cash balance atomically.
 
 ### Manual Device Testing Recommendations:
 1. **SAF Document Provider Compatibility:** Test export and restore with Google Drive, local internal storage, and third-party file managers.
 2. **Cross-Device Transfer:** Export backup JSON from Device A and restore onto a fresh install on Device B.
 3. **Corrupt File Handling:** Attempt restoring an empty or non-JSON file via the file picker and verify the error alert dialog displays without application crash.
+4. **Loan Repayment Cash Balance Test:** Create a borrowed loan of ৳5,000 (balance increases by ৳5,000), repay ৳2,000 (balance decreases by ৳2,000 to net ৳3,000 gain), verify ordinary living expenses remain unaffected.

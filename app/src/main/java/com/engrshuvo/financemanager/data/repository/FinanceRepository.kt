@@ -262,12 +262,17 @@ class FinanceRepository(
 
     suspend fun markLoanSettled(loanId: Long): Boolean = withContext(Dispatchers.IO) {
         val currentLoan = loanDao.getLoanByIdDirect(loanId) ?: return@withContext false
-        loanDao.updateLoan(
-            currentLoan.copy(
-                remainingAmount = 0.0,
-                status = LoanStatus.SETTLED
+        if (currentLoan.remainingAmount > 0.0) {
+            val note = if (currentLoan.type == LoanType.LENT) "Full collection settlement" else "Full repayment settlement"
+            recordLoanRepayment(loanId, currentLoan.remainingAmount, note)
+        } else {
+            loanDao.updateLoan(
+                currentLoan.copy(
+                    remainingAmount = 0.0,
+                    status = LoanStatus.SETTLED
+                )
             )
-        )
+        }
         true
     }
 
