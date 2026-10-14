@@ -10,6 +10,9 @@ import com.engrshuvo.financemanager.data.model.TransactionType
 import com.engrshuvo.financemanager.ui.util.CurrencyUtils
 import com.engrshuvo.financemanager.ui.util.DateUtils
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -160,5 +163,147 @@ class ExampleRobolectricTest {
         val settledLoan = db.loanDao().getLoanByIdDirect(loanId)
         assertEquals(0.0, settledLoan!!.remainingAmount, 0.001)
         assertEquals(LoanStatus.SETTLED, settledLoan.status)
+    }
+
+    @Test
+    fun `non-cash debt forgiveness settles loan without creating cash transaction or changing cash balance`() = kotlinx.coroutines.runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = com.engrshuvo.financemanager.data.local.AppDatabase.getDatabase(context)
+        val repo = com.engrshuvo.financemanager.data.repository.FinanceRepository(
+            transactionDao = db.transactionDao(),
+            budgetSettingDao = db.budgetSettingDao(),
+            loanDao = db.loanDao(),
+            budgetAllocationDao = db.budgetAllocationDao(),
+            database = db
+        )
+
+        // Starting loan of 4000
+        val loan = LoanEntity(
+            id = 0,
+            type = LoanType.LENT,
+            personName = "Anis",
+            initialAmount = 4000.0,
+            remainingAmount = 4000.0,
+            status = LoanStatus.ACTIVE
+        )
+        val loanId = repo.insertLoanWithTransaction(loan)
+
+        // Count transactions before settlement (only creation transaction exists for this loan)
+        val txsBefore = db.transactionDao().getAllTransactionsForBackup().filter { it.loanId == loanId }
+        assertEquals(1, txsBefore.size)
+
+        // Settle non-cash (forgive / write off)
+        val success = repo.settleLoanWithoutCash(loanId, "Bad debt write-off")
+        assertTrue(success)
+
+        val settledLoan = db.loanDao().getLoanByIdDirect(loanId)
+        assertNotNull(settledLoan)
+        assertEquals(0.0, settledLoan!!.remainingAmount, 0.001)
+        assertEquals(LoanStatus.SETTLED, settledLoan.status)
+
+        // Ensure NO repayment record and NO new cash transaction was created
+        val txsAfter = db.transactionDao().getAllTransactionsForBackup().filter { it.loanId == loanId }
+        assertEquals(1, txsAfter.size) // Still exactly 1, no cash transaction invented!
+
+        val repayments = db.loanDao().getAllRepaymentsForBackup().filter { it.loanId == loanId }
+        assertEquals(0, repayments.size) // No fake repayment records
+    }
+
+    @Test
+    fun `settleLoanWithCash records full collection transaction and reduces remaining to zero`() = kotlinx.coroutines.runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = com.engrshuvo.financemanager.data.local.AppDatabase.getDatabase(context)
+        val repo = com.engrshuvo.financemanager.data.repository.FinanceRepository(
+            transactionDao = db.transactionDao(),
+            budgetSettingDao = db.budgetSettingDao(),
+            loanDao = db.loanDao(),
+            budgetAllocationDao = db.budgetAllocationDao(),
+            database = db
+        )
+
+        val loan = LoanEntity(
+            id = 0,
+            type = LoanType.LENT,
+            personName = "Babar",
+            initialAmount = 3500.0,
+            remainingAmount = 3500.0,
+            status = LoanStatus.ACTIVE
+        )
+        val loanId = repo.insertLoanWithTransaction(loan)
+
+        // Settle with cash
+        val success = repo.settleLoanWithCash(loanId)
+        assertTrue(success)
+
+        val settledLoan = db.loanDao().getLoanByIdDirect(loanId)
+        assertEquals(0.0, settledLoan!!.remainingAmount, 0.001)
+        assertEquals(LoanStatus.SETTLED, settledLoan.status)
+
+        // Check that exactly one repayment transaction was created
+        val txs = db.transactionDao().getAllTransactionsForBackup().filter { it.loanId == loanId }
+        assertEquals(2, txs.size) // Creation (3500 lent) + Settlement (3500 collected)
+        val collectionTx = txs.first { it.categoryId == "loan_collected" }
+        assertEquals(3500.0, collectionTx.amount, 0.001)
+    }
+
+    @Test
+    fun `viewmodel submitLoanRepayment on invalid amount keeps dialog open and reports error in ui state`() = kotlinx.coroutines.runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = com.engrshuvo.financemanager.data.local.AppDatabase.getDatabase(context)
+        val repo = com.engrshuvo.financemanager.data.repository.FinanceRepository(
+            transactionDao = db.transactionDao(),
+            budgetSettingDao = db.budgetSettingDao(),
+            loanDao = db.loanDao(),
+            budgetAllocationDao = db.budgetAllocationDao(),
+            database = db
+        )
+        val viewModel = com.engrshuvo.financemanager.ui.viewmodel.FinanceViewModel(repo)
+        val collectJob = launch(kotlinx.coroutines.Dispatchers.Unconfined) {
+            viewModel.uiState.collect {}
+        }
+        try {
+            val loan = LoanEntity(
+            id = 0,
+            type = LoanType.BORROWED,
+            personName = "Tareq",
+            initialAmount = 5000.0,
+            remainingAmount = 2000.0,
+            status = LoanStatus.ACTIVE
+        )
+        val loanId = repo.insertLoanWithTransaction(loan)
+        val insertedLoan = db.loanDao().getLoanByIdDirect(loanId)!!
+
+        // Open repay dialog
+        viewModel.openRepayDialog(insertedLoan)
+        kotlinx.coroutines.yield()
+        kotlinx.coroutines.delay(100)
+        assertTrue(viewModel.uiState.value.isRepayDialogOpen)
+        assertEquals(loanId, viewModel.uiState.value.repayingLoan?.id)
+
+        // Submit overpayment (3000 > 2000 remaining)
+        viewModel.submitLoanRepayment(loanId, 3000.0, "Invalid overpay")
+        kotlinx.coroutines.yield()
+        kotlinx.coroutines.delay(300)
+
+        // Dialog MUST remain open and error reported
+        assertTrue(viewModel.uiState.value.isRepayDialogOpen)
+        assertNotNull(viewModel.uiState.value.loanOperationError)
+        assertFalse(viewModel.uiState.value.isRepaymentSaving)
+
+        // Loan remaining amount MUST remain unchanged at 2000
+        val untouchedLoan = db.loanDao().getLoanByIdDirect(loanId)!!
+        assertEquals(2000.0, untouchedLoan.remainingAmount, 0.001)
+
+        // Now submit valid repayment (1000 <= 2000)
+        viewModel.submitLoanRepayment(loanId, 1000.0, "Valid partial")
+        kotlinx.coroutines.yield()
+        kotlinx.coroutines.delay(300)
+
+        // Dialog MUST close and error MUST be cleared
+        assertFalse(viewModel.uiState.value.isRepayDialogOpen)
+        assertNull(viewModel.uiState.value.loanOperationError)
+        } finally {
+            collectJob.cancel()
+        }
     }
 }

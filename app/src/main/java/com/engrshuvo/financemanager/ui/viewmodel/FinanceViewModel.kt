@@ -69,6 +69,8 @@ class FinanceViewModel(
     private val _selectedLoanStatusFilter = MutableStateFlow(LoanStatusFilter.ACTIVE)
     private val _repayingLoan = MutableStateFlow<LoanEntity?>(null)
     private val _isRepayDialogOpen = MutableStateFlow(false)
+    private val _isRepaymentSavingState = MutableStateFlow(false)
+    private val _loanOperationError = MutableStateFlow<String?>(null)
 
     private val _isAddTransactionSheetOpen = MutableStateFlow(false)
     private val _editingTransaction = MutableStateFlow<TransactionEntity?>(null)
@@ -245,7 +247,9 @@ class FinanceViewModel(
         val repayingLoan: LoanEntity?,
         val isBudgetLimitDialogOpen: Boolean,
         val isBudgetPlanningDialogOpen: Boolean,
-        val isDailyLimitDialogOpen: Boolean
+        val isDailyLimitDialogOpen: Boolean,
+        val isRepaymentSaving: Boolean,
+        val loanOperationError: String?
     )
 
     private val dialogParamsFlow: Flow<DialogParams> = combine(
@@ -258,7 +262,9 @@ class FinanceViewModel(
             _repayingLoan,
             _isBudgetLimitDialogOpen,
             _isBudgetPlanningDialogOpen,
-            _isDailyLimitDialogOpen
+            _isDailyLimitDialogOpen,
+            _isRepaymentSavingState,
+            _loanOperationError
         )
     ) { array ->
         DialogParams(
@@ -270,7 +276,9 @@ class FinanceViewModel(
             repayingLoan = array[5] as? LoanEntity,
             isBudgetLimitDialogOpen = array[6] as Boolean,
             isBudgetPlanningDialogOpen = array[7] as Boolean,
-            isDailyLimitDialogOpen = array[8] as Boolean
+            isDailyLimitDialogOpen = array[8] as Boolean,
+            isRepaymentSaving = array[9] as Boolean,
+            loanOperationError = array[10] as? String
         )
     }.flowOn(Dispatchers.Default)
 
@@ -875,6 +883,8 @@ class FinanceViewModel(
             selectedLoanStatusFilter = loanStatusFilter,
             repayingLoan = dialogParams.repayingLoan,
             isRepayDialogOpen = dialogParams.isRepayDialogOpen,
+            isRepaymentSaving = dialogParams.isRepaymentSaving,
+            loanOperationError = dialogParams.loanOperationError,
             allGoals = allGoalUiModels,
             activeGoals = activeGoalModels,
             totalGoalTarget = totalGoalTarget,
@@ -1156,32 +1166,71 @@ class FinanceViewModel(
 
     fun openRepayDialog(loan: LoanEntity) {
         _repayingLoan.value = loan
+        _loanOperationError.value = null
         _isRepayDialogOpen.value = true
     }
 
     fun closeRepayDialog() {
         _isRepayDialogOpen.value = false
         _repayingLoan.value = null
+        _loanOperationError.value = null
+    }
+
+    fun clearLoanOperationError() {
+        _loanOperationError.value = null
     }
 
     fun submitLoanRepayment(loanId: Long, amount: Double, note: String) {
         if (!isRepaymentSaving.compareAndSet(false, true)) {
             return
         }
+        _isRepaymentSavingState.value = true
+        _loanOperationError.value = null
         viewModelScope.launch {
             try {
-                repository.recordLoanRepayment(loanId, amount, note)
-                closeRepayDialog()
+                val success = repository.recordLoanRepayment(loanId, amount, note)
+                if (success) {
+                    closeRepayDialog()
+                } else {
+                    _loanOperationError.value = "Failed to record repayment. Amount cannot exceed remaining balance."
+                }
+            } catch (e: Exception) {
+                _loanOperationError.value = "Failed to record repayment: ${e.message ?: "Database error"}"
             } finally {
                 isRepaymentSaving.set(false)
+                _isRepaymentSavingState.value = false
+            }
+        }
+    }
+
+    fun settleLoanWithCash(loanId: Long) {
+        viewModelScope.launch {
+            try {
+                val success = repository.settleLoanWithCash(loanId)
+                if (!success) {
+                    _loanOperationError.value = "Failed to record cash settlement."
+                }
+            } catch (e: Exception) {
+                _loanOperationError.value = "Error settling loan: ${e.message ?: "Database error"}"
+            }
+        }
+    }
+
+    fun settleLoanWithoutCash(loanId: Long, reason: String = "Forgiven / Written off") {
+        viewModelScope.launch {
+            try {
+                val success = repository.settleLoanWithoutCash(loanId, reason)
+                if (!success) {
+                    _loanOperationError.value = "Failed to settle loan."
+                }
+            } catch (e: Exception) {
+                _loanOperationError.value = "Error settling loan: ${e.message ?: "Database error"}"
             }
         }
     }
 
     fun markLoanSettled(loanId: Long) {
-        viewModelScope.launch {
-            repository.markLoanSettled(loanId)
-        }
+        settleLoanWithoutCash(loanId)
     }
 
     fun setSearchQuery(query: String) {

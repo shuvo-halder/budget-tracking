@@ -260,7 +260,7 @@ class FinanceRepository(
         repId > 0L
     }
 
-    suspend fun markLoanSettled(loanId: Long): Boolean = withContext(Dispatchers.IO) {
+    suspend fun settleLoanWithCash(loanId: Long): Boolean = withContext(Dispatchers.IO) {
         val currentLoan = loanDao.getLoanByIdDirect(loanId) ?: return@withContext false
         if (currentLoan.remainingAmount > 0.0) {
             val note = if (currentLoan.type == LoanType.LENT) "Full collection settlement" else "Full repayment settlement"
@@ -272,8 +272,29 @@ class FinanceRepository(
                     status = LoanStatus.SETTLED
                 )
             )
+            true
         }
+    }
+
+    suspend fun settleLoanWithoutCash(loanId: Long, note: String = "Forgiven / Written off"): Boolean = withContext(Dispatchers.IO) {
+        val currentLoan = loanDao.getLoanByIdDirect(loanId) ?: return@withContext false
+        val updatedNote = if (currentLoan.note.isBlank()) note else "${currentLoan.note} ($note)"
+        loanDao.updateLoan(
+            currentLoan.copy(
+                remainingAmount = 0.0,
+                status = LoanStatus.SETTLED,
+                note = updatedNote
+            )
+        )
         true
+    }
+
+    suspend fun markLoanSettled(loanId: Long, recordCashMovement: Boolean = false): Boolean = withContext(Dispatchers.IO) {
+        if (recordCashMovement) {
+            settleLoanWithCash(loanId)
+        } else {
+            settleLoanWithoutCash(loanId)
+        }
     }
 
     // Financial Goals repository methods

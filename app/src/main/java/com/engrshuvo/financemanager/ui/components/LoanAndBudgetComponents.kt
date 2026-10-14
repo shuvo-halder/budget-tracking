@@ -1,5 +1,6 @@
 package com.engrshuvo.financemanager.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -643,14 +644,23 @@ fun AddRepaymentDialog(
     isOpen: Boolean,
     loan: LoanEntity?,
     onDismiss: () -> Unit,
-    onSubmitRepayment: (loanId: Long, amount: Double, note: String) -> Unit
+    onSubmitRepayment: (loanId: Long, amount: Double, note: String) -> Unit,
+    isSubmitting: Boolean = false,
+    serverErrorMessage: String? = null
 ) {
     if (!isOpen || loan == null) return
 
     var amountText by remember(loan) { mutableStateOf("") }
     var noteText by remember(loan) { mutableStateOf("") }
-    var isSubmitting by remember(loan, isOpen) { mutableStateOf(false) }
+    var localSubmitting by remember(loan, isOpen) { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val effectiveSubmitting = isSubmitting || localSubmitting
+    val displayedError = serverErrorMessage ?: errorMessage
+
+    if (serverErrorMessage != null && localSubmitting) {
+        localSubmitting = false
+    }
 
     val isLent = loan.type == LoanType.LENT
 
@@ -743,9 +753,9 @@ fun AddRepaymentDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                if (errorMessage != null) {
+                if (displayedError != null) {
                     Text(
-                        text = errorMessage ?: "",
+                        text = displayedError,
                         style = MaterialTheme.typography.bodySmall,
                         color = ExpenseRed
                     )
@@ -755,7 +765,7 @@ fun AddRepaymentDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (isSubmitting) return@Button
+                    if (effectiveSubmitting) return@Button
                     val amount = amountText.toDoubleOrNull()
                     if (amount == null || amount <= 0.0) {
                         errorMessage = "Please enter a valid repayment amount"
@@ -765,13 +775,159 @@ fun AddRepaymentDialog(
                         errorMessage = "Amount cannot exceed remaining balance (${CurrencyUtils.formatBDT(loan.remainingAmount)})"
                         return@Button
                     }
-                    isSubmitting = true
+                    localSubmitting = true
                     onSubmitRepayment(loan.id, amount, noteText)
                 },
-                enabled = !isSubmitting,
+                enabled = !effectiveSubmitting,
                 modifier = Modifier.testTag("submit_repayment_button")
             ) {
-                Text("Confirm Repayment")
+                Text(if (effectiveSubmitting) "Saving..." else "Confirm Repayment")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+fun SettleLoanDialog(
+    isOpen: Boolean,
+    loan: LoanEntity?,
+    onDismiss: () -> Unit,
+    onSettleWithCash: (loanId: Long) -> Unit,
+    onSettleWithoutCash: (loanId: Long, reason: String) -> Unit
+) {
+    if (!isOpen || loan == null) return
+
+    val isLent = loan.type == LoanType.LENT
+    val hasRemaining = loan.remainingAmount > 0.0
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Settle Loan with ${loan.personName}",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (hasRemaining) {
+                    Text(
+                        text = "Remaining balance: ${CurrencyUtils.formatBDT(loan.remainingAmount)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Choose how to settle this loan:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    // Option A: Paid in full (Cash)
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onSettleWithCash(loan.id)
+                                onDismiss()
+                            },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Payments,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isLent) "Collected in Full (Cash)" else "Paid in Full (Cash)",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = if (isLent) {
+                                    "Record full cash collection of ${CurrencyUtils.formatBDT(loan.remainingAmount)}. Increases available cash balance."
+                                } else {
+                                    "Record full cash repayment of ${CurrencyUtils.formatBDT(loan.remainingAmount)}. Decreases available cash balance."
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    // Option B: Forgive / Write-off (No Cash)
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onSettleWithoutCash(loan.id, if (isLent) "Forgiven / Bad debt write-off" else "Forgiven / Debt cancelled")
+                                onDismiss()
+                            },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isLent) "Forgive / Write Off (No Cash)" else "Debt Cancelled / Forgiven (No Cash)",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Close this loan without recording any cash transaction. Current cash balance will NOT change.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "This loan is already fully paid. Mark as settled?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            if (!hasRemaining) {
+                Button(
+                    onClick = {
+                        onSettleWithoutCash(loan.id, "Fully repaid")
+                        onDismiss()
+                    }
+                ) {
+                    Text("Mark Settled")
+                }
             }
         },
         dismissButton = {

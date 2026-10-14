@@ -458,4 +458,67 @@ class SalaryFinanceAccountingTest {
         val ordinaryInc = list.filter { it.type == TransactionType.INCOME && it.categoryId != "loan_collected" }.sumOf { it.amount }
         assertEquals(10000.0, ordinaryInc, 0.001)
     }
+
+    @Test
+    fun `non-cash debt forgiveness or write-off creates zero cash movements and leaves current balance untouched`() {
+        // Starting cash: ৳10,000 (Income)
+        val t1 = TransactionEntity(id = 1, type = TransactionType.INCOME, amount = 10000.0, categoryId = "salary", categoryName = "Salary", note = "")
+        // Lent ৳3,000 to colleague
+        val t2 = TransactionEntity(id = 2, type = TransactionType.LOAN, amount = 3000.0, categoryId = "loan_lent", categoryName = "Lent to Colleague", note = "", loanId = 102L)
+        val list = listOf(t1, t2)
+
+        fun calcBalance(txs: List<TransactionEntity>): Double {
+            val inc = txs.filter { it.type == TransactionType.INCOME && it.categoryId != "loan_collected" }.sumOf { it.amount }
+            val exp = txs.filter { it.type == TransactionType.EXPENSE && it.categoryId != "loan_repaid" }.sumOf { it.amount }
+            val bor = txs.filter { it.categoryId == "loan_borrowed" }.sumOf { it.amount }
+            val len = txs.filter { it.categoryId == "loan_lent" }.sumOf { it.amount }
+            val rep = txs.filter { it.categoryId == "loan_repaid" }.sumOf { it.amount }
+            val col = txs.filter { it.categoryId == "loan_collected" }.sumOf { it.amount }
+            return inc - exp + bor - len - rep + col
+        }
+
+        // Cash after lending ৳3,000: 10,000 - 3,000 = 7,000
+        assertEquals(7000.0, calcBalance(list), 0.001)
+
+        // Non-cash forgiveness / write-off: NO transaction is added
+        val listAfterForgive = list // List of transactions is untouched
+
+        // Cash remains exactly ৳7,000
+        assertEquals(7000.0, calcBalance(listAfterForgive), 0.001)
+
+        // Ordinary income & expense remain unchanged
+        val ordinaryInc = listAfterForgive.filter { it.type == TransactionType.INCOME && it.categoryId != "loan_collected" }.sumOf { it.amount }
+        val ordinaryExp = listAfterForgive.filter { it.type == TransactionType.EXPENSE && it.categoryId != "loan_repaid" }.sumOf { it.amount }
+        assertEquals(10000.0, ordinaryInc, 0.001)
+        assertEquals(0.0, ordinaryExp, 0.001)
+    }
+
+    @Test
+    fun `settling loan with cash adjusts balance by remaining amount, while settling without cash leaves balance unchanged`() {
+        val t1 = TransactionEntity(id = 1, type = TransactionType.INCOME, amount = 10000.0, categoryId = "salary", categoryName = "Salary", note = "")
+        val t2 = TransactionEntity(id = 2, type = TransactionType.LOAN, amount = 5000.0, categoryId = "loan_borrowed", categoryName = "Borrowed", note = "", loanId = 103L)
+        val initialList = listOf(t1, t2)
+
+        fun calcBalance(txs: List<TransactionEntity>): Double {
+            val inc = txs.filter { it.type == TransactionType.INCOME && it.categoryId != "loan_collected" }.sumOf { it.amount }
+            val exp = txs.filter { it.type == TransactionType.EXPENSE && it.categoryId != "loan_repaid" }.sumOf { it.amount }
+            val bor = txs.filter { it.categoryId == "loan_borrowed" }.sumOf { it.amount }
+            val len = txs.filter { it.categoryId == "loan_lent" }.sumOf { it.amount }
+            val rep = txs.filter { it.categoryId == "loan_repaid" }.sumOf { it.amount }
+            val col = txs.filter { it.categoryId == "loan_collected" }.sumOf { it.amount }
+            return inc - exp + bor - len - rep + col
+        }
+
+        // Cash: 10,000 + 5,000 = 15,000
+        assertEquals(15000.0, calcBalance(initialList), 0.001)
+
+        // Case A: Settle without cash (e.g. debt cancelled/forgiven by lender) -> zero transactions added -> balance stays 15,000
+        val nonCashList = initialList
+        assertEquals(15000.0, calcBalance(nonCashList), 0.001)
+
+        // Case B: Settle with cash -> 5,000 repayment transaction added -> balance decreases to 10,000
+        val cashSettlementTx = TransactionEntity(id = 3, type = TransactionType.LOAN, amount = 5000.0, categoryId = "loan_repaid", categoryName = "Full repayment settlement", note = "", loanId = 103L)
+        val cashSettledList = initialList + cashSettlementTx
+        assertEquals(10000.0, calcBalance(cashSettledList), 0.001)
+    }
 }

@@ -59,6 +59,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -83,6 +84,7 @@ import com.engrshuvo.financemanager.ui.components.DailyLimitDialog
 import com.engrshuvo.financemanager.ui.components.DashboardOverviewView
 import com.engrshuvo.financemanager.ui.components.DaySummarySheet
 import com.engrshuvo.financemanager.ui.components.LoansScreen
+import com.engrshuvo.financemanager.ui.components.SettleLoanDialog
 import com.engrshuvo.financemanager.ui.components.SetBudgetDialog
 import com.engrshuvo.financemanager.ui.components.UniversalTransactionSheet
 import com.engrshuvo.financemanager.ui.state.FinanceTab
@@ -116,6 +118,18 @@ fun MainFinanceScreen(
 
     var transactionToDelete by remember { mutableStateOf<TransactionEntity?>(null) }
     var loanToDelete by remember { mutableStateOf<LoanEntity?>(null) }
+    var loanToSettle by remember { mutableStateOf<LoanEntity?>(null) }
+
+    LaunchedEffect(uiState.loanOperationError) {
+        val error = uiState.loanOperationError
+        if (error != null) {
+            snackbarHostState.showSnackbar(
+                message = error,
+                duration = SnackbarDuration.Short
+            )
+            viewModel.clearLoanOperationError()
+        }
+    }
 
     // Soft delete confirmation dialog for transaction
     if (transactionToDelete != null) {
@@ -643,7 +657,7 @@ fun MainFinanceScreen(
                             onStatusFilterChange = { viewModel.setLoanStatusFilter(it) },
                             onAddLoanClick = { viewModel.openAddTransactionSheet(TransactionType.LOAN, LoanType.LENT) },
                             onRepayClick = { viewModel.openRepayDialog(it) },
-                            onSettleClick = { viewModel.markLoanSettled(it.id) },
+                            onSettleClick = { loanToSettle = it },
                             onDeleteLoanClick = { loanToDelete = it }
                         )
                     }
@@ -692,6 +706,20 @@ fun MainFinanceScreen(
         onDismiss = { viewModel.closeRepayDialog() },
         onSubmitRepayment = { loanId, amount, note ->
             viewModel.submitLoanRepayment(loanId, amount, note)
+        },
+        isSubmitting = uiState.isRepaymentSaving,
+        serverErrorMessage = uiState.loanOperationError
+    )
+
+    SettleLoanDialog(
+        isOpen = loanToSettle != null,
+        loan = loanToSettle,
+        onDismiss = { loanToSettle = null },
+        onSettleWithCash = { loanId ->
+            viewModel.settleLoanWithCash(loanId)
+        },
+        onSettleWithoutCash = { loanId, reason ->
+            viewModel.settleLoanWithoutCash(loanId, reason)
         }
     )
 

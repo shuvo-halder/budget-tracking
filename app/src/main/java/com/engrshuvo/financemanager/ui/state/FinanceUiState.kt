@@ -188,6 +188,8 @@ data class FinanceUiState(
     val selectedLoanStatusFilter: LoanStatusFilter = LoanStatusFilter.ACTIVE,
     val repayingLoan: LoanEntity? = null,
     val isRepayDialogOpen: Boolean = false,
+    val isRepaymentSaving: Boolean = false,
+    val loanOperationError: String? = null,
 
     // Financial Goals State
     val allGoals: List<FinancialGoalUiModel> = emptyList(),
