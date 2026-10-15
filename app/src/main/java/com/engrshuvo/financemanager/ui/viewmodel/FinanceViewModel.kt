@@ -53,7 +53,8 @@ import java.util.Locale
 
 class FinanceViewModel(
     private val repository: FinanceRepository,
-    private val notificationPreferencesRepo: NotificationPreferencesRepository? = null
+    private val notificationPreferencesRepo: NotificationPreferencesRepository? = null,
+    private val paymentSmsPreferencesRepo: com.engrshuvo.financemanager.sms.PaymentSmsPreferencesRepository? = null
 ) : ViewModel() {
 
     private val _activeTab = MutableStateFlow(FinanceTab.DASHBOARD)
@@ -130,6 +131,12 @@ class FinanceViewModel(
     // In-flight operation guards to prevent duplicate concurrent submissions
     private val isTransactionSaving = java.util.concurrent.atomic.AtomicBoolean(false)
     private val isRepaymentSaving = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    // Payment SMS Import State
+    private val _smsRecordToReview = MutableStateFlow<com.engrshuvo.financemanager.data.model.SmsImportedRecordEntity?>(null)
+    private val _smsPasteInput = MutableStateFlow("")
+    private val _smsPasteTestResult = MutableStateFlow<String?>(null)
+    private val _smsOperationMessage = MutableStateFlow<String?>(null)
 
     init {
         // Automatic cleanup on app startup
@@ -380,6 +387,34 @@ class FinanceViewModel(
         )
     }.combine(_itemToDeletePurchase) { params, toDelete ->
         params.copy(itemToDelete = toDelete)
+    }.flowOn(Dispatchers.Default)
+
+    private data class SmsImportParams(
+        val prefs: com.engrshuvo.financemanager.sms.PaymentSmsPreferences,
+        val records: List<com.engrshuvo.financemanager.data.model.SmsImportedRecordEntity>,
+        val recordToReview: com.engrshuvo.financemanager.data.model.SmsImportedRecordEntity?,
+        val pasteInput: String,
+        val pasteTestResult: String?,
+        val operationMessage: String?
+    )
+
+    private val smsImportParamsFlow: Flow<SmsImportParams> = combine(
+        paymentSmsPreferencesRepo?.preferencesFlow ?: kotlinx.coroutines.flow.flowOf(com.engrshuvo.financemanager.sms.PaymentSmsPreferences()),
+        repository.allSmsImportedRecords,
+        _smsRecordToReview,
+        _smsPasteInput,
+        _smsPasteTestResult
+    ) { prefs, records, toReview, pasteInput, testResult ->
+        SmsImportParams(
+            prefs = prefs,
+            records = records,
+            recordToReview = toReview,
+            pasteInput = pasteInput,
+            pasteTestResult = testResult,
+            operationMessage = _smsOperationMessage.value
+        )
+    }.combine(_smsOperationMessage) { params, msg ->
+        params.copy(operationMessage = msg)
     }.flowOn(Dispatchers.Default)
 
     private data class MonthlyFinancialSummary(
@@ -1014,6 +1049,20 @@ class FinanceViewModel(
             isAddPurchaseItemDialogOpen = purchaseParams.isAddDialogOpen,
             editingPurchaseItem = purchaseParams.editingItem,
             itemToDeletePurchase = purchaseParams.itemToDelete
+        )
+    }.combine(smsImportParamsFlow) { state, smsParams ->
+        state.copy(
+            isSmsImportEnabled = smsParams.prefs.isEnabled,
+            smsImportActivatedAt = smsParams.prefs.activatedAt,
+            smsImportLastAt = smsParams.prefs.lastImportedAt,
+            smsImportedCount = smsParams.prefs.importedCount,
+            smsAutoPostUnambiguous = smsParams.prefs.autoPostUnambiguous,
+            importedSmsRecords = smsParams.records,
+            pendingReviewSmsRecords = smsParams.records.filter { it.status == com.engrshuvo.financemanager.data.model.SmsImportStatus.PENDING_REVIEW },
+            smsRecordToReview = smsParams.recordToReview,
+            smsPasteInput = smsParams.pasteInput,
+            smsPasteTestResult = smsParams.pasteTestResult,
+            smsOperationMessage = smsParams.operationMessage
         )
     }.flowOn(Dispatchers.Default)
     .stateIn(
@@ -1939,16 +1988,107 @@ class FinanceViewModel(
             _itemToDeletePurchase.value = null
         }
     }
+
+    // ==========================================
+    // PAYMENT SMS IMPORT ACTIONS
+    // ==========================================
+
+    fun updateSmsImportEnabled(enabled: Boolean, context: Context? = null) {
+        viewModelScope.launch {
+            paymentSmsPreferencesRepo?.updateEnabled(enabled)
+            if (enabled) {
+                _smsOperationMessage.value = "Payment SMS Import enabled. New incoming payment messages will be captured."
+            } else {
+                _smsOperationMessage.value = "Payment SMS Import disabled."
+            }
+        }
+    }
+
+    fun updateSmsAutoPost(autoPost: Boolean) {
+        viewModelScope.launch {
+            paymentSmsPreferencesRepo?.updateAutoPost(autoPost)
+        }
+    }
+
+    fun openSmsRecordReview(record: com.engrshuvo.financemanager.data.model.SmsImportedRecordEntity) {
+        _smsRecordToReview.value = record
+    }
+
+    fun dismissSmsRecordReview() {
+        _smsRecordToReview.value = null
+    }
+
+    fun approveSmsRecord(recordId: Long, categoryId: String, note: String = "") {
+        viewModelScope.launch {
+            val success = repository.approveSmsRecord(recordId, categoryId, note)
+            if (success) {
+                _smsOperationMessage.value = "Payment record approved and added to transactions!"
+            }
+            _smsRecordToReview.value = null
+        }
+    }
+
+    fun dismissSmsRecord(recordId: Long) {
+        viewModelScope.launch {
+            repository.dismissSmsRecord(recordId)
+            _smsRecordToReview.value = null
+            _smsOperationMessage.value = "SMS candidate dismissed."
+        }
+    }
+
+    fun deleteSmsRecord(recordId: Long) {
+        viewModelScope.launch {
+            repository.deleteSmsRecord(recordId)
+            _smsRecordToReview.value = null
+        }
+    }
+
+    fun setSmsPasteInput(input: String) {
+        _smsPasteInput.value = input
+        _smsPasteTestResult.value = null
+    }
+
+    fun testParseSmsPaste(sender: String, body: String) {
+        val parsed = com.engrshuvo.financemanager.sms.parser.PaymentSmsParser.parse(sender, body)
+        if (parsed != null) {
+            _smsPasteTestResult.value = "✅ Parsed Successfully!\nProvider: ${parsed.provider}\nType: ${parsed.type}\nAmount: ৳${String.format(Locale.US, "%.2f", parsed.amount)}\nFee: ৳${String.format(Locale.US, "%.2f", parsed.fee)}\nTrxID: ${parsed.trxId ?: "N/A"}\nCounterparty: ${parsed.counterparty.ifBlank { "N/A" }}\nSuggested Category: ${parsed.suggestedCategory}"
+        } else {
+            _smsPasteTestResult.value = "⚠️ Could not parse as a supported financial payment message or message is promotional/OTP."
+        }
+    }
+
+    fun importPastedSms(context: Context, sender: String, body: String) {
+        viewModelScope.launch {
+            val success = com.engrshuvo.financemanager.sms.PaymentSmsProcessor.processIncomingSms(
+                context = context,
+                sender = sender,
+                body = body,
+                messageTimestamp = System.currentTimeMillis()
+            )
+            if (success) {
+                _smsOperationMessage.value = "SMS parsed and imported into records!"
+                _smsPasteInput.value = ""
+                _smsPasteTestResult.value = null
+            } else {
+                _smsOperationMessage.value = "Import rejected: duplicate TrxID, feature disabled, or invalid payment format."
+            }
+        }
+    }
+
+    fun dismissSmsOperationMessage() {
+        _smsOperationMessage.value = null
+    }
 }
 
 class FinanceViewModelFactory(
     private val repository: FinanceRepository,
-    private val notificationPreferencesRepo: NotificationPreferencesRepository? = null
+    private val notificationPreferencesRepo: NotificationPreferencesRepository? = null,
+    private val paymentSmsPreferencesRepo: com.engrshuvo.financemanager.sms.PaymentSmsPreferencesRepository? = null
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(FinanceViewModel::class.java)) {
-            return FinanceViewModel(repository, notificationPreferencesRepo) as T
+            return FinanceViewModel(repository, notificationPreferencesRepo, paymentSmsPreferencesRepo) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }

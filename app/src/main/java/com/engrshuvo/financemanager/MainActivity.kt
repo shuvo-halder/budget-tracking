@@ -36,10 +36,12 @@ class MainActivity : ComponentActivity() {
             financialGoalDao = database.financialGoalDao(),
             goalContributionDao = database.goalContributionDao(),
             purchaseItemDao = database.purchaseItemDao(),
+            smsImportedRecordDao = database.smsImportedRecordDao(),
             database = database
         )
         val notificationRepo = NotificationPreferencesRepository(applicationContext)
-        FinanceViewModelFactory(repository, notificationRepo)
+        val paymentSmsRepo = com.engrshuvo.financemanager.sms.PaymentSmsPreferencesRepository(applicationContext)
+        FinanceViewModelFactory(repository, notificationRepo, paymentSmsRepo)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

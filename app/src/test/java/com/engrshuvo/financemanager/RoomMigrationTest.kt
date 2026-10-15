@@ -507,4 +507,91 @@ class RoomMigrationTest {
 
         db.close()
     }
+
+    @Test
+    fun `migration from v5 to v6 creates sms_imported_records table without data loss`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val openHelper = FrameworkSQLiteOpenHelperFactory().create(
+            androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
+                .name("test_migration_v5_v6.db")
+                .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(5) {
+                    override fun onCreate(db: SupportSQLiteDatabase) {
+                        // Version 5 Schema (includes purchase_items)
+                        db.execSQL(
+                            """
+                            CREATE TABLE IF NOT EXISTS `transactions` (
+                                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                `type` TEXT NOT NULL,
+                                `amount` REAL NOT NULL,
+                                `categoryId` TEXT NOT NULL,
+                                `categoryName` TEXT NOT NULL,
+                                `note` TEXT NOT NULL,
+                                `timestamp` INTEGER NOT NULL,
+                                `loanId` INTEGER,
+                                `archivedAt` INTEGER
+                            )
+                            """.trimIndent()
+                        )
+                        db.execSQL(
+                            """
+                            CREATE TABLE IF NOT EXISTS `purchase_items` (
+                                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                `title` TEXT NOT NULL,
+                                `note` TEXT NOT NULL,
+                                `isCompleted` INTEGER NOT NULL,
+                                `createdAt` INTEGER NOT NULL,
+                                `completedAt` INTEGER
+                            )
+                            """.trimIndent()
+                        )
+                    }
+
+                    override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) {}
+                })
+                .build()
+        )
+
+        val db = openHelper.writableDatabase
+
+        // Insert pre-existing v5 records
+        db.execSQL("INSERT INTO transactions (id, type, amount, categoryId, categoryName, note, timestamp) VALUES (1, 'EXPENSE', 400.0, 'grocery', 'Grocery', 'Vegetables', 1710000000000)")
+        db.execSQL("INSERT INTO purchase_items (id, title, note, isCompleted, createdAt, completedAt) VALUES (1, 'Dish Soap', 'Lemon scent', 0, 1710000000000, NULL)")
+
+        // Run Migration 5 -> 6
+        AppDatabase.MIGRATION_5_6.migrate(db)
+
+        // Verify pre-existing data is preserved
+        val txCursor = db.query("SELECT amount, note FROM transactions WHERE id = 1")
+        assertTrue(txCursor.moveToFirst())
+        assertEquals(400.0, txCursor.getDouble(0), 0.001)
+        assertEquals("Vegetables", txCursor.getString(1))
+        txCursor.close()
+
+        val pCursor = db.query("SELECT title, isCompleted FROM purchase_items WHERE id = 1")
+        assertTrue(pCursor.moveToFirst())
+        assertEquals("Dish Soap", pCursor.getString(0))
+        assertEquals(0, pCursor.getInt(1))
+        pCursor.close()
+
+        // Insert into newly created sms_imported_records table
+        db.execSQL(
+            """
+            INSERT INTO sms_imported_records (
+                id, sender, provider, trxId, type, amount, fee, counterparty, suggestedCategory, timestamp, status, linkedTransactionId, fallbackFingerprint, note
+            ) VALUES (
+                1, 'bKash', 'bKash', 'TRX123456', 'EXPENSE', 450.0, 0.0, '01712345678', 'shopping', 1710005000000, 'PENDING_REVIEW', NULL, 'fingerprint123', 'bKash Payment'
+            )
+            """.trimIndent()
+        )
+
+        val smsCursor = db.query("SELECT provider, trxId, amount, status FROM sms_imported_records WHERE id = 1")
+        assertTrue(smsCursor.moveToFirst())
+        assertEquals("bKash", smsCursor.getString(0))
+        assertEquals("TRX123456", smsCursor.getString(1))
+        assertEquals(450.0, smsCursor.getDouble(2), 0.001)
+        assertEquals("PENDING_REVIEW", smsCursor.getString(3))
+        smsCursor.close()
+
+        db.close()
+    }
 }

@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -141,6 +142,18 @@ fun MoreScreen(
     onRequestDeletePurchaseItem: (com.engrshuvo.financemanager.data.model.PurchaseItemEntity) -> Unit = {},
     onConfirmDeletePurchaseItem: () -> Unit = {},
     onDismissDeletePurchaseItemDialog: () -> Unit = {},
+    // Payment SMS Import actions
+    onToggleSmsEnabled: (Boolean, android.content.Context) -> Unit = { _, _ -> },
+    onToggleSmsAutoPost: (Boolean) -> Unit = {},
+    onOpenReviewSmsRecord: (com.engrshuvo.financemanager.data.model.SmsImportedRecordEntity) -> Unit = {},
+    onDismissReviewSmsRecord: () -> Unit = {},
+    onApproveSmsRecord: (id: Long, categoryId: String, note: String) -> Unit = { _, _, _ -> },
+    onDismissSmsRecord: (Long) -> Unit = {},
+    onDeleteSmsRecord: (Long) -> Unit = {},
+    onSmsPasteInputChange: (String) -> Unit = {},
+    onTestParseSmsPaste: (sender: String, body: String) -> Unit = { _, _ -> },
+    onImportPastedSms: (android.content.Context, sender: String, body: String) -> Unit = { _, _, _ -> },
+    onDismissSmsOperationMessage: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     AnimatedContent(
@@ -155,6 +168,8 @@ fun MoreScreen(
                     archivedCount = uiState.archivedItems.size,
                     activeGoalsCount = uiState.activeGoals.size,
                     pendingPurchasesCount = uiState.pendingPurchaseCount,
+                    pendingSmsReviewCount = uiState.pendingReviewSmsRecords.size,
+                    isSmsImportEnabled = uiState.isSmsImportEnabled,
                     onNavigateToSubDestination = onNavigateToSubDestination
                 )
             }
@@ -278,6 +293,25 @@ fun MoreScreen(
                     onDismissDeleteDialog = onDismissDeletePurchaseItemDialog
                 )
             }
+
+            MoreSubDestination.SMS_IMPORT -> {
+                BackHandler { onNavigateBack() }
+                PaymentSmsImportScreen(
+                    uiState = uiState,
+                    onNavigateBack = onNavigateBack,
+                    onToggleEnabled = onToggleSmsEnabled,
+                    onToggleAutoPost = onToggleSmsAutoPost,
+                    onOpenReviewRecord = onOpenReviewSmsRecord,
+                    onDismissReviewRecord = onDismissReviewSmsRecord,
+                    onApproveRecord = onApproveSmsRecord,
+                    onDismissRecord = onDismissSmsRecord,
+                    onDeleteRecord = onDeleteSmsRecord,
+                    onPasteInputChange = onSmsPasteInputChange,
+                    onTestParsePaste = onTestParseSmsPaste,
+                    onImportPastedSms = onImportPastedSms,
+                    onDismissOperationMessage = onDismissSmsOperationMessage
+                )
+            }
         }
     }
 }
@@ -287,6 +321,8 @@ private fun MoreHubView(
     archivedCount: Int,
     activeGoalsCount: Int,
     pendingPurchasesCount: Int,
+    pendingSmsReviewCount: Int = 0,
+    isSmsImportEnabled: Boolean = false,
     onNavigateToSubDestination: (MoreSubDestination) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -338,6 +374,20 @@ private fun MoreHubView(
                 badgeColor = if (pendingPurchasesCount > 0) Color(0xFFF59E0B) else MaterialTheme.colorScheme.outline,
                 onClick = { onNavigateToSubDestination(MoreSubDestination.PURCHASE_PLANNER) },
                 testTag = "more_purchase_planner_card"
+            )
+        }
+
+        item(key = "more_item_sms_import") {
+            MoreDestinationCard(
+                icon = Icons.Default.Sms,
+                iconColor = Color(0xFF0284C7),
+                iconBg = Color(0xFFE0F2FE),
+                title = "Payment SMS Import",
+                subtitle = "Automatic on-device payment import for bKash, Nagad, Rocket, cards & banks with zero battery overhead",
+                badgeText = if (pendingSmsReviewCount > 0) "$pendingSmsReviewCount to review" else if (isSmsImportEnabled) "Active" else "Disabled",
+                badgeColor = if (pendingSmsReviewCount > 0) Color(0xFFF59E0B) else if (isSmsImportEnabled) IncomeGreen else MaterialTheme.colorScheme.outline,
+                onClick = { onNavigateToSubDestination(MoreSubDestination.SMS_IMPORT) },
+                testTag = "more_sms_import_card"
             )
         }
 

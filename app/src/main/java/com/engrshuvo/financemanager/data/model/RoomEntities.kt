@@ -155,3 +155,38 @@ data class PurchaseItemEntity(
     val completedAt: Long? = null
 )
 
+enum class SmsImportStatus {
+    PENDING_REVIEW,
+    POSTED,
+    DISMISSED
+}
+
+@Immutable
+@Entity(
+    tableName = "sms_imported_records",
+    indices = [
+        Index(value = ["trxId"], unique = true),
+        Index("timestamp"),
+        Index("status"),
+        Index("fallbackFingerprint")
+    ]
+)
+data class SmsImportedRecordEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val sender: String,
+    val provider: String,
+    val trxId: String? = null,
+    val type: TransactionType,
+    val amount: Double,
+    val fee: Double = 0.0,
+    val counterparty: String = "",
+    val suggestedCategory: String = "other_expense",
+    val timestamp: Long = System.currentTimeMillis(),
+    val status: SmsImportStatus = SmsImportStatus.PENDING_REVIEW,
+    val linkedTransactionId: Long? = null,
+    val fallbackFingerprint: String = "",
+    val note: String = ""
+)
+
+

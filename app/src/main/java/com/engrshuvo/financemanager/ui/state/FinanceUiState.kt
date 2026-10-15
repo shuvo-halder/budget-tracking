@@ -8,6 +8,7 @@ import com.engrshuvo.financemanager.data.model.LoanEntity
 import com.engrshuvo.financemanager.data.model.LoanStatus
 import com.engrshuvo.financemanager.data.model.LoanType
 import com.engrshuvo.financemanager.data.model.PurchaseItemEntity
+import com.engrshuvo.financemanager.data.model.SmsImportedRecordEntity
 import com.engrshuvo.financemanager.data.model.TransactionCategory
 import com.engrshuvo.financemanager.data.model.TransactionEntity
 import com.engrshuvo.financemanager.data.model.TransactionType
@@ -32,7 +33,8 @@ enum class MoreSubDestination {
     BACKUP_RESTORE,
     GOALS,
     PDF_EXPORT,
-    PURCHASE_PLANNER
+    PURCHASE_PLANNER,
+    SMS_IMPORT
 }
 
 enum class PurchaseItemFilter(val label: String) {
@@ -263,5 +265,18 @@ data class FinanceUiState(
     val completedPurchaseCount: Int = 0,
     val isAddPurchaseItemDialogOpen: Boolean = false,
     val editingPurchaseItem: PurchaseItemEntity? = null,
-    val itemToDeletePurchase: PurchaseItemEntity? = null
+    val itemToDeletePurchase: PurchaseItemEntity? = null,
+
+    // Automatic Payment SMS Import State
+    val isSmsImportEnabled: Boolean = false,
+    val smsImportActivatedAt: Long = 0L,
+    val smsImportLastAt: Long = 0L,
+    val smsImportedCount: Int = 0,
+    val smsAutoPostUnambiguous: Boolean = false,
+    val importedSmsRecords: List<SmsImportedRecordEntity> = emptyList(),
+    val pendingReviewSmsRecords: List<SmsImportedRecordEntity> = emptyList(),
+    val smsRecordToReview: SmsImportedRecordEntity? = null,
+    val smsPasteInput: String = "",
+    val smsPasteTestResult: String? = null,
+    val smsOperationMessage: String? = null
 )

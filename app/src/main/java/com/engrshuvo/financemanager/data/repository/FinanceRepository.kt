@@ -11,6 +11,7 @@ import com.engrshuvo.financemanager.data.local.PurchaseItemDao
 import com.engrshuvo.financemanager.data.local.TransactionDao
 import com.engrshuvo.financemanager.data.model.BudgetAllocationEntity
 import com.engrshuvo.financemanager.data.model.BudgetSettingEntity
+import com.engrshuvo.financemanager.data.model.CategoryCatalog
 import com.engrshuvo.financemanager.data.model.FinanceBackupData
 import com.engrshuvo.financemanager.data.model.FinancialGoalEntity
 import com.engrshuvo.financemanager.data.model.GoalContributionEntity
@@ -37,6 +38,7 @@ class FinanceRepository(
     private val financialGoalDao: FinancialGoalDao? = null,
     private val goalContributionDao: GoalContributionDao? = null,
     private val purchaseItemDao: PurchaseItemDao? = null,
+    private val smsImportedRecordDao: com.engrshuvo.financemanager.data.local.SmsImportedRecordDao? = null,
     private val database: AppDatabase? = null
 ) {
     // Transaction streams strictly on Dispatchers.IO
@@ -543,6 +545,50 @@ class FinanceRepository(
 
     suspend fun deletePurchaseItem(id: Long): Boolean = withContext(Dispatchers.IO) {
         val count = purchaseItemDao?.deleteItemById(id) ?: 0
+        count > 0
+    }
+
+    // ==========================================
+    // SMS IMPORTED RECORDS LAYER
+    // ==========================================
+
+    val allSmsImportedRecords: Flow<List<com.engrshuvo.financemanager.data.model.SmsImportedRecordEntity>> =
+        smsImportedRecordDao?.getAllRecordsFlow()?.flowOn(Dispatchers.IO) ?: flowOf(emptyList())
+
+    val pendingReviewSmsRecords: Flow<List<com.engrshuvo.financemanager.data.model.SmsImportedRecordEntity>> =
+        smsImportedRecordDao?.getPendingReviewRecordsFlow()?.flowOn(Dispatchers.IO) ?: flowOf(emptyList())
+
+    suspend fun insertSmsRecord(record: com.engrshuvo.financemanager.data.model.SmsImportedRecordEntity): Long = withContext(Dispatchers.IO) {
+        smsImportedRecordDao?.insertRecord(record) ?: -1L
+    }
+
+    suspend fun approveSmsRecord(recordId: Long, categoryId: String, note: String = ""): Boolean = withContext(Dispatchers.IO) {
+        val record = smsImportedRecordDao?.getRecordById(recordId) ?: return@withContext false
+        val cat = CategoryCatalog.getCategoryById(categoryId)
+        val tx = TransactionEntity(
+            type = record.type,
+            amount = record.amount,
+            categoryId = cat.id,
+            categoryName = cat.name,
+            note = if (note.isNotBlank()) note else "${record.note}${if (record.trxId != null) " (TrxID: ${record.trxId})" else ""}",
+            timestamp = record.timestamp
+        )
+        val createdTxId = transactionDao.insertTransaction(tx)
+        if (createdTxId > 0) {
+            val updated = smsImportedRecordDao.updateStatus(recordId, com.engrshuvo.financemanager.data.model.SmsImportStatus.POSTED, createdTxId)
+            updated > 0
+        } else {
+            false
+        }
+    }
+
+    suspend fun dismissSmsRecord(recordId: Long): Boolean = withContext(Dispatchers.IO) {
+        val count = smsImportedRecordDao?.updateStatus(recordId, com.engrshuvo.financemanager.data.model.SmsImportStatus.DISMISSED) ?: 0
+        count > 0
+    }
+
+    suspend fun deleteSmsRecord(recordId: Long): Boolean = withContext(Dispatchers.IO) {
+        val count = smsImportedRecordDao?.deleteRecord(recordId) ?: 0
         count > 0
     }
 }

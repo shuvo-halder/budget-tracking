@@ -14,6 +14,7 @@ import com.engrshuvo.financemanager.data.model.GoalContributionEntity
 import com.engrshuvo.financemanager.data.model.LoanEntity
 import com.engrshuvo.financemanager.data.model.LoanRepaymentEntity
 import com.engrshuvo.financemanager.data.model.PurchaseItemEntity
+import com.engrshuvo.financemanager.data.model.SmsImportedRecordEntity
 import com.engrshuvo.financemanager.data.model.TransactionEntity
 
 @Database(
@@ -25,9 +26,10 @@ import com.engrshuvo.financemanager.data.model.TransactionEntity
         BudgetAllocationEntity::class,
         FinancialGoalEntity::class,
         GoalContributionEntity::class,
-        PurchaseItemEntity::class
+        PurchaseItemEntity::class,
+        SmsImportedRecordEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(RoomConverters::class)
@@ -39,6 +41,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun financialGoalDao(): FinancialGoalDao
     abstract fun goalContributionDao(): GoalContributionDao
     abstract fun purchaseItemDao(): PurchaseItemDao
+    abstract fun smsImportedRecordDao(): SmsImportedRecordDao
 
     companion object {
         @Volatile
@@ -137,6 +140,35 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `sms_imported_records` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `sender` TEXT NOT NULL,
+                        `provider` TEXT NOT NULL,
+                        `trxId` TEXT,
+                        `type` TEXT NOT NULL,
+                        `amount` REAL NOT NULL,
+                        `fee` REAL NOT NULL,
+                        `counterparty` TEXT NOT NULL,
+                        `suggestedCategory` TEXT NOT NULL,
+                        `timestamp` INTEGER NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `linkedTransactionId` INTEGER,
+                        `fallbackFingerprint` TEXT NOT NULL,
+                        `note` TEXT NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_sms_imported_records_trxId` ON `sms_imported_records` (`trxId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sms_imported_records_timestamp` ON `sms_imported_records` (`timestamp`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sms_imported_records_status` ON `sms_imported_records` (`status`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sms_imported_records_fallbackFingerprint` ON `sms_imported_records` (`fallbackFingerprint`)")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -144,7 +176,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "finance_manager_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .build()
                 INSTANCE = instance
                 instance

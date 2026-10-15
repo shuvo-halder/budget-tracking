@@ -12,6 +12,7 @@ import com.engrshuvo.financemanager.ui.state.MoreSubDestination
 import com.engrshuvo.financemanager.ui.state.PurchaseItemFilter
 import com.engrshuvo.financemanager.ui.viewmodel.FinanceViewModel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -297,9 +298,13 @@ class PurchasePlannerUnitTest {
         assertEquals(1L, pendingApple[0].id)
     }
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     @Test
-    fun `navigationToPurchasePlanner_updatesMoreSubDestinationAndBack`() {
+    fun `navigationToPurchasePlanner_updatesMoreSubDestinationAndBack`() = kotlinx.coroutines.test.runTest {
         val viewModel = FinanceViewModel(repository)
+        val job = launch(kotlinx.coroutines.test.UnconfinedTestDispatcher()) {
+            viewModel.uiState.collect {}
+        }
 
         // Initial destination must be NONE
         assertEquals(MoreSubDestination.NONE, viewModel.uiState.value.moreSubDestination)
@@ -311,5 +316,7 @@ class PurchasePlannerUnitTest {
         // Navigate back from Purchase Planner
         viewModel.navigateBackFromMoreSubDestination()
         assertEquals(MoreSubDestination.NONE, viewModel.uiState.value.moreSubDestination)
+
+        job.cancel()
     }
 }

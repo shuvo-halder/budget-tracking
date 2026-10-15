@@ -77,4 +77,16 @@ class RoomConverters {
             com.engrshuvo.financemanager.data.model.GoalStatus.ACTIVE
         }
     }
+
+    @TypeConverter
+    fun fromSmsImportStatus(value: com.engrshuvo.financemanager.data.model.SmsImportStatus): String = value.name
+
+    @TypeConverter
+    fun toSmsImportStatus(value: String): com.engrshuvo.financemanager.data.model.SmsImportStatus {
+        return try {
+            com.engrshuvo.financemanager.data.model.SmsImportStatus.valueOf(value)
+        } catch (e: Exception) {
+            com.engrshuvo.financemanager.data.model.SmsImportStatus.PENDING_REVIEW
+        }
+    }
 }

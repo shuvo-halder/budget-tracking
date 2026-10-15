@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.Tune
 import com.engrshuvo.financemanager.ui.theme.IncomeGreen
 import androidx.compose.material3.AlertDialog
@@ -316,6 +317,21 @@ fun MainFinanceScreen(
                                     modifier = Modifier.testTag("overflow_menu_purchase_planner")
                                 )
                                 DropdownMenuItem(
+                                    text = { Text("Payment SMS Import") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Sms,
+                                            contentDescription = null,
+                                            tint = Color(0xFF0284C7)
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        viewModel.navigateToMoreSubDestination(MoreSubDestination.SMS_IMPORT)
+                                    },
+                                    modifier = Modifier.testTag("overflow_menu_sms_import")
+                                )
+                                DropdownMenuItem(
                                     text = { Text("Backup & Restore") },
                                     leadingIcon = {
                                         Icon(
@@ -554,6 +570,17 @@ fun MainFinanceScreen(
                 onRequestDeletePurchaseItem = { viewModel.requestDeletePurchaseItem(it) },
                 onConfirmDeletePurchaseItem = { viewModel.confirmDeletePurchaseItem() },
                 onDismissDeletePurchaseItemDialog = { viewModel.dismissDeletePurchaseItemDialog() },
+                onToggleSmsEnabled = { enabled, ctx -> viewModel.updateSmsImportEnabled(enabled, ctx) },
+                onToggleSmsAutoPost = { viewModel.updateSmsAutoPost(it) },
+                onOpenReviewSmsRecord = { viewModel.openSmsRecordReview(it) },
+                onDismissReviewSmsRecord = { viewModel.dismissSmsRecordReview() },
+                onApproveSmsRecord = { id, catId, note -> viewModel.approveSmsRecord(id, catId, note) },
+                onDismissSmsRecord = { viewModel.dismissSmsRecord(it) },
+                onDeleteSmsRecord = { viewModel.deleteSmsRecord(it) },
+                onSmsPasteInputChange = { viewModel.setSmsPasteInput(it) },
+                onTestParseSmsPaste = { sender, body -> viewModel.testParseSmsPaste(sender, body) },
+                onImportPastedSms = { ctx, sender, body -> viewModel.importPastedSms(ctx, sender, body) },
+                onDismissSmsOperationMessage = { viewModel.dismissSmsOperationMessage() },
                 modifier = Modifier.padding(innerPadding)
             )
         } else {
