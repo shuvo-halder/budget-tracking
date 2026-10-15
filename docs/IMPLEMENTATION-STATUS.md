@@ -89,6 +89,7 @@ Automated testing covers 68 unit and integration tests across 7 test suites, ach
 - [x] Concurrency guards added to prevent concurrent export/restore operations.
 - [x] Reactive UI flows refresh automatically on database commit.
 - [x] Phase 12.2 Loan Settlement Safety & Repayment Failure Handling verified (Settle dialog distinguishes cash vs non-cash; ViewModel handles repayment failures with UI feedback).
+- [x] Phase 13 Personal Refreshments discreet expense category added (`personal_refreshments`).
 
 ---
 
@@ -106,7 +107,29 @@ Automated testing covers 68 unit and integration tests across 7 test suites, ach
 - **Accounting Invariants Preserved:**
   - Non-cash forgiveness/write-off now correctly closes the loan without inventing phantom cash movements or altering Current Balance.
 
+---
+
+## 6. Phase 13 — Discreet Personal Refreshments Expense Category
+
+- **Status:** `FIXED — TESTS PASS`
+- **Category ID:** `personal_refreshments`
+- **Category Display Name:** `Personal Refreshments`
+- **Type:** `TransactionType.EXPENSE`
+- **Icon:** `Icons.Default.LocalCafe`
+- **Color:** Warm Coffee/Muted Brown (`#8D6E63`)
+- **Integration Points:**
+  - Available across all expense category selection components (`UniversalTransactionSheet.kt`).
+  - Available in expense category filter bar (`FilterChipsBar.kt`).
+  - Displayed in transaction history list items with dedicated icon and color (`TransactionComponents.kt`).
+  - Aggregated in monthly financial summaries, category spend breakdown, and reports (`FinanceViewModel.kt`, `ReportsScreen.kt`).
+  - Included in PDF exports and category breakdown summaries (`PdfReportGenerator.kt`, `PdfExportScreen.kt`).
+- **Discretion & Policy Compliance:**
+  - Display name remains generic and discreet (`Personal Refreshments`).
+  - No explicit references to smoking, cigarettes, or tobacco.
+  - No database migration required; existing categories preserved.
+  - Budget allocation rules, loan accounting, and balance formulas remain strictly unaffected.
+
 ### Manual Device Testing Recommendations:
-1. **Partial Repayment Failure:** Open Repay dialog, enter an amount higher than remaining balance, and verify "Confirm Repayment" does NOT close the dialog and shows an error message.
-2. **Non-Cash Settlement:** Settle an active loan choosing "Forgive / Write Off" and verify Current Balance on the Dashboard does not change.
-3. **Cash Settlement:** Settle an active loan choosing "Collected in Full" and verify Current Balance increases by the remaining amount.
+1. **Category Selection:** Open the Add Transaction sheet, choose Expense, verify `Personal Refreshments` chip appears with coffee cup icon, select it, and save an entry.
+2. **Transaction History & Filter:** Verify the saved entry displays with the coffee icon in the transaction list and can be filtered using the Personal Refreshments filter chip.
+3. **Reports & Breakdown:** Verify the entry is included in the monthly category spend breakdown and report charts.

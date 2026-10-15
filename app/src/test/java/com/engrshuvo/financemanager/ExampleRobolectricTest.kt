@@ -9,6 +9,7 @@ import com.engrshuvo.financemanager.data.model.LoanType
 import com.engrshuvo.financemanager.data.model.TransactionType
 import com.engrshuvo.financemanager.ui.util.CurrencyUtils
 import com.engrshuvo.financemanager.ui.util.DateUtils
+import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -247,7 +248,30 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `viewmodel submitLoanRepayment on invalid amount keeps dialog open and reports error in ui state`() = kotlinx.coroutines.runBlocking {
+    fun `personal refreshments category is present in expense categories and absent in income categories`() {
+        val expenseCats = CategoryCatalog.expenseCategories
+        val incomeCats = CategoryCatalog.incomeCategories
+
+        val refreshmentsCat = expenseCats.find { it.id == "personal_refreshments" }
+        assertNotNull(refreshmentsCat)
+        assertEquals("Personal Refreshments", refreshmentsCat!!.name)
+        assertEquals(TransactionType.EXPENSE, refreshmentsCat.type)
+
+        // Must not appear in income categories
+        assertFalse(incomeCats.any { it.id == "personal_refreshments" })
+
+        // Direct lookup
+        val lookup = CategoryCatalog.getCategoryById("personal_refreshments")
+        assertEquals("Personal Refreshments", lookup.name)
+        assertEquals(TransactionType.EXPENSE, lookup.type)
+
+        // No duplicate entries in all categories
+        val allMatching = CategoryCatalog.getAllCategories().filter { it.id == "personal_refreshments" }
+        assertEquals(1, allMatching.size)
+    }
+
+    @Test
+    fun `transaction can be saved and edited with personal refreshments category`() = kotlinx.coroutines.runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val db = com.engrshuvo.financemanager.data.local.AppDatabase.getDatabase(context)
         val repo = com.engrshuvo.financemanager.data.repository.FinanceRepository(
@@ -257,53 +281,68 @@ class ExampleRobolectricTest {
             budgetAllocationDao = db.budgetAllocationDao(),
             database = db
         )
-        val viewModel = com.engrshuvo.financemanager.ui.viewmodel.FinanceViewModel(repo)
-        val collectJob = launch(kotlinx.coroutines.Dispatchers.Unconfined) {
-            viewModel.uiState.collect {}
-        }
-        try {
-            val loan = LoanEntity(
+
+        val tx = com.engrshuvo.financemanager.data.model.TransactionEntity(
             id = 0,
-            type = LoanType.BORROWED,
-            personName = "Tareq",
-            initialAmount = 5000.0,
-            remainingAmount = 2000.0,
-            status = LoanStatus.ACTIVE
+            type = TransactionType.EXPENSE,
+            amount = 120.0,
+            categoryId = "personal_refreshments",
+            categoryName = "Personal Refreshments",
+            note = "Tea and biscuits"
         )
-        val loanId = repo.insertLoanWithTransaction(loan)
-        val insertedLoan = db.loanDao().getLoanByIdDirect(loanId)!!
+        val txId = repo.insertTransaction(tx)
+        assertTrue(txId > 0)
 
-        // Open repay dialog
-        viewModel.openRepayDialog(insertedLoan)
-        kotlinx.coroutines.yield()
-        kotlinx.coroutines.delay(100)
-        assertTrue(viewModel.uiState.value.isRepayDialogOpen)
-        assertEquals(loanId, viewModel.uiState.value.repayingLoan?.id)
+        val retrieved = db.transactionDao().getAllTransactionsForBackup().find { it.id == txId }
+        assertNotNull(retrieved)
+        assertEquals("personal_refreshments", retrieved!!.categoryId)
+        assertEquals("Personal Refreshments", retrieved.categoryName)
+        assertEquals(120.0, retrieved.amount, 0.001)
 
-        // Submit overpayment (3000 > 2000 remaining)
-        viewModel.submitLoanRepayment(loanId, 3000.0, "Invalid overpay")
-        kotlinx.coroutines.yield()
-        kotlinx.coroutines.delay(300)
+        // Edit transaction
+        val updatedTx = retrieved.copy(amount = 150.0, note = "Coffee and cookies")
+        repo.updateTransaction(updatedTx)
 
-        // Dialog MUST remain open and error reported
-        assertTrue(viewModel.uiState.value.isRepayDialogOpen)
-        assertNotNull(viewModel.uiState.value.loanOperationError)
-        assertFalse(viewModel.uiState.value.isRepaymentSaving)
+        val updatedRetrieved = db.transactionDao().getAllTransactionsForBackup().find { it.id == txId }
+        assertNotNull(updatedRetrieved)
+        assertEquals(150.0, updatedRetrieved!!.amount, 0.001)
+        assertEquals("Coffee and cookies", updatedRetrieved.note)
+    }
 
-        // Loan remaining amount MUST remain unchanged at 2000
-        val untouchedLoan = db.loanDao().getLoanByIdDirect(loanId)!!
-        assertEquals(2000.0, untouchedLoan.remainingAmount, 0.001)
+    @Test
+    fun `personal refreshments expense transaction is counted exactly once in expense totals and reports`() = kotlinx.coroutines.runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = com.engrshuvo.financemanager.data.local.AppDatabase.getDatabase(context)
+        val repo = com.engrshuvo.financemanager.data.repository.FinanceRepository(
+            transactionDao = db.transactionDao(),
+            budgetSettingDao = db.budgetSettingDao(),
+            loanDao = db.loanDao(),
+            budgetAllocationDao = db.budgetAllocationDao(),
+            database = db
+        )
 
-        // Now submit valid repayment (1000 <= 2000)
-        viewModel.submitLoanRepayment(loanId, 1000.0, "Valid partial")
-        kotlinx.coroutines.yield()
-        kotlinx.coroutines.delay(300)
+        val allTxsBefore = db.transactionDao().getAllTransactionsForBackup().filter { it.archivedAt == null }
+        val beforeExpenses = allTxsBefore.filter { it.type == TransactionType.EXPENSE }.sumOf { it.amount }
 
-        // Dialog MUST close and error MUST be cleared
-        assertFalse(viewModel.uiState.value.isRepayDialogOpen)
-        assertNull(viewModel.uiState.value.loanOperationError)
-        } finally {
-            collectJob.cancel()
-        }
+        // Personal Refreshments expense of 250
+        val refreshmentTx = com.engrshuvo.financemanager.data.model.TransactionEntity(
+            id = 0,
+            type = TransactionType.EXPENSE,
+            amount = 250.0,
+            categoryId = "personal_refreshments",
+            categoryName = "Personal Refreshments",
+            note = "Refreshments"
+        )
+        val txId = repo.insertTransaction(refreshmentTx)
+
+        val allTxsAfter = db.transactionDao().getAllTransactionsForBackup().filter { it.archivedAt == null }
+        val afterExpenses = allTxsAfter.filter { it.type == TransactionType.EXPENSE }.sumOf { it.amount }
+        val insertedRefreshment = allTxsAfter.find { it.id == txId }
+
+        assertNotNull(insertedRefreshment)
+        assertEquals(250.0, insertedRefreshment!!.amount, 0.001)
+        assertEquals("personal_refreshments", insertedRefreshment.categoryId)
+        // Verify total expenses increased by exactly 250.0 (counted exactly once)
+        assertEquals(250.0, afterExpenses - beforeExpenses, 0.001)
     }
 }

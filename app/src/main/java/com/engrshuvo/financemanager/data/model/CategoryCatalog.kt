@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.LocalMall
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Payments
@@ -46,6 +47,7 @@ object CategoryCatalog {
         TransactionCategory("education", "Education", TransactionType.EXPENSE, Icons.Default.School, Color(0xFFEAB308)),
         TransactionCategory("entertainment", "Entertainment", TransactionType.EXPENSE, Icons.Default.Movie, Color(0xFFA855F7)),
         TransactionCategory("fitness", "Fitness & Sports", TransactionType.EXPENSE, Icons.Default.FitnessCenter, Color(0xFF14B8A6)),
+        TransactionCategory("personal_refreshments", "Personal Refreshments", TransactionType.EXPENSE, Icons.Default.LocalCafe, Color(0xFF8D6E63)),
         TransactionCategory("other_expense", "Other Expense", TransactionType.EXPENSE, Icons.Default.Payments, Color(0xFF64748B))
     )
 
