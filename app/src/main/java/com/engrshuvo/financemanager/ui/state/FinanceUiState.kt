@@ -7,6 +7,7 @@ import com.engrshuvo.financemanager.data.model.GoalStatus
 import com.engrshuvo.financemanager.data.model.LoanEntity
 import com.engrshuvo.financemanager.data.model.LoanStatus
 import com.engrshuvo.financemanager.data.model.LoanType
+import com.engrshuvo.financemanager.data.model.PurchaseItemEntity
 import com.engrshuvo.financemanager.data.model.TransactionCategory
 import com.engrshuvo.financemanager.data.model.TransactionEntity
 import com.engrshuvo.financemanager.data.model.TransactionType
@@ -30,7 +31,14 @@ enum class MoreSubDestination {
     NOTIFICATION_SETTINGS,
     BACKUP_RESTORE,
     GOALS,
-    PDF_EXPORT
+    PDF_EXPORT,
+    PURCHASE_PLANNER
+}
+
+enum class PurchaseItemFilter(val label: String) {
+    PENDING("Pending"),
+    COMPLETED("Completed"),
+    ALL("All")
 }
 
 enum class ArchiveFilterType(val label: String) {
@@ -244,5 +252,16 @@ data class FinanceUiState(
     val isGeneratingPdf: Boolean = false,
     val pdfExportMessage: String? = null,
     val pdfExportError: String? = null,
-    val pdfExportFileUri: android.net.Uri? = null
+    val pdfExportFileUri: android.net.Uri? = null,
+
+    // Purchase Planner (Shopping Notes) State
+    val purchaseItems: List<PurchaseItemEntity> = emptyList(),
+    val filteredPurchaseItems: List<PurchaseItemEntity> = emptyList(),
+    val purchaseItemFilter: PurchaseItemFilter = PurchaseItemFilter.PENDING,
+    val purchaseSearchQuery: String = "",
+    val pendingPurchaseCount: Int = 0,
+    val completedPurchaseCount: Int = 0,
+    val isAddPurchaseItemDialogOpen: Boolean = false,
+    val editingPurchaseItem: PurchaseItemEntity? = null,
+    val itemToDeletePurchase: PurchaseItemEntity? = null
 )

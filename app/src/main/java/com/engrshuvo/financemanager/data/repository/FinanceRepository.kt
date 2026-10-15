@@ -7,6 +7,7 @@ import com.engrshuvo.financemanager.data.local.BudgetSettingDao
 import com.engrshuvo.financemanager.data.local.FinancialGoalDao
 import com.engrshuvo.financemanager.data.local.GoalContributionDao
 import com.engrshuvo.financemanager.data.local.LoanDao
+import com.engrshuvo.financemanager.data.local.PurchaseItemDao
 import com.engrshuvo.financemanager.data.local.TransactionDao
 import com.engrshuvo.financemanager.data.model.BudgetAllocationEntity
 import com.engrshuvo.financemanager.data.model.BudgetSettingEntity
@@ -17,6 +18,7 @@ import com.engrshuvo.financemanager.data.model.LoanEntity
 import com.engrshuvo.financemanager.data.model.LoanRepaymentEntity
 import com.engrshuvo.financemanager.data.model.LoanStatus
 import com.engrshuvo.financemanager.data.model.LoanType
+import com.engrshuvo.financemanager.data.model.PurchaseItemEntity
 import com.engrshuvo.financemanager.data.model.TransactionEntity
 import com.engrshuvo.financemanager.data.model.TransactionType
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +36,7 @@ class FinanceRepository(
     private val budgetAllocationDao: BudgetAllocationDao,
     private val financialGoalDao: FinancialGoalDao? = null,
     private val goalContributionDao: GoalContributionDao? = null,
+    private val purchaseItemDao: PurchaseItemDao? = null,
     private val database: AppDatabase? = null
 ) {
     // Transaction streams strictly on Dispatchers.IO
@@ -509,5 +512,37 @@ class FinanceRepository(
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    // ==========================================
+    // PURCHASE PLANNER (SHOPPING NOTES)
+    // Strictly isolated from financial accounting
+    // ==========================================
+
+    val allPurchaseItems: Flow<List<PurchaseItemEntity>> =
+        purchaseItemDao?.getAllItemsFlow()?.flowOn(Dispatchers.IO) ?: flowOf(emptyList())
+
+    suspend fun insertPurchaseItem(item: PurchaseItemEntity): Long = withContext(Dispatchers.IO) {
+        purchaseItemDao?.insertItem(item) ?: -1L
+    }
+
+    suspend fun updatePurchaseItem(item: PurchaseItemEntity): Boolean = withContext(Dispatchers.IO) {
+        val updated = purchaseItemDao?.updateItem(item) ?: 0
+        updated > 0
+    }
+
+    suspend fun markPurchaseItemCompleted(id: Long): Boolean = withContext(Dispatchers.IO) {
+        val count = purchaseItemDao?.markCompleted(id) ?: 0
+        count > 0
+    }
+
+    suspend fun restorePurchaseItemToPending(id: Long): Boolean = withContext(Dispatchers.IO) {
+        val count = purchaseItemDao?.restoreToPending(id) ?: 0
+        count > 0
+    }
+
+    suspend fun deletePurchaseItem(id: Long): Boolean = withContext(Dispatchers.IO) {
+        val count = purchaseItemDao?.deleteItemById(id) ?: 0
+        count > 0
     }
 }

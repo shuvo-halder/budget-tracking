@@ -14,6 +14,7 @@ import com.engrshuvo.financemanager.data.model.GoalStatus
 import com.engrshuvo.financemanager.data.model.LoanEntity
 import com.engrshuvo.financemanager.data.model.LoanStatus
 import com.engrshuvo.financemanager.data.model.LoanType
+import com.engrshuvo.financemanager.data.model.PurchaseItemEntity
 import com.engrshuvo.financemanager.data.model.TransactionEntity
 import com.engrshuvo.financemanager.data.model.TransactionType
 import com.engrshuvo.financemanager.data.repository.FinanceRepository
@@ -29,6 +30,7 @@ import com.engrshuvo.financemanager.ui.state.FinanceUiState
 import com.engrshuvo.financemanager.ui.state.LoanStatusFilter
 import com.engrshuvo.financemanager.ui.state.LoanTypeFilter
 import com.engrshuvo.financemanager.ui.state.MoreSubDestination
+import com.engrshuvo.financemanager.ui.state.PurchaseItemFilter
 import com.engrshuvo.financemanager.ui.state.TransactionTypeFilter
 import com.engrshuvo.financemanager.ui.util.DateUtils
 import android.content.Context
@@ -41,6 +43,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -115,6 +118,14 @@ class FinanceViewModel(
     private val _pdfExportMessage = MutableStateFlow<String?>(null)
     private val _pdfExportError = MutableStateFlow<String?>(null)
     private val _pdfExportFileUri = MutableStateFlow<android.net.Uri?>(null)
+
+    // Purchase Planner (Shopping Notes) State
+    private val _purchaseItemFilter = MutableStateFlow(PurchaseItemFilter.PENDING)
+    private val _purchaseSearchQuery = MutableStateFlow("")
+    private val _isAddPurchaseDialogOpen = MutableStateFlow(false)
+    private val _editingPurchaseItem = MutableStateFlow<PurchaseItemEntity?>(null)
+    private val _itemToDeletePurchase = MutableStateFlow<PurchaseItemEntity?>(null)
+    private val isPurchaseItemSaving = java.util.concurrent.atomic.AtomicBoolean(false)
 
     // In-flight operation guards to prevent duplicate concurrent submissions
     private val isTransactionSaving = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -341,6 +352,34 @@ class FinanceViewModel(
             error = array[3] as? String,
             fileUri = array[4] as? android.net.Uri
         )
+    }.flowOn(Dispatchers.Default)
+
+    private data class PurchasePlannerParams(
+        val items: List<PurchaseItemEntity>,
+        val filter: PurchaseItemFilter,
+        val searchQuery: String,
+        val isAddDialogOpen: Boolean,
+        val editingItem: PurchaseItemEntity?,
+        val itemToDelete: PurchaseItemEntity?
+    )
+
+    private val purchasePlannerParamsFlow: Flow<PurchasePlannerParams> = combine(
+        repository.allPurchaseItems,
+        _purchaseItemFilter,
+        _purchaseSearchQuery,
+        _isAddPurchaseDialogOpen,
+        _editingPurchaseItem
+    ) { items, filter, query, isAddOpen, editingItem ->
+        PurchasePlannerParams(
+            items = items,
+            filter = filter,
+            searchQuery = query,
+            isAddDialogOpen = isAddOpen,
+            editingItem = editingItem,
+            itemToDelete = _itemToDeletePurchase.value
+        )
+    }.combine(_itemToDeletePurchase) { params, toDelete ->
+        params.copy(itemToDelete = toDelete)
     }.flowOn(Dispatchers.Default)
 
     private data class MonthlyFinancialSummary(
@@ -943,6 +982,38 @@ class FinanceViewModel(
             pdfExportMessage = pdfParams.message,
             pdfExportError = pdfParams.error,
             pdfExportFileUri = pdfParams.fileUri
+        )
+    }.combine(purchasePlannerParamsFlow) { state, purchaseParams ->
+        val allItems = purchaseParams.items
+        val pendingCount = allItems.count { !it.isCompleted }
+        val completedCount = allItems.count { it.isCompleted }
+
+        val q = purchaseParams.searchQuery.trim().lowercase()
+        val filtered = allItems.filter { item ->
+            val matchesFilter = when (purchaseParams.filter) {
+                PurchaseItemFilter.ALL -> true
+                PurchaseItemFilter.PENDING -> !item.isCompleted
+                PurchaseItemFilter.COMPLETED -> item.isCompleted
+            }
+            val matchesSearch = if (q.isBlank()) true else {
+                item.title.lowercase().contains(q) || item.note.lowercase().contains(q)
+            }
+            matchesFilter && matchesSearch
+        }.sortedWith(
+            compareBy<PurchaseItemEntity> { it.isCompleted }
+                .thenByDescending { if (it.isCompleted) (it.completedAt ?: it.createdAt) else it.createdAt }
+        )
+
+        state.copy(
+            purchaseItems = allItems,
+            filteredPurchaseItems = filtered,
+            purchaseItemFilter = purchaseParams.filter,
+            purchaseSearchQuery = purchaseParams.searchQuery,
+            pendingPurchaseCount = pendingCount,
+            completedPurchaseCount = completedCount,
+            isAddPurchaseItemDialogOpen = purchaseParams.isAddDialogOpen,
+            editingPurchaseItem = purchaseParams.editingItem,
+            itemToDeletePurchase = purchaseParams.itemToDelete
         )
     }.flowOn(Dispatchers.Default)
     .stateIn(
@@ -1774,6 +1845,98 @@ class FinanceViewModel(
             context.startActivity(viewIntent)
         } catch (e: Exception) {
             _pdfExportError.value = "No PDF viewer app found on device. Please install a PDF viewer."
+        }
+    }
+
+    // ==========================================
+    // PURCHASE PLANNER (SHOPPING NOTES)
+    // Strictly isolated from financial accounting
+    // ==========================================
+
+    fun setPurchaseFilter(filter: PurchaseItemFilter) {
+        _purchaseItemFilter.value = filter
+    }
+
+    fun setPurchaseSearchQuery(query: String) {
+        _purchaseSearchQuery.value = query
+    }
+
+    fun openAddPurchaseItemDialog() {
+        _editingPurchaseItem.value = null
+        _isAddPurchaseDialogOpen.value = true
+    }
+
+    fun openEditPurchaseItemDialog(item: PurchaseItemEntity) {
+        _editingPurchaseItem.value = item
+        _isAddPurchaseDialogOpen.value = true
+    }
+
+    fun closePurchaseItemDialog() {
+        _isAddPurchaseDialogOpen.value = false
+        _editingPurchaseItem.value = null
+    }
+
+    fun savePurchaseItem(id: Long = 0L, title: String, note: String = "") {
+        val cleanTitle = title.trim()
+        if (cleanTitle.isBlank()) return
+        if (!isPurchaseItemSaving.compareAndSet(false, true)) return
+
+        viewModelScope.launch {
+            try {
+                if (id == 0L) {
+                    val newItem = PurchaseItemEntity(
+                        title = cleanTitle,
+                        note = note.trim(),
+                        isCompleted = false,
+                        createdAt = System.currentTimeMillis()
+                    )
+                    repository.insertPurchaseItem(newItem)
+                } else {
+                    val existing = _editingPurchaseItem.value ?: repository.allPurchaseItems.first().find { it.id == id }
+                    if (existing != null) {
+                        val updated = existing.copy(
+                            title = cleanTitle,
+                            note = note.trim()
+                        )
+                        repository.updatePurchaseItem(updated)
+                    }
+                }
+                closePurchaseItemDialog()
+            } finally {
+                isPurchaseItemSaving.set(false)
+            }
+        }
+    }
+
+    fun togglePurchaseItemComplete(item: PurchaseItemEntity) {
+        viewModelScope.launch {
+            if (item.isCompleted) {
+                repository.restorePurchaseItemToPending(item.id)
+            } else {
+                repository.markPurchaseItemCompleted(item.id)
+            }
+        }
+    }
+
+    fun restorePurchaseItem(id: Long) {
+        viewModelScope.launch {
+            repository.restorePurchaseItemToPending(id)
+        }
+    }
+
+    fun requestDeletePurchaseItem(item: PurchaseItemEntity) {
+        _itemToDeletePurchase.value = item
+    }
+
+    fun dismissDeletePurchaseItemDialog() {
+        _itemToDeletePurchase.value = null
+    }
+
+    fun confirmDeletePurchaseItem() {
+        val toDelete = _itemToDeletePurchase.value ?: return
+        viewModelScope.launch {
+            repository.deletePurchaseItem(toDelete.id)
+            _itemToDeletePurchase.value = null
         }
     }
 }

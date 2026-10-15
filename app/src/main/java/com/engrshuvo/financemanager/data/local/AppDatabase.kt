@@ -13,6 +13,7 @@ import com.engrshuvo.financemanager.data.model.FinancialGoalEntity
 import com.engrshuvo.financemanager.data.model.GoalContributionEntity
 import com.engrshuvo.financemanager.data.model.LoanEntity
 import com.engrshuvo.financemanager.data.model.LoanRepaymentEntity
+import com.engrshuvo.financemanager.data.model.PurchaseItemEntity
 import com.engrshuvo.financemanager.data.model.TransactionEntity
 
 @Database(
@@ -23,9 +24,10 @@ import com.engrshuvo.financemanager.data.model.TransactionEntity
         LoanRepaymentEntity::class,
         BudgetAllocationEntity::class,
         FinancialGoalEntity::class,
-        GoalContributionEntity::class
+        GoalContributionEntity::class,
+        PurchaseItemEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(RoomConverters::class)
@@ -36,6 +38,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun budgetAllocationDao(): BudgetAllocationDao
     abstract fun financialGoalDao(): FinancialGoalDao
     abstract fun goalContributionDao(): GoalContributionDao
+    abstract fun purchaseItemDao(): PurchaseItemDao
 
     companion object {
         @Volatile
@@ -115,6 +118,25 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `purchase_items` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `note` TEXT NOT NULL,
+                        `isCompleted` INTEGER NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `completedAt` INTEGER
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_purchase_items_isCompleted` ON `purchase_items` (`isCompleted`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_purchase_items_createdAt` ON `purchase_items` (`createdAt`)")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -122,7 +144,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "finance_manager_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build()
                 INSTANCE = instance
                 instance

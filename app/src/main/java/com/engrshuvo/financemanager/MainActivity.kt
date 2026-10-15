@@ -35,6 +35,7 @@ class MainActivity : ComponentActivity() {
             budgetAllocationDao = database.budgetAllocationDao(),
             financialGoalDao = database.financialGoalDao(),
             goalContributionDao = database.goalContributionDao(),
+            purchaseItemDao = database.purchaseItemDao(),
             database = database
         )
         val notificationRepo = NotificationPreferencesRepository(applicationContext)

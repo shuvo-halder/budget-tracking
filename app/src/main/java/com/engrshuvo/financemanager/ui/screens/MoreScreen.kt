@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -128,6 +129,18 @@ fun MoreScreen(
     onSharePdfReport: (android.content.Context) -> Unit = {},
     onOpenPdfReport: (android.content.Context, android.net.Uri) -> Unit = { _, _ -> },
     onDismissPdfMessage: () -> Unit = {},
+    // Purchase Planner actions
+    onSetPurchaseFilter: (com.engrshuvo.financemanager.ui.state.PurchaseItemFilter) -> Unit = {},
+    onPurchaseSearchQueryChange: (String) -> Unit = {},
+    onOpenAddPurchaseItemDialog: () -> Unit = {},
+    onOpenEditPurchaseItemDialog: (com.engrshuvo.financemanager.data.model.PurchaseItemEntity) -> Unit = {},
+    onDismissPurchaseItemDialog: () -> Unit = {},
+    onSavePurchaseItem: (id: Long, title: String, note: String) -> Unit = { _, _, _ -> },
+    onTogglePurchaseItemComplete: (com.engrshuvo.financemanager.data.model.PurchaseItemEntity) -> Unit = {},
+    onRestorePurchaseItem: (Long) -> Unit = {},
+    onRequestDeletePurchaseItem: (com.engrshuvo.financemanager.data.model.PurchaseItemEntity) -> Unit = {},
+    onConfirmDeletePurchaseItem: () -> Unit = {},
+    onDismissDeletePurchaseItemDialog: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     AnimatedContent(
@@ -141,6 +154,7 @@ fun MoreScreen(
                 MoreHubView(
                     archivedCount = uiState.archivedItems.size,
                     activeGoalsCount = uiState.activeGoals.size,
+                    pendingPurchasesCount = uiState.pendingPurchaseCount,
                     onNavigateToSubDestination = onNavigateToSubDestination
                 )
             }
@@ -245,6 +259,25 @@ fun MoreScreen(
                     onDismissMessage = onDismissPdfMessage
                 )
             }
+
+            MoreSubDestination.PURCHASE_PLANNER -> {
+                BackHandler { onNavigateBack() }
+                PurchasePlannerScreen(
+                    uiState = uiState,
+                    onNavigateBack = onNavigateBack,
+                    onSetFilter = onSetPurchaseFilter,
+                    onSearchQueryChange = onPurchaseSearchQueryChange,
+                    onOpenAddDialog = onOpenAddPurchaseItemDialog,
+                    onOpenEditDialog = onOpenEditPurchaseItemDialog,
+                    onDismissDialog = onDismissPurchaseItemDialog,
+                    onSaveItem = onSavePurchaseItem,
+                    onToggleComplete = onTogglePurchaseItemComplete,
+                    onRestoreItem = onRestorePurchaseItem,
+                    onRequestDelete = onRequestDeletePurchaseItem,
+                    onConfirmDelete = onConfirmDeletePurchaseItem,
+                    onDismissDeleteDialog = onDismissDeletePurchaseItemDialog
+                )
+            }
         }
     }
 }
@@ -253,6 +286,7 @@ fun MoreScreen(
 private fun MoreHubView(
     archivedCount: Int,
     activeGoalsCount: Int,
+    pendingPurchasesCount: Int,
     onNavigateToSubDestination: (MoreSubDestination) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -290,6 +324,20 @@ private fun MoreHubView(
                 badgeColor = MaterialTheme.colorScheme.primary,
                 onClick = { onNavigateToSubDestination(MoreSubDestination.CALENDAR) },
                 testTag = "more_calendar_card"
+            )
+        }
+
+        item(key = "more_item_purchase_planner") {
+            MoreDestinationCard(
+                icon = Icons.Default.ShoppingCart,
+                iconColor = Color(0xFFF59E0B),
+                iconBg = Color(0xFFFEF3C7),
+                title = "Purchase Planner",
+                subtitle = "Track shopping notes, needed items, and mark off purchases with pending & completed lists",
+                badgeText = if (pendingPurchasesCount > 0) "$pendingPurchasesCount pending" else "Shopping notes",
+                badgeColor = if (pendingPurchasesCount > 0) Color(0xFFF59E0B) else MaterialTheme.colorScheme.outline,
+                onClick = { onNavigateToSubDestination(MoreSubDestination.PURCHASE_PLANNER) },
+                testTag = "more_purchase_planner_card"
             )
         }
 

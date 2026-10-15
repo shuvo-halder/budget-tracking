@@ -2,9 +2,9 @@
 
 **Project:** Daily Budget & Loan Manager  
 **Package:** `com.engrshuvo.financemanager`  
-**Current Phase:** Phase 12.2 — Loan Settlement Safety & Repayment Failure Handling Completed  
-**Room Database Schema Version:** 3 (Preserved with strict non-destructive migrations)  
-**Date:** October 14, 2026  
+**Current Phase:** Phase 14 — Purchase Planner / Shopping Notes Completed  
+**Room Database Schema Version:** 5 (Preserved with strict non-destructive migrations)  
+**Date:** October 15, 2026  
 
 ---
 
@@ -90,6 +90,7 @@ Automated testing covers 68 unit and integration tests across 7 test suites, ach
 - [x] Reactive UI flows refresh automatically on database commit.
 - [x] Phase 12.2 Loan Settlement Safety & Repayment Failure Handling verified (Settle dialog distinguishes cash vs non-cash; ViewModel handles repayment failures with UI feedback).
 - [x] Phase 13 Personal Refreshments discreet expense category added (`personal_refreshments`).
+- [x] Phase 14 Purchase Planner / Shopping Notes feature implemented with strict financial isolation.
 
 ---
 
@@ -129,7 +130,43 @@ Automated testing covers 68 unit and integration tests across 7 test suites, ach
   - No database migration required; existing categories preserved.
   - Budget allocation rules, loan accounting, and balance formulas remain strictly unaffected.
 
-### Manual Device Testing Recommendations:
-1. **Category Selection:** Open the Add Transaction sheet, choose Expense, verify `Personal Refreshments` chip appears with coffee cup icon, select it, and save an entry.
-2. **Transaction History & Filter:** Verify the saved entry displays with the coffee icon in the transaction list and can be filtered using the Personal Refreshments filter chip.
-3. **Reports & Breakdown:** Verify the entry is included in the monthly category spend breakdown and report charts.
+---
+
+## 7. Phase 14 — Purchase Planner / Shopping Notes
+
+- **Status:** `FIXED — TESTS PASS`
+- **Objective:** Provide a dedicated task and shopping notes manager for planned purchases without affecting financial balances or creating financial transactions.
+- **Core Functionality:**
+  - **Add & Edit Items:** Title (required) with optional notes/specifications.
+  - **Status Transitions:** Toggle items between Pending and Completed. Marking an item completed sets `completedAt` timestamp and moves it into the Completed list.
+  - **Restore:** Completed items can be restored back to Pending, resetting `completedAt` to null.
+  - **Deletion:** Deleting an item prompts an explicit confirmation dialog before permanent removal.
+  - **Search & Filters:** Search by title and note in real-time. Quick filters for `Pending`, `Completed`, and `All` with reactive badges indicating item counts.
+  - **Empty States:** Tailored empty states for each filter and empty search results.
+- **Strict Financial Isolation:**
+  - Adding, editing, completing, restoring, or deleting purchase planner items never creates, modifies, or deletes financial transactions.
+  - Current Balance, Total Income, Total Expense, Budget Limits, and Loan accounting are completely unaffected.
+- **Data Persistence:**
+  - Room table `purchase_items` with fields: `id`, `title`, `note`, `isCompleted`, `createdAt`, `completedAt`.
+  - Non-destructive `MIGRATION_4_5` upgrades schema safely without affecting existing user data.
+- **Navigation:**
+  - Accessible directly from the top-right three-dot (⋮) overflow menu (`overflow_menu_purchase_planner`) across all main screens.
+  - Also located under the **More** screen hub via the `Purchase Planner` card (`more_purchase_planner_card`) with shopping cart icon and dynamic pending count badge.
+- **Automated Test Evidence:**
+  - `PurchasePlannerUnitTest`: 9 comprehensive tests verifying save, edit, complete, restore, delete, database reload survival, search/filter logic, strict financial isolation, and overflow navigation transitions.
+  - `RoomMigrationTest`: Verified non-destructive `MIGRATION_4_5` preserves existing transactions while creating `purchase_items` table.
+
+---
+
+## 8. Phase 14.1 — Fix Purchase Planner Navigation Entry
+
+- **Status:** `FIXED — TESTS PASS`
+- **Root Cause:** The `TopAppBar` three-dot overflow `DropdownMenu` in `MainFinanceScreen.kt` had items for Goals, Backup, Archive, Reports, PDF, and Notifications, but omitted an entry for `MoreSubDestination.PURCHASE_PLANNER`.
+- **Fix Applied:**
+  - Added `DropdownMenuItem` for "Purchase Planner" into the TopAppBar `DropdownMenu` in `MainFinanceScreen.kt`.
+  - Integrated `Icons.Default.ShoppingCart` with amber tint (`Color(0xFFF59E0B)`) matching the app's visual style.
+  - Test tag assigned: `overflow_menu_purchase_planner`.
+  - On selection, dismisses the menu (`showMoreMenu = false`) and invokes `viewModel.navigateToMoreSubDestination(MoreSubDestination.PURCHASE_PLANNER)`.
+  - Full back-navigation support maintained via `BackHandler` returning to `MoreSubDestination.NONE`.
+  - Preserved the existing More screen entry (`more_purchase_planner_card`) and all existing overflow menu items.
+

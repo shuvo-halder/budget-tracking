@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Tune
 import com.engrshuvo.financemanager.ui.theme.IncomeGreen
 import androidx.compose.material3.AlertDialog
@@ -300,6 +301,21 @@ fun MainFinanceScreen(
                                     modifier = Modifier.testTag("overflow_menu_goals")
                                 )
                                 DropdownMenuItem(
+                                    text = { Text("Purchase Planner") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.ShoppingCart,
+                                            contentDescription = null,
+                                            tint = Color(0xFFF59E0B)
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        viewModel.navigateToMoreSubDestination(MoreSubDestination.PURCHASE_PLANNER)
+                                    },
+                                    modifier = Modifier.testTag("overflow_menu_purchase_planner")
+                                )
+                                DropdownMenuItem(
                                     text = { Text("Backup & Restore") },
                                     leadingIcon = {
                                         Icon(
@@ -527,6 +543,17 @@ fun MainFinanceScreen(
                 onSharePdfReport = { ctx -> viewModel.sharePdfReport(ctx) },
                 onOpenPdfReport = { ctx, uri -> viewModel.openPdfReport(ctx, uri) },
                 onDismissPdfMessage = { viewModel.dismissPdfExportMessage() },
+                onSetPurchaseFilter = { viewModel.setPurchaseFilter(it) },
+                onPurchaseSearchQueryChange = { viewModel.setPurchaseSearchQuery(it) },
+                onOpenAddPurchaseItemDialog = { viewModel.openAddPurchaseItemDialog() },
+                onOpenEditPurchaseItemDialog = { viewModel.openEditPurchaseItemDialog(it) },
+                onDismissPurchaseItemDialog = { viewModel.closePurchaseItemDialog() },
+                onSavePurchaseItem = { id, title, note -> viewModel.savePurchaseItem(id, title, note) },
+                onTogglePurchaseItemComplete = { viewModel.togglePurchaseItemComplete(it) },
+                onRestorePurchaseItem = { viewModel.restorePurchaseItem(it) },
+                onRequestDeletePurchaseItem = { viewModel.requestDeletePurchaseItem(it) },
+                onConfirmDeletePurchaseItem = { viewModel.confirmDeletePurchaseItem() },
+                onDismissDeletePurchaseItemDialog = { viewModel.dismissDeletePurchaseItemDialog() },
                 modifier = Modifier.padding(innerPadding)
             )
         } else {

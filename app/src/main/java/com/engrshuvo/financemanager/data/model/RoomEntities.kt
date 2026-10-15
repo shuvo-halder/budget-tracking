@@ -140,3 +140,18 @@ data class GoalContributionEntity(
     val archivedAt: Long? = null
 )
 
+@Immutable
+@Entity(
+    tableName = "purchase_items",
+    indices = [Index("isCompleted"), Index("createdAt")]
+)
+data class PurchaseItemEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val title: String,
+    val note: String = "",
+    val isCompleted: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis(),
+    val completedAt: Long? = null
+)
+
