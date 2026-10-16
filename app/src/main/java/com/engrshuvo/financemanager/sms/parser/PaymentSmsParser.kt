@@ -33,7 +33,7 @@ object PaymentSmsParser {
     )
 
     private val TRX_ID_PATTERN = Pattern.compile(
-        "(?i)(?:trxid|trx\\s*id|txnid|txn\\s*id|txid|ref|trx\\s*ref)[:\\s]+([A-Za-z0-9]+)"
+        "(?i)(?:trxid|trx\\s*id|txnid|txn\\s*id|txid|ref|trx\\s*ref)[:\\s]+([A-Za-z0-9_-]+)"
     )
 
     private val FAILED_TRANSACTION_PATTERN = Pattern.compile(
@@ -79,7 +79,9 @@ object PaymentSmsParser {
                 body.contains("send money", ignoreCase = true) ||
                 body.contains("recharge", ignoreCase = true) ||
                 body.contains("bill", ignoreCase = true) ||
+                body.contains("purchase", ignoreCase = true) ||
                 body.contains("purchased", ignoreCase = true) ||
+                body.contains("used for", ignoreCase = true) ||
                 body.contains("withdrawn", ignoreCase = true) ||
                 body.contains("transferred", ignoreCase = true) ||
                 body.contains("refund", ignoreCase = true) ||
@@ -164,11 +166,23 @@ object PaymentSmsParser {
 
         val counterparty = when {
             body.contains(" to ", ignoreCase = true) -> {
-                val afterTo = body.substringAfter(" to ", "").substringBefore(" successful").substringBefore(".").trim()
+                val afterTo = body.substringAfter(" to ", "")
+                    .substringBefore(" is successful")
+                    .substringBefore(" is Complete")
+                    .substringBefore(" is complete")
+                    .substringBefore(" successful")
+                    .substringBefore(".")
+                    .trim()
                 afterTo.take(40)
             }
             body.contains(" from ", ignoreCase = true) -> {
-                val afterFrom = body.substringAfter(" from ", "").substringBefore(" successful").substringBefore(".").trim()
+                val afterFrom = body.substringAfter(" from ", "")
+                    .substringBefore(" is successful")
+                    .substringBefore(" is Complete")
+                    .substringBefore(" is complete")
+                    .substringBefore(" successful")
+                    .substringBefore(".")
+                    .trim()
                 afterFrom.take(40)
             }
             else -> ""
@@ -216,10 +230,22 @@ object PaymentSmsParser {
 
         val counterparty = when {
             body.contains(" to ", ignoreCase = true) -> {
-                body.substringAfter(" to ", "").substringBefore(" successful").substringBefore(".").trim().take(40)
+                body.substringAfter(" to ", "")
+                    .substringBefore(" is successful")
+                    .substringBefore(" is Complete")
+                    .substringBefore(" is complete")
+                    .substringBefore(" successful")
+                    .substringBefore(".")
+                    .trim().take(40)
             }
             body.contains(" from ", ignoreCase = true) -> {
-                body.substringAfter(" from ", "").substringBefore(" successful").substringBefore(".").trim().take(40)
+                body.substringAfter(" from ", "")
+                    .substringBefore(" is successful")
+                    .substringBefore(" is Complete")
+                    .substringBefore(" is complete")
+                    .substringBefore(" successful")
+                    .substringBefore(".")
+                    .trim().take(40)
             }
             else -> ""
         }

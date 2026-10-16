@@ -301,22 +301,28 @@ class PurchasePlannerUnitTest {
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     @Test
     fun `navigationToPurchasePlanner_updatesMoreSubDestinationAndBack`() = kotlinx.coroutines.test.runTest {
-        val viewModel = FinanceViewModel(repository)
-        val job = launch(kotlinx.coroutines.test.UnconfinedTestDispatcher()) {
-            viewModel.uiState.collect {}
+        val testDispatcher = kotlinx.coroutines.test.UnconfinedTestDispatcher(testScheduler)
+        kotlinx.coroutines.Dispatchers.setMain(testDispatcher)
+        try {
+            val viewModel = FinanceViewModel(repository)
+            val job = launch(testDispatcher) {
+                viewModel.uiState.collect {}
+            }
+
+            // Initial destination must be NONE
+            assertEquals(MoreSubDestination.NONE, viewModel.uiState.value.moreSubDestination)
+
+            // Navigate to Purchase Planner (as triggered by the 3-dot overflow menu or More screen)
+            viewModel.navigateToMoreSubDestination(MoreSubDestination.PURCHASE_PLANNER)
+            assertEquals(MoreSubDestination.PURCHASE_PLANNER, viewModel.uiState.value.moreSubDestination)
+
+            // Navigate back from Purchase Planner
+            viewModel.navigateBackFromMoreSubDestination()
+            assertEquals(MoreSubDestination.NONE, viewModel.uiState.value.moreSubDestination)
+
+            job.cancel()
+        } finally {
+            kotlinx.coroutines.Dispatchers.resetMain()
         }
-
-        // Initial destination must be NONE
-        assertEquals(MoreSubDestination.NONE, viewModel.uiState.value.moreSubDestination)
-
-        // Navigate to Purchase Planner (as triggered by the 3-dot overflow menu or More screen)
-        viewModel.navigateToMoreSubDestination(MoreSubDestination.PURCHASE_PLANNER)
-        assertEquals(MoreSubDestination.PURCHASE_PLANNER, viewModel.uiState.value.moreSubDestination)
-
-        // Navigate back from Purchase Planner
-        viewModel.navigateBackFromMoreSubDestination()
-        assertEquals(MoreSubDestination.NONE, viewModel.uiState.value.moreSubDestination)
-
-        job.cancel()
     }
 }
