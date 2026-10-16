@@ -33,9 +33,9 @@ class MorningBudgetWorker(
             val endOfToday = DateUtils.getEndOfDay()
             val todayTransactions = db.transactionDao().getTransactionsInDateRangeDirect(startOfToday, endOfToday)
 
-            // Strictly filter ordinary living expenses (excluding loan repayments to keep operating calculation clean)
+            // Strictly filter ordinary living expenses (excluding loan repayments and loans lent to keep operating calculation clean)
             val todayExpenses = todayTransactions
-                .filter { it.type == TransactionType.EXPENSE && it.categoryId != "loan_repaid" && it.archivedAt == null }
+                .filter { it.type == TransactionType.EXPENSE && it.categoryId != "loan_repaid" && it.categoryId != "loan_lent" && it.archivedAt == null }
                 .sumOf { it.amount }
 
             val title: String

@@ -2,9 +2,9 @@
 
 **Project:** Daily Budget & Loan Manager  
 **Package:** `com.engrshuvo.financemanager`  
-**Current Phase:** Phase 14 — Purchase Planner / Shopping Notes Completed  
-**Room Database Schema Version:** 5 (Preserved with strict non-destructive migrations)  
-**Date:** October 15, 2026  
+**Current Phase:** Phase 15.4 — Automatic Payment SMS Import Completed  
+**Room Database Schema Version:** 6 (Preserved with strict non-destructive migrations MIGRATION_1_2 through MIGRATION_5_6)  
+**Date:** October 16, 2026  
 
 ---
 
@@ -91,6 +91,46 @@ Automated testing covers 68 unit and integration tests across 7 test suites, ach
 - [x] Phase 12.2 Loan Settlement Safety & Repayment Failure Handling verified (Settle dialog distinguishes cash vs non-cash; ViewModel handles repayment failures with UI feedback).
 - [x] Phase 13 Personal Refreshments discreet expense category added (`personal_refreshments`).
 - [x] Phase 14 Purchase Planner / Shopping Notes feature implemented with strict financial isolation.
+- [x] Phase 15 & 15.4 Automatic Payment SMS Import implemented with strict privacy, deduplication, and financial balance integrity.
+
+---
+
+## 9. Phase 15 & 15.4 — Automatic Payment SMS Import
+
+- **Status:** `COMPLETED & STABILIZED`
+- **Objective:** Automatically parse incoming mobile financial services (MFS) and banking payment SMS alerts to suggest transactions without risking account corruption, duplicate entries, or battery drain.
+- **Strict New-Message-Only Enforcement:**
+  - **Activation Timestamp:** Stored in DataStore (`sms_import_activated_at`). When enabled, `activatedAt` is set to `System.currentTimeMillis()`. When disabled, it resets to `0L`.
+  - **Historical SMS Protection:** Messages with `messageTimestamp < activatedAt` are strictly rejected.
+  - **Zero Inbox Scanning:** No `android.permission.READ_SMS` is requested or used. The app never queries `content://sms/inbox`.
+  - **Permission Check:** At runtime, `PaymentSmsProcessor` verifies `ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PERMISSION_GRANTED`.
+- **Lightweight Receiver Architecture:**
+  - `PaymentSmsReceiver` declared with `android:permission="android.permission.BROADCAST_SMS"`, ensuring only the Android OS telephony framework can dispatch SMS broadcasts.
+  - **Synchronous Pre-Filter:** `PaymentSmsParser.isPotentialFinancialSms` validates currency and payment keywords before allocating coroutines or accessing Room. Non-financial messages exit within microseconds.
+  - **Bounded Execution:** Uses `goAsync()` on `Dispatchers.IO` with `finally { pendingResult.finish() }` and exception safety.
+  - **Zero Background Services:** No foreground services, no periodic WorkManager tasks, no wake locks, no network communication.
+- **Provider Coverage & Format Support:**
+  - **MFS:** bKash, Nagad (including 16167), Rocket (16216), Upay (16268), Tap (16733), mCash (16259), OK Wallet (16269), MyCash, SureCash.
+  - **Banks & Cards:** City Bank, Eastern Bank (EBL), Standard Chartered, DBBL, BRAC Bank, Islami Bank, Dhaka Bank, Prime Bank, UCB, and credit/debit card alerts.
+  - **Supported Types:** Merchant payments, cash out, cash in, received funds, utility bills, card purchases, ATM cash withdrawals, refunds, and transaction reversals.
+- **Safety & Anti-Double-Counting Invariants:**
+  - **Failed Transactions:** Messages matching `(failed|declined|unsuccessful|cancelled|insufficient balance)` are strictly rejected.
+  - **OTP & Promo Filtering:** OTP codes, security verification codes, recharge offers, and cashback ads are discarded.
+  - **Credit Card Bill Payments:** Flagged `isConfident = false` and routed to `PENDING_REVIEW` with an explicit warning note to prevent double-counting expenses already recorded during card purchases.
+  - **Ambiguous Messages:** Messages without verifiable provider transaction IDs (`trxId`) route to `PENDING_REVIEW` and never auto-post to the ledger.
+- **Deduplication Strategy:**
+  - **Unique Transaction ID:** SQLite `UNIQUE INDEX` on `trxId` in `sms_imported_records`.
+  - **Composite Fallback Fingerprint:** `"${provider}:${type}:${amount}:${timestamp/60000}:${body.trim().hashCode()}"` prevents duplicate imports on cellular network broadcast re-deliveries while preserving distinct transactions with different content or timestamps.
+- **Approval Safety & Idempotency:**
+  - `FinanceRepository.approveSmsRecord` verifies `record.status == PENDING_REVIEW && record.linkedTransactionId == null`.
+  - Double-approvals or rapid clicks safely return `false` without inserting duplicate transactions.
+  - Dismissing already posted records is blocked to prevent ledger desync.
+  - Wrapped inside `database.withTransaction` for full atomicity between transaction creation and status update.
+- **Schema & Migrations:**
+  - Room Version 6 introduces `sms_imported_records` table via non-destructive `MIGRATION_5_6`.
+- **Known Limitations & Future Scope:**
+  - Parsing relies on standardized English/Bangla-transliterated SMS formats from supported Bangladeshi MFS and banking institutions.
+  - Provider SMS format changes will require updated regex patterns.
 
 ---
 

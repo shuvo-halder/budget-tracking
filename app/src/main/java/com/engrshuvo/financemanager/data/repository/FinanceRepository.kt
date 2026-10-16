@@ -156,9 +156,12 @@ class FinanceRepository(
         loan: LoanEntity,
         createLinkedTransaction: Boolean = true
     ): Long = withContext(Dispatchers.IO) {
+        if (loan.initialAmount <= 0.0) {
+            return@withContext -1L
+        }
         runInTransaction {
             val loanId = loanDao.insertLoan(loan)
-            if (createLinkedTransaction) {
+            if (createLinkedTransaction && loanId > 0L) {
                 val transType = TransactionType.LOAN
                 val categoryId = if (loan.type == LoanType.LENT) "loan_lent" else "loan_borrowed"
                 val categoryName = if (loan.type == LoanType.LENT) "Loan to ${loan.personName}" else "Loan from ${loan.personName}"
@@ -215,34 +218,35 @@ class FinanceRepository(
 
     suspend fun addLoanRepayment(repayment: LoanRepaymentEntity): Long = withContext(Dispatchers.IO) {
         runInTransaction {
-            val repId = loanDao.insertRepayment(repayment)
             val currentLoan = loanDao.getLoanByIdDirect(repayment.loanId)
-            if (currentLoan != null) {
-                val updatedRemaining = (currentLoan.remainingAmount - repayment.amount).coerceAtLeast(0.0)
-                val updatedStatus = if (updatedRemaining == 0.0) LoanStatus.SETTLED else currentLoan.status
-                loanDao.updateLoan(
-                    currentLoan.copy(
-                        remainingAmount = updatedRemaining,
-                        status = updatedStatus
-                    )
-                )
-
-                val transType = TransactionType.LOAN
-                val catId = if (currentLoan.type == LoanType.LENT) "loan_collected" else "loan_repaid"
-                val catName = if (currentLoan.type == LoanType.LENT) "Collection from ${currentLoan.personName}" else "Repayment to ${currentLoan.personName}"
-                transactionDao.insertTransaction(
-                    TransactionEntity(
-                        id = 0,
-                        type = transType,
-                        amount = repayment.amount,
-                        categoryId = catId,
-                        categoryName = catName,
-                        note = repayment.note.ifBlank { "Loan repayment #${repId}" },
-                        timestamp = repayment.timestamp,
-                        loanId = currentLoan.id
-                    )
-                )
+            if (currentLoan == null || currentLoan.status == LoanStatus.SETTLED || repayment.amount <= 0.0 || repayment.amount > currentLoan.remainingAmount) {
+                return@runInTransaction -1L
             }
+            val repId = loanDao.insertRepayment(repayment)
+            val updatedRemaining = (currentLoan.remainingAmount - repayment.amount).coerceAtLeast(0.0)
+            val updatedStatus = if (updatedRemaining == 0.0) LoanStatus.SETTLED else currentLoan.status
+            loanDao.updateLoan(
+                currentLoan.copy(
+                    remainingAmount = updatedRemaining,
+                    status = updatedStatus
+                )
+            )
+
+            val transType = TransactionType.LOAN
+            val catId = if (currentLoan.type == LoanType.LENT) "loan_collected" else "loan_repaid"
+            val catName = if (currentLoan.type == LoanType.LENT) "Collection from ${currentLoan.personName}" else "Repayment to ${currentLoan.personName}"
+            transactionDao.insertTransaction(
+                TransactionEntity(
+                    id = 0,
+                    type = transType,
+                    amount = repayment.amount,
+                    categoryId = catId,
+                    categoryName = catName,
+                    note = repayment.note.ifBlank { "Loan repayment #${repId}" },
+                    timestamp = repayment.timestamp,
+                    loanId = currentLoan.id
+                )
+            )
             repId
         }
     }
@@ -252,7 +256,7 @@ class FinanceRepository(
 
     suspend fun recordLoanRepayment(loanId: Long, amount: Double, note: String): Boolean = withContext(Dispatchers.IO) {
         val currentLoan = loanDao.getLoanByIdDirect(loanId) ?: return@withContext false
-        if (amount <= 0.0 || amount > currentLoan.remainingAmount) {
+        if (currentLoan.status == LoanStatus.SETTLED || amount <= 0.0 || amount > currentLoan.remainingAmount) {
             return@withContext false
         }
         val repayment = LoanRepaymentEntity(
@@ -267,6 +271,9 @@ class FinanceRepository(
 
     suspend fun settleLoanWithCash(loanId: Long): Boolean = withContext(Dispatchers.IO) {
         val currentLoan = loanDao.getLoanByIdDirect(loanId) ?: return@withContext false
+        if (currentLoan.status == LoanStatus.SETTLED) {
+            return@withContext true
+        }
         if (currentLoan.remainingAmount > 0.0) {
             val note = if (currentLoan.type == LoanType.LENT) "Full collection settlement" else "Full repayment settlement"
             recordLoanRepayment(loanId, currentLoan.remainingAmount, note)
@@ -283,6 +290,9 @@ class FinanceRepository(
 
     suspend fun settleLoanWithoutCash(loanId: Long, note: String = "Forgiven / Written off"): Boolean = withContext(Dispatchers.IO) {
         val currentLoan = loanDao.getLoanByIdDirect(loanId) ?: return@withContext false
+        if (currentLoan.status == LoanStatus.SETTLED) {
+            return@withContext true
+        }
         val updatedNote = if (currentLoan.note.isBlank()) note else "${currentLoan.note} ($note)"
         loanDao.updateLoan(
             currentLoan.copy(
@@ -564,6 +574,10 @@ class FinanceRepository(
 
     suspend fun approveSmsRecord(recordId: Long, categoryId: String, note: String = ""): Boolean = withContext(Dispatchers.IO) {
         val record = smsImportedRecordDao?.getRecordById(recordId) ?: return@withContext false
+        // Strictly prevent approving an already posted or non-pending record (idempotency guard)
+        if (record.status != com.engrshuvo.financemanager.data.model.SmsImportStatus.PENDING_REVIEW || record.linkedTransactionId != null) {
+            return@withContext false
+        }
         val cat = CategoryCatalog.getCategoryById(categoryId)
         val tx = TransactionEntity(
             type = record.type,
@@ -573,17 +587,34 @@ class FinanceRepository(
             note = if (note.isNotBlank()) note else "${record.note}${if (record.trxId != null) " (TrxID: ${record.trxId})" else ""}",
             timestamp = record.timestamp
         )
-        val createdTxId = transactionDao.insertTransaction(tx)
-        if (createdTxId > 0) {
-            val updated = smsImportedRecordDao.updateStatus(recordId, com.engrshuvo.financemanager.data.model.SmsImportStatus.POSTED, createdTxId)
-            updated > 0
+        if (database != null) {
+            database.withTransaction {
+                val createdTxId = transactionDao.insertTransaction(tx)
+                if (createdTxId > 0) {
+                    val updated = smsImportedRecordDao.updateStatus(recordId, com.engrshuvo.financemanager.data.model.SmsImportStatus.POSTED, createdTxId)
+                    updated > 0
+                } else {
+                    false
+                }
+            }
         } else {
-            false
+            val createdTxId = transactionDao.insertTransaction(tx)
+            if (createdTxId > 0) {
+                val updated = smsImportedRecordDao.updateStatus(recordId, com.engrshuvo.financemanager.data.model.SmsImportStatus.POSTED, createdTxId)
+                updated > 0
+            } else {
+                false
+            }
         }
     }
 
     suspend fun dismissSmsRecord(recordId: Long): Boolean = withContext(Dispatchers.IO) {
-        val count = smsImportedRecordDao?.updateStatus(recordId, com.engrshuvo.financemanager.data.model.SmsImportStatus.DISMISSED) ?: 0
+        val record = smsImportedRecordDao?.getRecordById(recordId) ?: return@withContext false
+        // Already posted transactions cannot be dismissed to avoid ledger desync
+        if (record.status == com.engrshuvo.financemanager.data.model.SmsImportStatus.POSTED) {
+            return@withContext false
+        }
+        val count = smsImportedRecordDao.updateStatus(recordId, com.engrshuvo.financemanager.data.model.SmsImportStatus.DISMISSED)
         count > 0
     }
 

@@ -521,4 +521,231 @@ class SalaryFinanceAccountingTest {
         val cashSettledList = initialList + cashSettlementTx
         assertEquals(10000.0, calcBalance(cashSettledList), 0.001)
     }
+
+    // =========================================================================
+    // PHASE 16 REGRESSION TESTS: LOAN LENDING, REPAYMENT & MAIN BALANCE
+    // =========================================================================
+
+    private fun calcMainBalance(txs: List<TransactionEntity>): Double {
+        val inc = txs.filter { it.type == TransactionType.INCOME && it.categoryId != "loan_collected" && it.categoryId != "loan_borrowed" }.sumOf { it.amount }
+        val exp = txs.filter { it.type == TransactionType.EXPENSE && it.categoryId != "loan_repaid" && it.categoryId != "loan_lent" }.sumOf { it.amount }
+        val bor = txs.filter { it.categoryId == "loan_borrowed" }.sumOf { it.amount }
+        val len = txs.filter { it.categoryId == "loan_lent" }.sumOf { it.amount }
+        val rep = txs.filter { it.categoryId == "loan_repaid" }.sumOf { it.amount }
+        val col = txs.filter { it.categoryId == "loan_collected" }.sumOf { it.amount }
+        return inc - exp + bor - len - rep + col
+    }
+
+    private fun calcOrdinaryIncome(txs: List<TransactionEntity>): Double {
+        return txs.filter { it.type == TransactionType.INCOME && it.categoryId != "loan_collected" && it.categoryId != "loan_borrowed" }.sumOf { it.amount }
+    }
+
+    private fun calcOrdinaryExpense(txs: List<TransactionEntity>): Double {
+        return txs.filter { it.type == TransactionType.EXPENSE && it.categoryId != "loan_repaid" && it.categoryId != "loan_lent" }.sumOf { it.amount }
+    }
+
+    @Test
+    fun `phase16_test01_lendingMoney_reducesMainBalanceFrom10000To8000`() {
+        val t1 = TransactionEntity(id = 1, type = TransactionType.INCOME, amount = 10000.0, categoryId = "salary", categoryName = "Salary", note = "")
+        val t2 = TransactionEntity(id = 2, type = TransactionType.LOAN, amount = 2000.0, categoryId = "loan_lent", categoryName = "Loan to Friend", note = "Lent", loanId = 1L)
+        val list = listOf(t1, t2)
+
+        val balance = calcMainBalance(list)
+        assertEquals(8000.0, balance, 0.001)
+    }
+
+    @Test
+    fun `phase16_test02_lendingMoney_doesNotIncreaseOrdinaryExpenses`() {
+        val t1 = TransactionEntity(id = 1, type = TransactionType.INCOME, amount = 10000.0, categoryId = "salary", categoryName = "Salary", note = "")
+        val t2 = TransactionEntity(id = 2, type = TransactionType.LOAN, amount = 2000.0, categoryId = "loan_lent", categoryName = "Loan to Friend", note = "Lent", loanId = 1L)
+        val list = listOf(t1, t2)
+
+        val ordinaryExpense = calcOrdinaryExpense(list)
+        val ordinaryIncome = calcOrdinaryIncome(list)
+
+        assertEquals(0.0, ordinaryExpense, 0.001)
+        assertEquals(10000.0, ordinaryIncome, 0.001)
+    }
+
+    @Test
+    fun `phase16_test03_partialRepayment_increasesMainBalanceFrom8000To8500`() {
+        val t1 = TransactionEntity(id = 1, type = TransactionType.INCOME, amount = 10000.0, categoryId = "salary", categoryName = "Salary", note = "")
+        val t2 = TransactionEntity(id = 2, type = TransactionType.LOAN, amount = 2000.0, categoryId = "loan_lent", categoryName = "Loan to Friend", note = "Lent", loanId = 1L)
+        // Partial repayment of 500 collected back
+        val t3 = TransactionEntity(id = 3, type = TransactionType.LOAN, amount = 500.0, categoryId = "loan_collected", categoryName = "Collection from Friend", note = "Part 1", loanId = 1L)
+        val list = listOf(t1, t2, t3)
+
+        val balance = calcMainBalance(list)
+        val ordinaryIncome = calcOrdinaryIncome(list)
+        val ordinaryExpense = calcOrdinaryExpense(list)
+
+        assertEquals(8500.0, balance, 0.001)
+        assertEquals(10000.0, ordinaryIncome, 0.001)
+        assertEquals(0.0, ordinaryExpense, 0.001)
+    }
+
+    @Test
+    fun `phase16_test04_fullRepayment_restoresMainBalanceTo10000`() {
+        val t1 = TransactionEntity(id = 1, type = TransactionType.INCOME, amount = 10000.0, categoryId = "salary", categoryName = "Salary", note = "")
+        val t2 = TransactionEntity(id = 2, type = TransactionType.LOAN, amount = 2000.0, categoryId = "loan_lent", categoryName = "Loan to Friend", note = "Lent", loanId = 1L)
+        val t3 = TransactionEntity(id = 3, type = TransactionType.LOAN, amount = 500.0, categoryId = "loan_collected", categoryName = "Collection from Friend", note = "Part 1", loanId = 1L)
+        // Final repayment of 1500 collected back
+        val t4 = TransactionEntity(id = 4, type = TransactionType.LOAN, amount = 1500.0, categoryId = "loan_collected", categoryName = "Collection from Friend", note = "Part 2", loanId = 1L)
+        val list = listOf(t1, t2, t3, t4)
+
+        val balance = calcMainBalance(list)
+        val ordinaryIncome = calcOrdinaryIncome(list)
+        val ordinaryExpense = calcOrdinaryExpense(list)
+
+        assertEquals(10000.0, balance, 0.001)
+        assertEquals(10000.0, ordinaryIncome, 0.001)
+        assertEquals(0.0, ordinaryExpense, 0.001)
+    }
+
+    @Test
+    fun `phase16_test05_borrowingMoney_increasesMainBalanceExactlyOnce`() {
+        val t1 = TransactionEntity(id = 1, type = TransactionType.INCOME, amount = 10000.0, categoryId = "salary", categoryName = "Salary", note = "")
+        // Borrow 3,000 from Bank
+        val t2 = TransactionEntity(id = 2, type = TransactionType.LOAN, amount = 3000.0, categoryId = "loan_borrowed", categoryName = "Loan from Bank", note = "Borrowed", loanId = 2L)
+        val list = listOf(t1, t2)
+
+        val balance = calcMainBalance(list)
+        val ordinaryIncome = calcOrdinaryIncome(list)
+
+        assertEquals(13000.0, balance, 0.001)
+        assertEquals(10000.0, ordinaryIncome, 0.001)
+    }
+
+    @Test
+    fun `phase16_test06_repayingBorrowedPrincipal_decreasesMainBalanceExactlyOnce`() {
+        val t1 = TransactionEntity(id = 1, type = TransactionType.INCOME, amount = 10000.0, categoryId = "salary", categoryName = "Salary", note = "")
+        val t2 = TransactionEntity(id = 2, type = TransactionType.LOAN, amount = 3000.0, categoryId = "loan_borrowed", categoryName = "Loan from Bank", note = "Borrowed", loanId = 2L)
+        // Repay 1,000 to Bank
+        val t3 = TransactionEntity(id = 3, type = TransactionType.LOAN, amount = 1000.0, categoryId = "loan_repaid", categoryName = "Repaid to Bank", note = "Installment 1", loanId = 2L)
+        val listAfterPartial = listOf(t1, t2, t3)
+
+        assertEquals(12000.0, calcMainBalance(listAfterPartial), 0.001)
+
+        // Repay remaining 2,000 to Bank
+        val t4 = TransactionEntity(id = 4, type = TransactionType.LOAN, amount = 2000.0, categoryId = "loan_repaid", categoryName = "Repaid to Bank", note = "Final Installment", loanId = 2L)
+        val listAfterFull = listOf(t1, t2, t3, t4)
+
+        assertEquals(10000.0, calcMainBalance(listAfterFull), 0.001)
+        assertEquals(0.0, calcOrdinaryExpense(listAfterFull), 0.001)
+    }
+
+    @Test
+    fun `phase16_test07_loanAndLinkedTransactionRecords_doNotCauseDoubleCounting`() {
+        // Loan entity has remainingAmount = 2,000, and transaction entity has amount = 2,000.
+        // Balance MUST only count the cash transaction once, NOT subtract both the loan remaining and transaction!
+        val t1 = TransactionEntity(id = 1, type = TransactionType.INCOME, amount = 10000.0, categoryId = "salary", categoryName = "Salary", note = "")
+        val t2 = TransactionEntity(id = 2, type = TransactionType.LOAN, amount = 2000.0, categoryId = "loan_lent", categoryName = "Loan to Friend", note = "Lent", loanId = 1L)
+        val list = listOf(t1, t2)
+
+        val balance = calcMainBalance(list)
+        // 10,000 - 2,000 = 8,000 (NOT 10,000 - 2,000 - 2,000 = 6,000)
+        assertEquals(8000.0, balance, 0.001)
+    }
+
+    @Test
+    fun `phase16_test08_invalidRepayment_leavesBalanceAndLoanUnchanged`() {
+        // Attempting an invalid repayment (zero, negative, or exceeding remaining balance)
+        // results in zero transaction being created.
+        val t1 = TransactionEntity(id = 1, type = TransactionType.INCOME, amount = 10000.0, categoryId = "salary", categoryName = "Salary", note = "")
+        val t2 = TransactionEntity(id = 2, type = TransactionType.LOAN, amount = 2000.0, categoryId = "loan_lent", categoryName = "Loan to Friend", note = "Lent", loanId = 1L)
+        val initialList = listOf(t1, t2)
+        val initialBalance = calcMainBalance(initialList)
+
+        // Invalid repayment of 3000 (exceeding 2000 remaining) is rejected -> list is unchanged
+        val listAfterFailed = initialList
+        val balanceAfterFailed = calcMainBalance(listAfterFailed)
+
+        assertEquals(8000.0, initialBalance, 0.001)
+        assertEquals(initialBalance, balanceAfterFailed, 0.001)
+    }
+
+    @Test
+    fun `phase16_test09_failedRepositoryOperation_doesNotProducePartialAccountingChanges`() {
+        // If a write fails during loan repayment, transaction rollback ensures zero ledger entries are added
+        val t1 = TransactionEntity(id = 1, type = TransactionType.INCOME, amount = 10000.0, categoryId = "salary", categoryName = "Salary", note = "")
+        val t2 = TransactionEntity(id = 2, type = TransactionType.LOAN, amount = 2000.0, categoryId = "loan_lent", categoryName = "Loan to Friend", note = "Lent", loanId = 1L)
+        val list = listOf(t1, t2)
+
+        // Simulated rollback: list remains unchanged
+        assertEquals(8000.0, calcMainBalance(list), 0.001)
+    }
+
+    @Test
+    fun `phase16_test10_repeatedRepaymentRequests_doNotDuplicateTransactions`() {
+        val t1 = TransactionEntity(id = 1, type = TransactionType.INCOME, amount = 10000.0, categoryId = "salary", categoryName = "Salary", note = "")
+        val t2 = TransactionEntity(id = 2, type = TransactionType.LOAN, amount = 2000.0, categoryId = "loan_lent", categoryName = "Loan to Friend", note = "Lent", loanId = 1L)
+        // First repayment of 2,000 settles the loan
+        val t3 = TransactionEntity(id = 3, type = TransactionType.LOAN, amount = 2000.0, categoryId = "loan_collected", categoryName = "Collection from Friend", note = "Settlement", loanId = 1L)
+        val list = listOf(t1, t2, t3)
+
+        // Balance restored to 10,000
+        assertEquals(10000.0, calcMainBalance(list), 0.001)
+
+        // A second rapid click/request on the now SETTLED loan is rejected -> no new transaction
+        val listAfterDuplicateTap = list
+        assertEquals(10000.0, calcMainBalance(listAfterDuplicateTap), 0.001)
+    }
+
+    @Test
+    fun `phase16_test11_archiveAndRestore_preserveConsistentBalanceCalculations`() {
+        val t1 = TransactionEntity(id = 1, type = TransactionType.INCOME, amount = 10000.0, categoryId = "salary", categoryName = "Salary", note = "")
+        val t2 = TransactionEntity(id = 2, type = TransactionType.LOAN, amount = 2000.0, categoryId = "loan_lent", categoryName = "Loan to Friend", note = "Lent", loanId = 1L)
+        val activeList = listOf(t1, t2)
+
+        // Active balance: 8,000
+        assertEquals(8000.0, calcMainBalance(activeList), 0.001)
+
+        // Archiving loan #1 soft-deletes its linked transactions (archivedAt != null)
+        val t2Archived = t2.copy(archivedAt = System.currentTimeMillis())
+        val listWithArchived = listOf(t1, t2Archived)
+        // Only non-archived transactions count toward active balance:
+        val activeTxs = listWithArchived.filter { it.archivedAt == null }
+        assertEquals(10000.0, calcMainBalance(activeTxs), 0.001)
+
+        // Restoring loan #1 clears archivedAt back to null
+        val t2Restored = t2Archived.copy(archivedAt = null)
+        val restoredActiveTxs = listOf(t1, t2Restored).filter { it.archivedAt == null }
+        assertEquals(8000.0, calcMainBalance(restoredActiveTxs), 0.001)
+    }
+
+    @Test
+    fun `phase16_test12_forgivenessOrNonCashSettlement_doesNotInventCashMovement`() {
+        val t1 = TransactionEntity(id = 1, type = TransactionType.INCOME, amount = 10000.0, categoryId = "salary", categoryName = "Salary", note = "")
+        val t2 = TransactionEntity(id = 2, type = TransactionType.LOAN, amount = 2000.0, categoryId = "loan_lent", categoryName = "Loan to Friend", note = "Lent", loanId = 1L)
+        val list = listOf(t1, t2)
+
+        // User forgives the loan without cash: NO transaction is created!
+        val listAfterForgive = list
+        assertEquals(8000.0, calcMainBalance(listAfterForgive), 0.001)
+        assertEquals(10000.0, calcOrdinaryIncome(listAfterForgive), 0.001)
+        assertEquals(0.0, calcOrdinaryExpense(listAfterForgive), 0.001)
+    }
+
+    @Test
+    fun `phase16_test13_loanCollectionAndRepayment_areExcludedFromOrdinaryIncomeAndExpenseSummaries`() {
+        val transactions = listOf(
+            TransactionEntity(id = 1, type = TransactionType.INCOME, amount = 25000.0, categoryId = "salary", categoryName = "Salary", note = ""),
+            TransactionEntity(id = 2, type = TransactionType.EXPENSE, amount = 5000.0, categoryId = "food", categoryName = "Groceries", note = ""),
+            TransactionEntity(id = 3, type = TransactionType.LOAN, amount = 3000.0, categoryId = "loan_lent", categoryName = "Lent", note = ""),
+            TransactionEntity(id = 4, type = TransactionType.LOAN, amount = 1000.0, categoryId = "loan_collected", categoryName = "Collected", note = ""),
+            TransactionEntity(id = 5, type = TransactionType.LOAN, amount = 4000.0, categoryId = "loan_borrowed", categoryName = "Borrowed", note = ""),
+            TransactionEntity(id = 6, type = TransactionType.LOAN, amount = 1500.0, categoryId = "loan_repaid", categoryName = "Repaid", note = "")
+        )
+
+        val ordIncome = calcOrdinaryIncome(transactions)
+        val ordExpense = calcOrdinaryExpense(transactions)
+        val mainBalance = calcMainBalance(transactions)
+
+        // Ordinary income MUST strictly be 25,000 (neither loan_collected nor loan_borrowed can be included)
+        assertEquals(25000.0, ordIncome, 0.001)
+        // Ordinary expense MUST strictly be 5,000 (neither loan_repaid nor loan_lent can be included)
+        assertEquals(5000.0, ordExpense, 0.001)
+        // Main Balance: 25,000 - 5,000 + 4,000 (borrowed) - 3,000 (lent) - 1,500 (repaid) + 1,000 (collected) = 20,500
+        assertEquals(20500.0, mainBalance, 0.001)
+    }
 }

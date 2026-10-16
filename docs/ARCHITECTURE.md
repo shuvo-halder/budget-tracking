@@ -92,6 +92,16 @@ Columns: `id`, `loanId`, `amount`, `note`, `timestamp`, `archivedAt` (Nullable L
 ### 5. `budget_settings` Table
 Key-value storage for overall user settings (`monthly_budget_limit`, `daily_budget_limit`).
 
+### 6. `financial_goals` & `goal_contributions` Tables *(Added in v4)*
+Tracks financial goal savings targets, monthly contributions, and archive status.
+
+### 7. `purchase_items` Table *(Added in v5)*
+Shopping notes and task planning items with strict financial isolation.
+
+### 8. `sms_imported_records` Table *(Added in v6)*
+Stores parsed payment SMS audit records and candidates for review.
+Columns: `id`, `sender`, `provider`, `trxId` (Nullable Text, UNIQUE Indexed), `type`, `amount`, `fee`, `counterparty`, `suggestedCategory`, `timestamp`, `status` (PENDING_REVIEW, POSTED, DISMISSED), `linkedTransactionId` (Nullable Long), `fallbackFingerprint` (Indexed), `note`.
+
 ---
 
 ## 4. Non-Destructive Room Migration Strategy
@@ -100,50 +110,42 @@ To ensure zero user data loss during schema evolution, the app registers explici
 
 1. **`MIGRATION_1_2` (v1 → v2)**: Creates `budget_allocations` table and index.
 2. **`MIGRATION_2_3` (v2 → v3)**: Adds nullable `archivedAt INTEGER DEFAULT NULL` columns to `transactions`, `loans`, and `loan_repayments`, and creates indexing on each `archivedAt` column. Active records default to null.
+3. **`MIGRATION_3_4` (v3 → v4)**: Creates `financial_goals` and `goal_contributions` tables with foreign key cascades.
+4. **`MIGRATION_4_5` (v4 → v5)**: Creates `purchase_items` table for shopping notes without touching financial ledger.
+5. **`MIGRATION_5_6` (v5 → v6)**: Creates `sms_imported_records` table with unique index on `trxId` and indexes on `timestamp`, `status`, and `fallbackFingerprint`.
 
-```kotlin
-val MIGRATION_1_2 = object : Migration(1, 2) {
-    override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL("""
-            CREATE TABLE IF NOT EXISTS `budget_allocations` (
-                `monthKey` TEXT NOT NULL,
-                `categoryId` TEXT NOT NULL,
-                `categoryName` TEXT NOT NULL,
-                `allocatedAmount` REAL NOT NULL,
-                `updatedAt` INTEGER NOT NULL,
-                PRIMARY KEY(`monthKey`, `categoryId`)
-            )
-        """.trimIndent())
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_budget_allocations_monthKey` ON `budget_allocations` (`monthKey`)")
-    }
-}
+---
 
-val MIGRATION_2_3 = object : Migration(2, 3) {
-    override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL("ALTER TABLE `transactions` ADD COLUMN `archivedAt` INTEGER DEFAULT NULL")
-        db.execSQL("ALTER TABLE `loans` ADD COLUMN `archivedAt` INTEGER DEFAULT NULL")
-        db.execSQL("ALTER TABLE `loan_repayments` ADD COLUMN `archivedAt` INTEGER DEFAULT NULL")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_archivedAt` ON `transactions` (`archivedAt`)")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_loans_archivedAt` ON `loans` (`archivedAt`)")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_loan_repayments_archivedAt` ON `loan_repayments` (`archivedAt`)")
-    }
-}
-```
-            CREATE TABLE IF NOT EXISTS `budget_allocations` (
-                `monthKey` TEXT NOT NULL,
-                `categoryId` TEXT NOT NULL,
-                `categoryName` TEXT NOT NULL,
-                `allocatedAmount` REAL NOT NULL,
-                `updatedAt` INTEGER NOT NULL,
-                PRIMARY KEY(`monthKey`, `categoryId`)
-            )
-        """.trimIndent())
-        db.execSQL(
-            "CREATE INDEX IF NOT EXISTS `index_budget_allocations_monthKey` ON `budget_allocations` (`monthKey`)"
-        )
-    }
-}
-```
+## 4.1 Automatic Payment SMS Import Architecture
+
+The Automatic Payment SMS Import feature operates under strict security, privacy, and data integrity guarantees:
+
+1. **Pure Event-Driven Receiver:**
+   - Listens only to `android.provider.Telephony.SMS_RECEIVED`.
+   - Protected in `AndroidManifest.xml` by `android.permission.BROADCAST_SMS` ensuring only the Android telephony framework can deliver broadcasts.
+   - Synchronous pre-filter (`PaymentSmsParser.isPotentialFinancialSms`) skips non-financial, spam, OTP, and failed messages within microseconds.
+   - Asynchronous processing executes inside `goAsync()` on `Dispatchers.IO` and terminates within bounded execution limits.
+
+2. **Strict New-Message-Only Enforcement:**
+   - Evaluates: `messageTimestamp >= activatedAt` and `isEnabled == true` and `RECEIVE_SMS` granted.
+   - When the user turns on the feature, `activatedAt` is stamped to the current epoch time.
+   - When the feature is turned off, `activatedAt` resets to 0. Re-enabling creates a fresh timestamp.
+   - Any SMS with a timestamp preceding `activatedAt` is immediately dropped.
+   - **Zero Historical Scanning:** The app does NOT request `android.permission.READ_SMS` and never accesses `content://sms/inbox`.
+
+3. **Deduplication & Financial Safety:**
+   - Two-tier deduplication:
+     - Primary: SQLite unique constraint and query check on `trxId`.
+     - Secondary: Composite `fallbackFingerprint` (`provider:type:amount:minute:bodyHash`) preventing duplicate entries on provider retries while preserving legitimate distinct transactions with different content or timestamps.
+   - Ambiguous messages (missing `trxId` or credit card bill payments) are flagged `isConfident = false` and routed exclusively to `PENDING_REVIEW`.
+   - Pending-review candidates do NOT affect cash balance or create financial transactions until explicitly approved by the user.
+   - Approval idempotency: `FinanceRepository.approveSmsRecord` verifies `record.status == PENDING_REVIEW && record.linkedTransactionId == null` and executes inside `database.withTransaction` to prevent duplicate transaction creation.
+
+4. **Battery & Privacy Compliance:**
+   - Zero background polling, zero wake locks, zero persistent foreground services.
+   - Zero network transmission: all parsing is strictly local regex matching.
+   - Privacy-safe: complete SMS bodies, OTPs, and account numbers are never persisted or logged.
+
 
 ---
 

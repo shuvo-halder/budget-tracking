@@ -480,17 +480,17 @@ class FinanceViewModel(
         val monthTransactions = allTransactions.filter { it.timestamp in startOfMonth..endOfMonth }
 
         val totalIncome = monthTransactions
-            .filter { it.type == TransactionType.INCOME && it.categoryId != "loan_collected" }
+            .filter { it.type == TransactionType.INCOME && it.categoryId != "loan_collected" && it.categoryId != "loan_borrowed" }
             .sumOf { it.amount }
 
         val totalExpense = monthTransactions
-            .filter { it.type == TransactionType.EXPENSE && it.categoryId != "loan_repaid" }
+            .filter { it.type == TransactionType.EXPENSE && it.categoryId != "loan_repaid" && it.categoryId != "loan_lent" }
             .sumOf { it.amount }
 
         val netOperatingCashChange = totalIncome - totalExpense
 
-        val allTimeIncome = allTransactions.filter { it.type == TransactionType.INCOME && it.categoryId != "loan_collected" }.sumOf { it.amount }
-        val allTimeExpense = allTransactions.filter { it.type == TransactionType.EXPENSE && it.categoryId != "loan_repaid" }.sumOf { it.amount }
+        val allTimeIncome = allTransactions.filter { it.type == TransactionType.INCOME && it.categoryId != "loan_collected" && it.categoryId != "loan_borrowed" }.sumOf { it.amount }
+        val allTimeExpense = allTransactions.filter { it.type == TransactionType.EXPENSE && it.categoryId != "loan_repaid" && it.categoryId != "loan_lent" }.sumOf { it.amount }
         val allTimeBorrowed = allTransactions.filter { it.categoryId == "loan_borrowed" }.sumOf { it.amount }
         val allTimeLent = allTransactions.filter { it.categoryId == "loan_lent" }.sumOf { it.amount }
         val allTimeRepaid = allTransactions.filter { it.categoryId == "loan_repaid" }.sumOf { it.amount }
@@ -500,7 +500,7 @@ class FinanceViewModel(
         val startOfToday = DateUtils.getStartOfDay()
         val endOfToday = DateUtils.getEndOfDay()
         val todayExpenses = allTransactions
-            .filter { it.type == TransactionType.EXPENSE && it.categoryId != "loan_repaid" && it.timestamp in startOfToday..endOfToday }
+            .filter { it.type == TransactionType.EXPENSE && it.categoryId != "loan_repaid" && it.categoryId != "loan_lent" && it.timestamp in startOfToday..endOfToday }
             .sumOf { it.amount }
 
         val dailyBudgetRemaining = dailyLimit - todayExpenses
@@ -567,7 +567,7 @@ class FinanceViewModel(
         val totalActiveLent = activeLoans.filter { it.type == LoanType.LENT }.sumOf { it.remainingAmount }
         val totalActiveBorrowed = activeLoans.filter { it.type == LoanType.BORROWED }.sumOf { it.remainingAmount }
 
-        val monthOrdinaryExpenses = monthTransactions.filter { it.type == TransactionType.EXPENSE && it.categoryId != "loan_repaid" }
+        val monthOrdinaryExpenses = monthTransactions.filter { it.type == TransactionType.EXPENSE && it.categoryId != "loan_repaid" && it.categoryId != "loan_lent" }
         val totalMonthExpense = monthOrdinaryExpenses.sumOf { it.amount }
         val categoryBreakdown = if (totalMonthExpense > 0) {
             monthOrdinaryExpenses

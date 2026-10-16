@@ -14,6 +14,8 @@ import com.engrshuvo.financemanager.ui.viewmodel.FinanceViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -305,22 +307,20 @@ class PurchasePlannerUnitTest {
         kotlinx.coroutines.Dispatchers.setMain(testDispatcher)
         try {
             val viewModel = FinanceViewModel(repository)
-            val job = launch(testDispatcher) {
-                viewModel.uiState.collect {}
-            }
 
             // Initial destination must be NONE
-            assertEquals(MoreSubDestination.NONE, viewModel.uiState.value.moreSubDestination)
+            val initialState = viewModel.uiState.first { it.moreSubDestination == MoreSubDestination.NONE }
+            assertEquals(MoreSubDestination.NONE, initialState.moreSubDestination)
 
             // Navigate to Purchase Planner (as triggered by the 3-dot overflow menu or More screen)
             viewModel.navigateToMoreSubDestination(MoreSubDestination.PURCHASE_PLANNER)
-            assertEquals(MoreSubDestination.PURCHASE_PLANNER, viewModel.uiState.value.moreSubDestination)
+            val plannerState = viewModel.uiState.first { it.moreSubDestination == MoreSubDestination.PURCHASE_PLANNER }
+            assertEquals(MoreSubDestination.PURCHASE_PLANNER, plannerState.moreSubDestination)
 
             // Navigate back from Purchase Planner
             viewModel.navigateBackFromMoreSubDestination()
-            assertEquals(MoreSubDestination.NONE, viewModel.uiState.value.moreSubDestination)
-
-            job.cancel()
+            val backState = viewModel.uiState.first { it.moreSubDestination == MoreSubDestination.NONE }
+            assertEquals(MoreSubDestination.NONE, backState.moreSubDestination)
         } finally {
             kotlinx.coroutines.Dispatchers.resetMain()
         }

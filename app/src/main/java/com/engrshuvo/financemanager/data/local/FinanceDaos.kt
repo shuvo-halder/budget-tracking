@@ -32,13 +32,13 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE archivedAt IS NULL ORDER BY timestamp DESC")
     suspend fun getAllTransactionsDirect(): List<TransactionEntity>
 
-    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM transactions WHERE type = 'INCOME' AND archivedAt IS NULL")
+    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM transactions WHERE type = 'INCOME' AND categoryId NOT IN ('loan_collected', 'loan_borrowed') AND archivedAt IS NULL")
     fun getTotalIncomeFlow(): Flow<Double>
 
-    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM transactions WHERE type = 'EXPENSE' AND archivedAt IS NULL")
+    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM transactions WHERE type = 'EXPENSE' AND categoryId NOT IN ('loan_repaid', 'loan_lent') AND archivedAt IS NULL")
     fun getTotalExpenseFlow(): Flow<Double>
 
-    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM transactions WHERE type = 'EXPENSE' AND timestamp >= :startTime AND archivedAt IS NULL")
+    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM transactions WHERE type = 'EXPENSE' AND categoryId NOT IN ('loan_repaid', 'loan_lent') AND timestamp >= :startTime AND archivedAt IS NULL")
     fun getMonthlyExpenseFlow(startTime: Long): Flow<Double>
 
     @Query("SELECT * FROM transactions WHERE id = :id LIMIT 1")
