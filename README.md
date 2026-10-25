@@ -92,7 +92,7 @@ $$\text{totalExpenses} = \sum \text{amount for } (\text{type} == \text{EXPENSE} 
 
 $$\text{netOperatingCashChange} = \text{totalIncome} - \text{totalExpenses}$$
 
-$$\text{availableCashBalance} = \text{allTimeIncome} - \text{allTimeExpense} + \text{allTimeBorrowed} - \text{allTimeLent}$$
+$$\text{availableCashBalance} = \text{allTimeIncome} - \text{allTimeExpense} + \text{allTimeBorrowed} - \text{allTimeLent} - \text{allTimeRepaid} + \text{allTimeCollected}$$
 
 $$\text{totalAllocated} = \sum \text{allocatedAmount for all active categories in } M$$
 

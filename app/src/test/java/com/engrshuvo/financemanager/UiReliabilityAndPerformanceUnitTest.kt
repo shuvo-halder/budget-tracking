@@ -817,4 +817,53 @@ class UiReliabilityAndPerformanceUnitTest {
             assertFalse("Iteration $i: Sheet must be closed", viewModel.uiState.value.isAddTransactionSheetOpen)
         }
     }
+
+    @Test
+    fun `15 - PERF-001 regression - rapid sequential dialog open requests atomically update all dialog parameters without race conditions`() = testScope.runTest {
+        backgroundScope.launch(kotlinx.coroutines.test.UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect {}
+        }
+        advanceUntilIdle()
+
+        // Test rapid transitions between different entry types and loan configurations
+        for (i in 1..10) {
+            // 1. Open as Income
+            viewModel.openAddTransactionSheet(TransactionType.INCOME)
+            advanceUntilIdle()
+            waitUntil { viewModel.uiState.value.isAddTransactionSheetOpen }
+            val stateIncome = viewModel.uiState.value
+            assertTrue("Cycle $i: sheet must be open for income", stateIncome.isAddTransactionSheetOpen)
+            assertEquals("Cycle $i: entry type must be INCOME", TransactionType.INCOME, stateIncome.defaultEntryType)
+            assertNull("Cycle $i: editingTransaction must be null", stateIncome.editingTransaction)
+
+            // 2. Open directly as Borrowed Loan without prior close
+            viewModel.openAddTransactionSheet(TransactionType.LOAN, LoanType.BORROWED)
+            advanceUntilIdle()
+            waitUntil { viewModel.uiState.value.defaultEntryType == TransactionType.LOAN }
+            val stateBorrowed = viewModel.uiState.value
+            assertTrue("Cycle $i: sheet must be open for loan", stateBorrowed.isAddTransactionSheetOpen)
+            assertEquals("Cycle $i: entry type must be LOAN", TransactionType.LOAN, stateBorrowed.defaultEntryType)
+            assertEquals("Cycle $i: loan type must be BORROWED", LoanType.BORROWED, stateBorrowed.defaultLoanType)
+            assertNull("Cycle $i: editingTransaction must be null", stateBorrowed.editingTransaction)
+
+            // 3. Open directly as Lent Loan
+            viewModel.openAddTransactionSheet(TransactionType.LOAN, LoanType.LENT)
+            advanceUntilIdle()
+            waitUntil { viewModel.uiState.value.defaultLoanType == LoanType.LENT }
+            val stateLent = viewModel.uiState.value
+            assertTrue("Cycle $i: sheet must be open for loan", stateLent.isAddTransactionSheetOpen)
+            assertEquals("Cycle $i: entry type must be LOAN", TransactionType.LOAN, stateLent.defaultEntryType)
+            assertEquals("Cycle $i: loan type must be LENT", LoanType.LENT, stateLent.defaultLoanType)
+
+            // 4. Close and verify reset to defaults
+            viewModel.closeAddTransactionSheet()
+            advanceUntilIdle()
+            waitUntil { !viewModel.uiState.value.isAddTransactionSheetOpen }
+            val closedState = viewModel.uiState.value
+            assertFalse("Cycle $i: sheet must be closed", closedState.isAddTransactionSheetOpen)
+            assertNull("Cycle $i: editingTransaction must be null", closedState.editingTransaction)
+            assertEquals("Cycle $i: defaultEntryType resets to EXPENSE", TransactionType.EXPENSE, closedState.defaultEntryType)
+            assertEquals("Cycle $i: defaultLoanType resets to LENT", LoanType.LENT, closedState.defaultLoanType)
+        }
+    }
 }

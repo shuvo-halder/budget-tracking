@@ -2,9 +2,9 @@
 
 **Project:** Daily Budget & Loan Manager  
 **Package:** `com.engrshuvo.financemanager`  
-**Current Phase:** Phase 15.4 — Automatic Payment SMS Import Completed  
+**Current Phase:** Phase 17 — Targeted Audit Remediation (PERF-001 & SEC-001 Completed)  
 **Room Database Schema Version:** 6 (Preserved with strict non-destructive migrations MIGRATION_1_2 through MIGRATION_5_6)  
-**Date:** October 16, 2026  
+**Date:** October 25, 2026  
 
 ---
 
@@ -12,7 +12,7 @@
 
 The application is built on modern Android principles with a 100% offline-first architecture:
 - **Language & Framework:** Kotlin, Jetpack Compose Material 3, AndroidX Lifecycle, Coroutines & Flow.
-- **Local Persistence:** Room Database v3 (SQLite) via Kotlin Symbol Processing (KSP).
+- **Local Persistence:** Room Database v6 (SQLite) via Kotlin Symbol Processing (KSP).
 - **Concurrency Model:**
   - Database queries and Storage Access Framework File I/O run exclusively on `Dispatchers.IO`.
   - Financial calculations, aggregation mathematics, and 42-day calendar matrices execute on `Dispatchers.Default`.
@@ -209,4 +209,20 @@ Automated testing covers 68 unit and integration tests across 7 test suites, ach
   - On selection, dismisses the menu (`showMoreMenu = false`) and invokes `viewModel.navigateToMoreSubDestination(MoreSubDestination.PURCHASE_PLANNER)`.
   - Full back-navigation support maintained via `BackHandler` returning to `MoreSubDestination.NONE`.
   - Preserved the existing More screen entry (`more_purchase_planner_card`) and all existing overflow menu items.
+
+---
+
+## 9. Phase 17 — Targeted Audit Remediation (PERF-001 & SEC-001)
+
+- **Status:** `FIXED & VERIFIED — 100% TESTS PASS (144/144)`
+- **Audited Findings Remediated:**
+  1. **PERF-001 (Dialog StateFlow Synchronization Race):**
+     - **Root Cause:** Four independent `MutableStateFlow` instances (`_isAddTransactionSheetOpen`, `_editingTransaction`, `_defaultEntryType`, `_defaultLoanType`) were updated sequentially and combined in `dialogParamsFlow` with `.flowOn(Dispatchers.Default)`. Rapid sequential openings emitted intermediate asynchronous states with stale entry types.
+     - **Fix Applied:** Consolidated the four fields into a single atomic immutable data class `TransactionSheetState(isOpen, editingTransaction, defaultEntryType, defaultLoanType)` managed by `_transactionSheetState = MutableStateFlow(...)`. Opening for add, opening for edit, and closing now execute as a single atomic assignment, resetting defaults on close.
+     - **Verification:** Verified with 10 rapid back-to-back open/edit/close cycles in `UiReliabilityAndPerformanceUnitTest` Test 12 and new Test 15. All 15 tests pass without race conditions or thread hangs.
+  2. **SEC-001 (Unrestricted Cloud Auto-Backup of Sensitive Financial Data):**
+     - **Root Cause:** Default template `data_extraction_rules.xml` and `backup_rules.xml` had empty rules, allowing Android OS Google Cloud Auto-Backup to upload the unencrypted SQLite database and DataStore preferences to Google Drive on devices with OS backup enabled.
+     - **Fix Applied:** Configured `data_extraction_rules.xml` (API 31+) to exclude `database`, `file path="datastore"`, and `sharedpref` from `<cloud-backup>`, while keeping local `<device-transfer>` enabled for phone-to-phone cable/Wi-Fi migrations. Configured legacy `backup_rules.xml` (API 23–30) to exclude `database`, `file path="datastore"`, and `sharedpref`.
+     - **SAF Backup Preserved:** Explicit user-driven SAF JSON backup/restore (`ACTION_CREATE_DOCUMENT`/`ACTION_OPEN_DOCUMENT`) remains 100% operational and independent.
+     - **Verification:** Verified via `sec001_backupRulesExcludeSensitiveDataFromCloudBackup` in `BackupRestoreDataIntegrityTest.kt`.
 

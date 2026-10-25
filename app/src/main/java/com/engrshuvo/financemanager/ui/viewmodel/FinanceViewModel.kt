@@ -76,10 +76,14 @@ class FinanceViewModel(
     private val _isRepaymentSavingState = MutableStateFlow(false)
     private val _loanOperationError = MutableStateFlow<String?>(null)
 
-    private val _isAddTransactionSheetOpen = MutableStateFlow(false)
-    private val _editingTransaction = MutableStateFlow<TransactionEntity?>(null)
-    private val _defaultEntryType = MutableStateFlow(TransactionType.EXPENSE)
-    private val _defaultLoanType = MutableStateFlow(LoanType.LENT)
+    private data class TransactionSheetState(
+        val isOpen: Boolean = false,
+        val editingTransaction: TransactionEntity? = null,
+        val defaultEntryType: TransactionType = TransactionType.EXPENSE,
+        val defaultLoanType: LoanType = LoanType.LENT
+    )
+
+    private val _transactionSheetState = MutableStateFlow(TransactionSheetState())
     private val _isBudgetLimitDialogOpen = MutableStateFlow(false)
     private val _isBudgetPlanningDialogOpen = MutableStateFlow(false)
     private val _isDailyLimitDialogOpen = MutableStateFlow(false)
@@ -272,10 +276,7 @@ class FinanceViewModel(
 
     private val dialogParamsFlow: Flow<DialogParams> = combine(
         listOf(
-            _isAddTransactionSheetOpen,
-            _editingTransaction,
-            _defaultEntryType,
-            _defaultLoanType,
+            _transactionSheetState,
             _isRepayDialogOpen,
             _repayingLoan,
             _isBudgetLimitDialogOpen,
@@ -285,18 +286,19 @@ class FinanceViewModel(
             _loanOperationError
         )
     ) { array ->
+        val sheet = array[0] as TransactionSheetState
         DialogParams(
-            isAddTransactionSheetOpen = array[0] as Boolean,
-            editingTransaction = array[1] as? TransactionEntity,
-            defaultEntryType = array[2] as TransactionType,
-            defaultLoanType = array[3] as LoanType,
-            isRepayDialogOpen = array[4] as Boolean,
-            repayingLoan = array[5] as? LoanEntity,
-            isBudgetLimitDialogOpen = array[6] as Boolean,
-            isBudgetPlanningDialogOpen = array[7] as Boolean,
-            isDailyLimitDialogOpen = array[8] as Boolean,
-            isRepaymentSaving = array[9] as Boolean,
-            loanOperationError = array[10] as? String
+            isAddTransactionSheetOpen = sheet.isOpen,
+            editingTransaction = sheet.editingTransaction,
+            defaultEntryType = sheet.defaultEntryType,
+            defaultLoanType = sheet.defaultLoanType,
+            isRepayDialogOpen = array[1] as Boolean,
+            repayingLoan = array[2] as? LoanEntity,
+            isBudgetLimitDialogOpen = array[3] as Boolean,
+            isBudgetPlanningDialogOpen = array[4] as Boolean,
+            isDailyLimitDialogOpen = array[5] as Boolean,
+            isRepaymentSaving = array[6] as Boolean,
+            loanOperationError = array[7] as? String
         )
     }.flowOn(Dispatchers.Default)
 
@@ -1186,21 +1188,30 @@ class FinanceViewModel(
         type: TransactionType = TransactionType.EXPENSE,
         loanType: LoanType = LoanType.LENT
     ) {
-        _editingTransaction.value = null
-        _defaultEntryType.value = type
-        _defaultLoanType.value = loanType
-        _isAddTransactionSheetOpen.value = true
+        _transactionSheetState.value = TransactionSheetState(
+            isOpen = true,
+            editingTransaction = null,
+            defaultEntryType = type,
+            defaultLoanType = loanType
+        )
     }
 
     fun openEditTransactionSheet(transaction: TransactionEntity) {
-        _editingTransaction.value = transaction
-        _defaultEntryType.value = transaction.type
-        _isAddTransactionSheetOpen.value = true
+        _transactionSheetState.value = TransactionSheetState(
+            isOpen = true,
+            editingTransaction = transaction,
+            defaultEntryType = transaction.type,
+            defaultLoanType = LoanType.LENT
+        )
     }
 
     fun closeAddTransactionSheet() {
-        _isAddTransactionSheetOpen.value = false
-        _editingTransaction.value = null
+        _transactionSheetState.value = TransactionSheetState(
+            isOpen = false,
+            editingTransaction = null,
+            defaultEntryType = TransactionType.EXPENSE,
+            defaultLoanType = LoanType.LENT
+        )
     }
 
     fun saveTransaction(

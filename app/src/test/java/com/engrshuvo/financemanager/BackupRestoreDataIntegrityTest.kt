@@ -676,4 +676,26 @@ class BackupRestoreDataIntegrityTest {
             assertTrue(e.message?.contains("Invalid transaction type 'INVALID_TYPE_ENUM'") == true)
         }
     }
+
+    @Test
+    fun `sec001_backupRulesExcludeSensitiveDataFromCloudBackup`() {
+        val dataRulesFile = java.io.File("src/main/res/xml/data_extraction_rules.xml").let {
+            if (it.exists()) it else java.io.File("app/src/main/res/xml/data_extraction_rules.xml")
+        }
+        assertTrue("data_extraction_rules.xml must exist", dataRulesFile.exists())
+        val dataRulesContent = dataRulesFile.readText()
+        assertTrue("Must exclude database from cloud backup", dataRulesContent.contains("<exclude domain=\"database\" path=\".\""))
+        assertTrue("Must exclude datastore files from cloud backup", dataRulesContent.contains("<exclude domain=\"file\" path=\"datastore\""))
+        assertTrue("Must exclude sharedpref from cloud backup", dataRulesContent.contains("<exclude domain=\"sharedpref\" path=\".\""))
+        assertTrue("Must include device-transfer", dataRulesContent.contains("<device-transfer>"))
+
+        val backupRulesFile = java.io.File("src/main/res/xml/backup_rules.xml").let {
+            if (it.exists()) it else java.io.File("app/src/main/res/xml/backup_rules.xml")
+        }
+        assertTrue("backup_rules.xml must exist", backupRulesFile.exists())
+        val backupRulesContent = backupRulesFile.readText()
+        assertTrue("Must exclude database from legacy backup", backupRulesContent.contains("<exclude domain=\"database\" path=\".\""))
+        assertTrue("Must exclude datastore files from legacy backup", backupRulesContent.contains("<exclude domain=\"file\" path=\"datastore\""))
+        assertTrue("Must exclude sharedpref from legacy backup", backupRulesContent.contains("<exclude domain=\"sharedpref\" path=\".\""))
+    }
 }

@@ -1,19 +1,21 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Data Extraction Rules for Android 12+ (API 31+).
    See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <!-- SEC-001: Exclude sensitive Room SQLite database files from OS Google Cloud Auto-Backup -->
+        <exclude domain="database" path="." />
+        <!-- SEC-001: Exclude DataStore preferences from OS Google Cloud Auto-Backup -->
+        <exclude domain="file" path="datastore" />
+        <!-- SEC-001: Exclude SharedPreferences from OS Google Cloud Auto-Backup -->
+        <exclude domain="sharedpref" path="." />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <!-- Permit local device-to-device migration (e.g. cable or Wi-Fi Direct phone setup) -->
+        <include domain="database" path="." />
+        <include domain="file" path="datastore" />
+        <include domain="sharedpref" path="." />
     </device-transfer>
-    -->
 </data-extraction-rules>

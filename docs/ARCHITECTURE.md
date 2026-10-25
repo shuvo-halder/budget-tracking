@@ -61,15 +61,16 @@ To prevent double-counting and misrepresentation of funds, the system establishe
 └──────────────────────────▲─────────────────────────────┘
                            │ Room DAOs
 ┌──────────────────────────┴─────────────────────────────┐
-│                 Room Database (v3)                     │
+│                 Room Database (v6)                     │
 │   (AppDatabase, TransactionDao, LoanDao,               │
-│    BudgetSettingDao, BudgetAllocationDao)              │
+│    BudgetSettingDao, BudgetAllocationDao,              │
+│    FinancialGoalDao, PurchaseItemDao, SmsDao)          │
 └────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 3. Database Schema (Room Version 3)
+## 3. Database Schema (Room Version 6)
 
 The database is defined in `com.engrshuvo.financemanager.data.local.AppDatabase`:
 
@@ -197,7 +198,7 @@ MainActivity
     │       ├── InteractiveCalendarView (42-day dot grid & Day activity sheet)
     │       ├── ArchiveScreen (Soft-deleted records, Search, Filter, Restore, Permanent Purge)
     │       ├── ReportsView (Donut chart, Cash flow ratios, Planned savings reserve)
-    │       └── Privacy & 100% Offline-first local Room v3 data information
+    │       └── Privacy & 100% Offline-first local Room v6 data information
     │
     └── Modal Sheets & Dialogs
         ├── BudgetPlanningDialog (Month category allocation planner & Copy Last Month action)
@@ -205,3 +206,15 @@ MainActivity
         ├── UniversalTransactionSheet (Salary/Income, Expense, and Loan creation)
         └── AddRepaymentDialog (Loan installment payment)
 ```
+
+---
+
+## 7. Android Security, Privacy & OS Auto-Backup Architecture
+
+- **Zero Unintended Cloud Extraction (SEC-001):**
+  - `data_extraction_rules.xml` (Android 12+, API 31+) and `backup_rules.xml` (API 23–30) explicitly exclude Room SQLite database files (`domain="database"`), DataStore preference protobufs (`domain="file" path="datastore"`), and SharedPreferences (`domain="sharedpref"`) from OS Google Cloud Auto-Backup.
+  - Direct cable/Wi-Fi phone-to-phone migration is permitted via `<device-transfer>` rules to support seamless hardware upgrades without routing financial data through external cloud servers.
+- **Atomic Dialog State (PERF-001):**
+  - Transaction entry sheet transitions are mediated via immutable `TransactionSheetState(isOpen, editingTransaction, defaultEntryType, defaultLoanType)` emitted through a single `_transactionSheetState` StateFlow, eliminating intermediate asynchronous desynchronization during rapid user interactions.
+- **Manual SAF Backup Preservation:**
+  - User-initiated export and import via Storage Access Framework (`ACTION_CREATE_DOCUMENT` / `ACTION_OPEN_DOCUMENT`) operate via direct user-selected ContentResolver URIs, fully decoupled from OS-managed backup policies.
