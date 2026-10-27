@@ -29,7 +29,7 @@ android {
       val devBase64 = file("${rootDir}/debug.keystore.base64")
       if (!devKeystore.exists() && devBase64.exists()) {
         try {
-          val decoded = java.util.Base64.getDecoder().decode(devBase64.readText().replace("\r", "").replace("\n", "").trim())
+          val decoded = Base64.getDecoder().decode(devBase64.readText().replace("\r", "").replace("\n", "").trim())
           devKeystore.writeBytes(decoded)
         } catch (_: Exception) {
           // Fall back gracefully if decoding fails

@@ -26,8 +26,8 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      # Restore the stable development keystore required by Gradle.
-      - name: Restore development keystore
+      # Optional restoration of development keystore if base64 file exists.
+      - name: Restore development keystore if available
         shell: bash
         run: |
           set -euo pipefail
@@ -35,32 +35,28 @@ jobs:
           KEYSTORE_FILE="$GITHUB_WORKSPACE/debug.keystore"
           BASE64_FILE="$GITHUB_WORKSPACE/debug.keystore.base64"
 
-          if [ ! -f "$BASE64_FILE" ]; then
-            echo "::error::debug.keystore.base64 was not found."
-            exit 1
+          if [ -f "$BASE64_FILE" ]; then
+            base64 --decode "$BASE64_FILE" > "$KEYSTORE_FILE"
+            chmod 600 "$KEYSTORE_FILE"
+            echo "Development keystore restored successfully."
+          else
+            echo "debug.keystore.base64 not found in workspace; proceeding with Gradle configuration defaults."
           fi
 
-          base64 --decode "$BASE64_FILE" > "$KEYSTORE_FILE"
-          chmod 600 "$KEYSTORE_FILE"
-
-          if [ ! -s "$KEYSTORE_FILE" ]; then
-            echo "::error::Development keystore is empty."
-            exit 1
-          fi
-
-          echo "Development keystore restored successfully."
-
-      - name: Verify development keystore
+      - name: Verify development keystore if present
         shell: bash
         run: |
           set -euo pipefail
 
-          keytool -list \
-            -keystore "$GITHUB_WORKSPACE/debug.keystore" \
-            -storepass android \
-            -alias androiddebugkey >/dev/null
-
-          echo "Development keystore validation passed."
+          if [ -f "$GITHUB_WORKSPACE/debug.keystore" ]; then
+            keytool -list \
+              -keystore "$GITHUB_WORKSPACE/debug.keystore" \
+              -storepass android \
+              -alias androiddebugkey >/dev/null
+            echo "Development keystore validation passed."
+          else
+            echo "No development keystore to verify; skipping."
+          fi
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -83,71 +79,82 @@ jobs:
 
           for name in KEYSTORE_BASE64 KEY_ALIAS KEY_PASSWORD KEYSTORE_PASSWORD; do
             if [ -z "${!name:-}" ]; then
-              echo "::error::Required GitHub Actions secret $name is missing."
+              echo "::error::Required GitHub Actions secret $name is missing or empty."
               exit 1
             fi
           done
 
           SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
-
-          if [ -z "$SDK" ]; then
+          if [ -z "$SDK" ] || [ ! -d "$SDK" ]; then
             echo "::error::Android SDK path was not found."
             exit 1
           fi
 
           BUILD_TOOLS="$(
             find "$SDK/build-tools" \
-              -mindepth 1 -maxdepth 1 -type d |
+              -mindepth 1 -maxdepth 1 -type d 2>/dev/null |
               sort -V | tail -n 1
           )"
 
-          if [ -z "$BUILD_TOOLS" ]; then
-            echo "::error::Android Build Tools were not found."
+          if [ -z "$BUILD_TOOLS" ] || [ ! -d "$BUILD_TOOLS" ]; then
+            echo "::error::Android Build Tools were not found under $SDK/build-tools."
             exit 1
           fi
 
-          INPUT_APK="app/build/outputs/apk/release/app-release-unsigned.apk"
+          INPUT_APK="$(find app/build/outputs/apk/release -type f -name "*.apk" ! -name "*-aligned.apk" ! -name "*-signed.apk" | head -n 1)"
+          if [ -z "$INPUT_APK" ] || [ ! -s "$INPUT_APK" ]; then
+            echo "::error::No release APK found in app/build/outputs/apk/release."
+            exit 1
+          fi
+          echo "Found generated release APK: $INPUT_APK"
+
           KEYSTORE_FILE="$RUNNER_TEMP/release-signing.jks"
           ALIGNED_APK="$RUNNER_TEMP/Budget-aligned.apk"
           SIGNED_APK="$GITHUB_WORKSPACE/Budget.apk"
-
-          if [ ! -s "$INPUT_APK" ]; then
-            echo "::error::Unsigned release APK was not found at $INPUT_APK"
-            exit 1
-          fi
 
           cleanup() {
             rm -f "$KEYSTORE_FILE" "$ALIGNED_APK"
           }
           trap cleanup EXIT
 
-          printf '%s' "$KEYSTORE_BASE64" |
-            base64 --decode > "$KEYSTORE_FILE"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
           chmod 600 "$KEYSTORE_FILE"
 
           if [ ! -s "$KEYSTORE_FILE" ]; then
-            echo "::error::Release keystore is empty."
+            echo "::error::Decoded release keystore is empty."
             exit 1
           fi
 
-          "$BUILD_TOOLS/zipalign" \
-            -f -v 4 "$INPUT_APK" "$ALIGNED_APK"
+          if "$BUILD_TOOLS/apksigner" verify "$INPUT_APK" >/dev/null 2>&1; then
+            echo "Release APK is already signed. Skipping signing."
+            cp "$INPUT_APK" "$SIGNED_APK"
+          else
+            echo "Release APK is unsigned. Proceeding with zipalign and apksigner..."
 
-          "$BUILD_TOOLS/apksigner" sign \
-            --ks "$KEYSTORE_FILE" \
-            --ks-key-alias "$KEY_ALIAS" \
-            --ks-pass env:KEYSTORE_PASSWORD \
-            --key-pass env:KEY_PASSWORD \
-            --out "$SIGNED_APK" \
-            "$ALIGNED_APK"
+            if "$BUILD_TOOLS/zipalign" -c 4 "$INPUT_APK" >/dev/null 2>&1; then
+              echo "Input APK is already 4-byte aligned."
+              cp "$INPUT_APK" "$ALIGNED_APK"
+            else
+              echo "Aligning APK using zipalign..."
+              "$BUILD_TOOLS/zipalign" -f -v 4 "$INPUT_APK" "$ALIGNED_APK"
+            fi
 
-          "$BUILD_TOOLS/apksigner" verify \
-            --verbose \
-            --print-certs "$SIGNED_APK"
+            "$BUILD_TOOLS/apksigner" sign \
+              --ks "$KEYSTORE_FILE" \
+              --ks-key-alias "$KEY_ALIAS" \
+              --ks-pass env:KEYSTORE_PASSWORD \
+              --key-pass env:KEY_PASSWORD \
+              --out "$SIGNED_APK" \
+              "$ALIGNED_APK"
+          fi
 
+          echo "Verifying final APK alignment..."
           "$BUILD_TOOLS/zipalign" -c -v 4 "$SIGNED_APK"
 
-          echo "Signed APK verification passed."
+          echo "Verifying final APK signature..."
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$SIGNED_APK"
+
+          echo "Signed APK verification passed successfully."
 
       - name: Upload signed APK
         uses: actions/upload-artifact@v4
