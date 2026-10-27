@@ -33,10 +33,13 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Sms
+import com.engrshuvo.financemanager.ui.state.DateFilterOption
+import com.engrshuvo.financemanager.ui.state.TransactionTypeFilter
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -154,6 +157,14 @@ fun MoreScreen(
     onTestParseSmsPaste: (sender: String, body: String) -> Unit = { _, _ -> },
     onImportPastedSms: (android.content.Context, sender: String, body: String) -> Unit = { _, _, _ -> },
     onDismissSmsOperationMessage: () -> Unit = {},
+    // Transactions ledger actions
+    onSearchQueryChange: (String) -> Unit = {},
+    onTypeSelect: (TransactionTypeFilter) -> Unit = {},
+    onCategorySelect: (String?) -> Unit = {},
+    onDateOptionSelect: (DateFilterOption) -> Unit = {},
+    onClearFilters: () -> Unit = {},
+    onAddIncomeClick: () -> Unit = {},
+    onAddExpenseClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     AnimatedContent(
@@ -170,6 +181,7 @@ fun MoreScreen(
                     pendingPurchasesCount = uiState.pendingPurchaseCount,
                     pendingSmsReviewCount = uiState.pendingReviewSmsRecords.size,
                     isSmsImportEnabled = uiState.isSmsImportEnabled,
+                    allTransactionsCount = uiState.allTransactions.size,
                     onNavigateToSubDestination = onNavigateToSubDestination
                 )
             }
@@ -312,6 +324,28 @@ fun MoreScreen(
                     onDismissOperationMessage = onDismissSmsOperationMessage
                 )
             }
+
+            MoreSubDestination.TRANSACTIONS -> {
+                BackHandler { onNavigateBack() }
+                TransactionsScreen(
+                    filteredTransactions = uiState.filteredTransactions,
+                    allTransactionsCount = uiState.allTransactions.size,
+                    searchQuery = uiState.searchQuery,
+                    selectedType = uiState.selectedTypeFilter,
+                    selectedCategoryId = uiState.selectedCategoryFilterId,
+                    selectedDateOption = uiState.selectedDateFilter,
+                    onSearchQueryChange = onSearchQueryChange,
+                    onTypeSelect = onTypeSelect,
+                    onCategorySelect = onCategorySelect,
+                    onDateOptionSelect = onDateOptionSelect,
+                    onClearFilters = onClearFilters,
+                    onAddIncomeClick = onAddIncomeClick,
+                    onAddExpenseClick = onAddExpenseClick,
+                    onEditTransaction = onEditTransaction,
+                    onDeleteTransaction = onDeleteTransaction,
+                    onNavigateBack = onNavigateBack
+                )
+            }
         }
     }
 }
@@ -323,6 +357,7 @@ private fun MoreHubView(
     pendingPurchasesCount: Int,
     pendingSmsReviewCount: Int = 0,
     isSmsImportEnabled: Boolean = false,
+    allTransactionsCount: Int = 0,
     onNavigateToSubDestination: (MoreSubDestination) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -360,6 +395,20 @@ private fun MoreHubView(
                 badgeColor = MaterialTheme.colorScheme.primary,
                 onClick = { onNavigateToSubDestination(MoreSubDestination.CALENDAR) },
                 testTag = "more_calendar_card"
+            )
+        }
+
+        item(key = "more_item_transactions") {
+            MoreDestinationCard(
+                icon = Icons.Default.Receipt,
+                iconColor = MaterialTheme.colorScheme.primary,
+                iconBg = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                title = "All Transactions Ledger",
+                subtitle = "Full transaction history with search, category filters, date filters, and swipe-to-archive",
+                badgeText = if (allTransactionsCount > 0) "$allTransactionsCount entries" else "Ledger",
+                badgeColor = MaterialTheme.colorScheme.primary,
+                onClick = { onNavigateToSubDestination(MoreSubDestination.TRANSACTIONS) },
+                testTag = "more_transactions_card"
             )
         }
 

@@ -28,8 +28,6 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Handshake
-import androidx.compose.material.icons.filled.MoreHoriz
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PieChart
@@ -41,8 +39,6 @@ import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.Tune
 import com.engrshuvo.financemanager.ui.theme.IncomeGreen
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -86,6 +82,7 @@ import com.engrshuvo.financemanager.ui.components.DailyLimitDialog
 import com.engrshuvo.financemanager.ui.components.DashboardOverviewView
 import com.engrshuvo.financemanager.ui.components.DaySummarySheet
 import com.engrshuvo.financemanager.ui.components.LoansScreen
+import com.engrshuvo.financemanager.ui.components.ModernBottomNavigationBar
 import com.engrshuvo.financemanager.ui.components.SettleLoanDialog
 import com.engrshuvo.financemanager.ui.components.SetBudgetDialog
 import com.engrshuvo.financemanager.ui.components.UniversalTransactionSheet
@@ -107,8 +104,6 @@ fun MainFinanceScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
-
-    var showMoreMenu by remember { mutableStateOf(false) }
 
     BackHandler(enabled = uiState.moreSubDestination != MoreSubDestination.NONE || uiState.activeTab != FinanceTab.DASHBOARD) {
         if (uiState.moreSubDestination != MoreSubDestination.NONE) {
@@ -246,11 +241,11 @@ fun MainFinanceScreen(
                                 )
                                 Text(
                                     text = when (uiState.activeTab) {
-                                        FinanceTab.DASHBOARD -> "Financial Dashboard"
-                                        FinanceTab.TRANSACTIONS -> "All Transactions Ledger"
+                                        FinanceTab.REPORTS -> "Financial Reports & Trends"
                                         FinanceTab.BUDGET -> "Monthly Envelope Planning"
-                                        FinanceTab.CALENDAR -> "Financial Calendar"
+                                        FinanceTab.DASHBOARD -> "Financial Dashboard"
                                         FinanceTab.LOANS -> "Debt & Loan Tracker"
+                                        FinanceTab.MORE -> "More Features & Tools"
                                     },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -259,154 +254,32 @@ fun MainFinanceScreen(
                         }
                     },
                     actions = {
-                        if (uiState.activeTab == FinanceTab.DASHBOARD || uiState.activeTab == FinanceTab.BUDGET) {
-                            IconButton(
-                                onClick = { viewModel.openBudgetPlanningDialog() },
-                                modifier = Modifier.testTag("top_budget_settings_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Tune,
-                                    contentDescription = "Budget settings",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
+                        when (uiState.activeTab) {
+                            FinanceTab.DASHBOARD -> {
+                                IconButton(
+                                    onClick = { viewModel.navigateToMoreSubDestination(MoreSubDestination.CALENDAR) },
+                                    modifier = Modifier.testTag("top_calendar_shortcut_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CalendarMonth,
+                                        contentDescription = "Open Full Calendar",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
                             }
-                        }
-                        Box {
-                            IconButton(
-                                onClick = { showMoreMenu = true },
-                                modifier = Modifier.testTag("top_overflow_menu_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.MoreVert,
-                                    contentDescription = "More options",
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
+                            FinanceTab.BUDGET -> {
+                                IconButton(
+                                    onClick = { viewModel.openBudgetPlanningDialog() },
+                                    modifier = Modifier.testTag("top_budget_settings_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Tune,
+                                        contentDescription = "Budget settings",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
                             }
-                            DropdownMenu(
-                                expanded = showMoreMenu,
-                                onDismissRequest = { showMoreMenu = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("Financial Goals") },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Default.Savings,
-                                            contentDescription = null,
-                                            tint = IncomeGreen
-                                        )
-                                    },
-                                    onClick = {
-                                        showMoreMenu = false
-                                        viewModel.navigateToMoreSubDestination(MoreSubDestination.GOALS)
-                                    },
-                                    modifier = Modifier.testTag("overflow_menu_goals")
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Purchase Planner") },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Default.ShoppingCart,
-                                            contentDescription = null,
-                                            tint = Color(0xFFF59E0B)
-                                        )
-                                    },
-                                    onClick = {
-                                        showMoreMenu = false
-                                        viewModel.navigateToMoreSubDestination(MoreSubDestination.PURCHASE_PLANNER)
-                                    },
-                                    modifier = Modifier.testTag("overflow_menu_purchase_planner")
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Payment SMS Import") },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Default.Sms,
-                                            contentDescription = null,
-                                            tint = Color(0xFF0284C7)
-                                        )
-                                    },
-                                    onClick = {
-                                        showMoreMenu = false
-                                        viewModel.navigateToMoreSubDestination(MoreSubDestination.SMS_IMPORT)
-                                    },
-                                    modifier = Modifier.testTag("overflow_menu_sms_import")
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Backup & Restore") },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Default.CloudSync,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
-                                    },
-                                    onClick = {
-                                        showMoreMenu = false
-                                        viewModel.navigateToMoreSubDestination(MoreSubDestination.BACKUP_RESTORE)
-                                    },
-                                    modifier = Modifier.testTag("overflow_menu_backup_restore")
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Archive & Recovery") },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Default.Archive,
-                                            contentDescription = null,
-                                            tint = Color(0xFFD97706)
-                                        )
-                                    },
-                                    onClick = {
-                                        showMoreMenu = false
-                                        viewModel.navigateToMoreSubDestination(MoreSubDestination.ARCHIVE)
-                                    },
-                                    modifier = Modifier.testTag("overflow_menu_archive")
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Reports & Analytics") },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Default.Analytics,
-                                            contentDescription = null,
-                                            tint = Color(0xFF2563EB)
-                                        )
-                                    },
-                                    onClick = {
-                                        showMoreMenu = false
-                                        viewModel.navigateToMoreSubDestination(MoreSubDestination.REPORTS)
-                                    },
-                                    modifier = Modifier.testTag("overflow_menu_reports")
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("PDF Export Center") },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Default.PictureAsPdf,
-                                            contentDescription = null,
-                                            tint = ExpenseRed
-                                        )
-                                    },
-                                    onClick = {
-                                        showMoreMenu = false
-                                        viewModel.navigateToMoreSubDestination(MoreSubDestination.PDF_EXPORT)
-                                    },
-                                    modifier = Modifier.testTag("overflow_menu_pdf_export")
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Notification Reminders") },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Default.NotificationsActive,
-                                            contentDescription = null,
-                                            tint = Color(0xFF059669)
-                                        )
-                                    },
-                                    onClick = {
-                                        showMoreMenu = false
-                                        viewModel.navigateToMoreSubDestination(MoreSubDestination.NOTIFICATION_SETTINGS)
-                                    },
-                                    modifier = Modifier.testTag("overflow_menu_notifications")
-                                )
-                            }
+                            else -> {}
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -416,64 +289,21 @@ fun MainFinanceScreen(
             }
         },
         bottomBar = {
-            NavigationBar(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.navigationBars),
-                containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 8.dp
-            ) {
-                FinanceTab.values().forEach { tab ->
-                    val isSelected = uiState.activeTab == tab
-                    val isDashboard = tab == FinanceTab.DASHBOARD
-                    val icon = when (tab) {
-                        FinanceTab.TRANSACTIONS -> Icons.Default.Receipt
-                        FinanceTab.BUDGET -> Icons.Default.AccountBalanceWallet
-                        FinanceTab.DASHBOARD -> Icons.Default.Dashboard
-                        FinanceTab.CALENDAR -> Icons.Default.CalendarMonth
-                        FinanceTab.LOANS -> Icons.Default.Handshake
-                    }
-                    NavigationBarItem(
-                        selected = isSelected,
-                        onClick = { viewModel.setActiveTab(tab) },
-                        icon = {
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = tab.label,
-                                modifier = if (isDashboard) Modifier.size(26.dp) else Modifier.size(24.dp)
-                            )
-                        },
-                        label = {
-                            Text(
-                                text = tab.label,
-                                style = MaterialTheme.typography.labelSmall,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                            )
-                        },
-                        alwaysShowLabel = true,
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            indicatorColor = MaterialTheme.colorScheme.primaryContainer
-                        ),
-                        modifier = Modifier.testTag("nav_tab_${tab.name.lowercase()}")
-                    )
-                }
-            }
+            ModernBottomNavigationBar(
+                activeTab = uiState.activeTab,
+                onTabSelected = { viewModel.setActiveTab(it) }
+            )
         },
         floatingActionButton = {
-            val showFab = uiState.moreSubDestination == MoreSubDestination.NONE
+            val showFab = uiState.moreSubDestination == MoreSubDestination.NONE &&
+                    uiState.activeTab != FinanceTab.MORE &&
+                    uiState.activeTab != FinanceTab.REPORTS
             if (showFab) {
                 FloatingActionButton(
                     onClick = {
                         when (uiState.activeTab) {
                             FinanceTab.LOANS -> viewModel.openAddTransactionSheet(TransactionType.LOAN, LoanType.LENT)
                             FinanceTab.BUDGET -> viewModel.openBudgetPlanningDialog()
-                            FinanceTab.CALENDAR -> viewModel.openAddTransactionSheet(TransactionType.EXPENSE)
                             else -> viewModel.openAddTransactionSheet(TransactionType.EXPENSE)
                         }
                     },
@@ -581,6 +411,13 @@ fun MainFinanceScreen(
                 onTestParseSmsPaste = { sender, body -> viewModel.testParseSmsPaste(sender, body) },
                 onImportPastedSms = { ctx, sender, body -> viewModel.importPastedSms(ctx, sender, body) },
                 onDismissSmsOperationMessage = { viewModel.dismissSmsOperationMessage() },
+                onSearchQueryChange = { viewModel.setSearchQuery(it) },
+                onTypeSelect = { viewModel.setTypeFilter(it) },
+                onCategorySelect = { viewModel.setCategoryFilter(it) },
+                onDateOptionSelect = { viewModel.setDateFilter(it) },
+                onClearFilters = { viewModel.clearAllFilters() },
+                onAddIncomeClick = { viewModel.openAddTransactionSheet(TransactionType.INCOME) },
+                onAddExpenseClick = { viewModel.openAddTransactionSheet(TransactionType.EXPENSE) },
                 modifier = Modifier.padding(innerPadding)
             )
         } else {
@@ -593,11 +430,55 @@ fun MainFinanceScreen(
                 label = "tabContentAnim"
             ) { tab ->
                 when (tab) {
+                    FinanceTab.REPORTS -> {
+                        ReportsScreen(
+                            uiState = uiState,
+                            onNavigateBack = { viewModel.setActiveTab(FinanceTab.DASHBOARD) },
+                            onPreviousMonth = { viewModel.changeMonth(-1) },
+                            onNextMonth = { viewModel.changeMonth(1) },
+                            onResetToToday = { viewModel.resetToCurrentMonth() },
+                            onViewTransactions = { viewModel.navigateToMoreSubDestination(MoreSubDestination.TRANSACTIONS) },
+                            showBackButton = false
+                        )
+                    }
+
+                    FinanceTab.BUDGET -> {
+                        BudgetScreen(
+                            monthName = DateUtils.formatMonthYear(uiState.displayedMonth),
+                            totalMonthlyIncome = uiState.totalIncome,
+                            totalAllocated = uiState.totalAllocated,
+                            unallocatedIncome = uiState.unallocatedIncome,
+                            plannedShortfall = uiState.plannedShortfall,
+                            isShortfall = uiState.isShortfall,
+                            plannedSavingsTotal = uiState.plannedSavingsTotal,
+                            dailyLimit = uiState.dailyBudgetLimit,
+                            todayExpenses = uiState.todayExpenses,
+                            dailyRemaining = uiState.dailyBudgetRemaining,
+                            dailyProgress = uiState.dailyBudgetProgress,
+                            isDailyOverBudget = uiState.isDailyOverBudget,
+                            allocations = uiState.monthAllocations,
+                            isDraft = uiState.isBudgetAllocationDraft,
+                            onPreviousMonth = { viewModel.changeMonth(-1) },
+                            onNextMonth = { viewModel.changeMonth(1) },
+                            onPlanBudgetClick = { viewModel.openBudgetPlanningDialog() },
+                            onConfigureDailyLimitClick = { viewModel.openDailyLimitDialog() },
+                            onCopyFromPreviousMonth = { viewModel.copyFromPreviousMonth() }
+                        )
+                    }
+
                     FinanceTab.DASHBOARD -> {
                         DashboardOverviewView(
                             monthName = DateUtils.formatMonthYear(uiState.displayedMonth),
                             onPreviousMonth = { viewModel.changeMonth(-1) },
                             onNextMonth = { viewModel.changeMonth(1) },
+                            onResetToToday = { viewModel.resetToCurrentMonth() },
+                            onOpenFullCalendar = { viewModel.navigateToMoreSubDestination(MoreSubDestination.CALENDAR) },
+                            displayedMonth = uiState.displayedMonth,
+                            calendarDays = uiState.calendarDays,
+                            onDateClick = { timestamp -> viewModel.selectDate(timestamp, openSheet = false) },
+                            selectedDateTimestamp = uiState.selectedDateTimestamp,
+                            selectedDaySummary = uiState.selectedDaySummary,
+                            selectedDayTransactions = uiState.selectedDayTransactions,
                             balance = uiState.balance,
                             totalIncome = uiState.totalIncome,
                             totalExpense = uiState.totalExpense,
@@ -632,71 +513,15 @@ fun MainFinanceScreen(
                             onConfigureDailyLimitClick = { viewModel.openDailyLimitDialog() },
                             onAddIncomeClick = { viewModel.openAddTransactionSheet(TransactionType.INCOME) },
                             onAddExpenseClick = { viewModel.openAddTransactionSheet(TransactionType.EXPENSE) },
+                            onAddLoanClick = { viewModel.openAddTransactionSheet(TransactionType.LOAN, LoanType.LENT) },
+                            onOpenSmsImport = { viewModel.navigateToMoreSubDestination(MoreSubDestination.SMS_IMPORT) },
                             onEditTransaction = { viewModel.openEditTransactionSheet(it) },
                             onDeleteTransaction = { transactionToDelete = it },
+                            onViewTransactions = { viewModel.navigateToMoreSubDestination(MoreSubDestination.TRANSACTIONS) },
                             activeGoalsCount = uiState.activeGoals.size,
                             totalGoalSaved = uiState.totalGoalSaved,
                             totalGoalTarget = uiState.totalGoalTarget,
                             onOpenGoals = { viewModel.navigateToMoreSubDestination(MoreSubDestination.GOALS) }
-                        )
-                    }
-
-                    FinanceTab.TRANSACTIONS -> {
-                        TransactionsScreen(
-                            filteredTransactions = uiState.filteredTransactions,
-                            allTransactionsCount = uiState.allTransactions.size,
-                            searchQuery = uiState.searchQuery,
-                            selectedType = uiState.selectedTypeFilter,
-                            selectedCategoryId = uiState.selectedCategoryFilterId,
-                            selectedDateOption = uiState.selectedDateFilter,
-                            onSearchQueryChange = { viewModel.setSearchQuery(it) },
-                            onTypeSelect = { viewModel.setTypeFilter(it) },
-                            onCategorySelect = { viewModel.setCategoryFilter(it) },
-                            onDateOptionSelect = { viewModel.setDateFilter(it) },
-                            onClearFilters = { viewModel.clearAllFilters() },
-                            onAddIncomeClick = { viewModel.openAddTransactionSheet(TransactionType.INCOME) },
-                            onAddExpenseClick = { viewModel.openAddTransactionSheet(TransactionType.EXPENSE) },
-                            onEditTransaction = { viewModel.openEditTransactionSheet(it) },
-                            onDeleteTransaction = { transactionToDelete = it }
-                        )
-                    }
-
-                    FinanceTab.BUDGET -> {
-                        BudgetScreen(
-                            monthName = DateUtils.formatMonthYear(uiState.displayedMonth),
-                            totalMonthlyIncome = uiState.totalIncome,
-                            totalAllocated = uiState.totalAllocated,
-                            unallocatedIncome = uiState.unallocatedIncome,
-                            plannedShortfall = uiState.plannedShortfall,
-                            isShortfall = uiState.isShortfall,
-                            plannedSavingsTotal = uiState.plannedSavingsTotal,
-                            dailyLimit = uiState.dailyBudgetLimit,
-                            todayExpenses = uiState.todayExpenses,
-                            dailyRemaining = uiState.dailyBudgetRemaining,
-                            dailyProgress = uiState.dailyBudgetProgress,
-                            isDailyOverBudget = uiState.isDailyOverBudget,
-                            allocations = uiState.monthAllocations,
-                            isDraft = uiState.isBudgetAllocationDraft,
-                            onPreviousMonth = { viewModel.changeMonth(-1) },
-                            onNextMonth = { viewModel.changeMonth(1) },
-                            onPlanBudgetClick = { viewModel.openBudgetPlanningDialog() },
-                            onConfigureDailyLimitClick = { viewModel.openDailyLimitDialog() },
-                            onCopyFromPreviousMonth = { viewModel.copyFromPreviousMonth() }
-                        )
-                    }
-
-                    FinanceTab.CALENDAR -> {
-                        CalendarScreen(
-                            uiState = uiState,
-                            onPreviousMonth = { viewModel.changeMonth(-1) },
-                            onNextMonth = { viewModel.changeMonth(1) },
-                            onResetToToday = { viewModel.resetToCurrentMonth() },
-                            onSelectDate = { timestamp -> viewModel.selectDate(timestamp, openSheet = true) },
-                            onAddExpenseClick = { viewModel.openAddTransactionSheet(TransactionType.EXPENSE) },
-                            onAddIncomeClick = { viewModel.openAddTransactionSheet(TransactionType.INCOME) },
-                            onEditTransaction = { viewModel.openEditTransactionSheet(it) },
-                            onDeleteTransaction = { transactionToDelete = it },
-                            onConfigureDailyLimitClick = { viewModel.openDailyLimitDialog() }
                         )
                     }
 
@@ -713,6 +538,107 @@ fun MainFinanceScreen(
                             onRepayClick = { viewModel.openRepayDialog(it) },
                             onSettleClick = { loanToSettle = it },
                             onDeleteLoanClick = { loanToDelete = it }
+                        )
+                    }
+
+                    FinanceTab.MORE -> {
+                        MoreScreen(
+                            uiState = uiState,
+                            onNavigateToSubDestination = { viewModel.navigateToMoreSubDestination(it) },
+                            onNavigateBack = { viewModel.setActiveTab(FinanceTab.DASHBOARD) },
+                            onPreviousMonth = { viewModel.changeMonth(-1) },
+                            onNextMonth = { viewModel.changeMonth(1) },
+                            onResetToToday = { viewModel.resetToCurrentMonth() },
+                            onSelectDate = { timestamp -> viewModel.selectDate(timestamp, openSheet = true) },
+                            onEditTransaction = { viewModel.openEditTransactionSheet(it) },
+                            onDeleteTransaction = { transactionToDelete = it },
+                            onArchiveSearchQueryChange = { viewModel.setArchiveSearchQuery(it) },
+                            onArchiveFilterSelect = { viewModel.setArchiveFilterType(it) },
+                            onRestoreArchiveItem = { item ->
+                                when (item) {
+                                    is com.engrshuvo.financemanager.ui.state.ArchiveItemWrapper.Transaction -> {
+                                        viewModel.restoreTransaction(item.id)
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar("Transaction restored")
+                                        }
+                                    }
+                                    is com.engrshuvo.financemanager.ui.state.ArchiveItemWrapper.Loan -> {
+                                        viewModel.restoreLoan(item.id)
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar("Loan and repayments restored")
+                                        }
+                                    }
+                                    is com.engrshuvo.financemanager.ui.state.ArchiveItemWrapper.Goal -> {
+                                        viewModel.restoreGoal(item.id)
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar("Goal restored")
+                                        }
+                                    }
+                                }
+                            },
+                            onRequestPermanentDelete = { viewModel.openPermanentDeleteDialog(it) },
+                            onConfirmPermanentDelete = { viewModel.confirmPermanentDelete() },
+                            onDismissPermanentDeleteDialog = { viewModel.closePermanentDeleteDialog() },
+                            onUpdateMorningEnabled = { viewModel.updateMorningNotificationEnabled(it, context) },
+                            onUpdateMorningTime = { hour, minute -> viewModel.updateMorningNotificationTime(hour, minute, context) },
+                            onUpdateReminderEnabled = { viewModel.updateExpenseReminderEnabled(it, context) },
+                            onUpdateReminderInterval = { viewModel.updateExpenseReminderInterval(it, context) },
+                            onUpdateQuietHours = { enabled, start, end -> viewModel.updateQuietHours(enabled, start, end, context) },
+                            onExportBackup = { viewModel.exportBackupToUri(it, context) },
+                            onReadBackupFile = { viewModel.readBackupFile(it, context) },
+                            onConfirmRestore = { viewModel.confirmRestoreBackup(context) },
+                            onDismissRestorePreview = { viewModel.dismissRestorePreview() },
+                            onDismissOperationMessage = { viewModel.dismissBackupOperationMessage() },
+                            onOpenCreateGoalDialog = { viewModel.openCreateGoalDialog() },
+                            onOpenEditGoalDialog = { viewModel.openEditGoalDialog(it) },
+                            onDismissGoalDialog = { viewModel.dismissGoalDialog() },
+                            onSaveGoal = { name, cat, target, initial, targetDate, prio, monthly ->
+                                viewModel.saveGoal(name, cat, target, initial, targetDate, prio, monthly)
+                            },
+                            onUpdateGoalStatus = { goal, status -> viewModel.updateGoalStatus(goal, status) },
+                            onArchiveGoal = { viewModel.archiveGoal(it) },
+                            onOpenAddContributionDialog = { viewModel.openAddContributionDialog(it) },
+                            onDismissAddContributionDialog = { viewModel.dismissAddContributionDialog() },
+                            onSaveGoalContribution = { goalId, amount, date, note ->
+                                viewModel.saveGoalContribution(goalId, amount, date, note)
+                            },
+                            onDeleteGoalContribution = { viewModel.deleteGoalContribution(it) },
+                            onSetGoalFilterStatus = { viewModel.setGoalFilterStatus(it) },
+                            onUpdatePdfFilterState = { transform -> viewModel.updatePdfFilterState(transform) },
+                            onResetPdfFilterState = { viewModel.resetPdfFilterState() },
+                            onGeneratePdfToUri = { uri, ctx -> viewModel.generatePdfToUri(uri, ctx) },
+                            onSharePdfReport = { ctx -> viewModel.sharePdfReport(ctx) },
+                            onOpenPdfReport = { ctx, uri -> viewModel.openPdfReport(ctx, uri) },
+                            onDismissPdfMessage = { viewModel.dismissPdfExportMessage() },
+                            onSetPurchaseFilter = { viewModel.setPurchaseFilter(it) },
+                            onPurchaseSearchQueryChange = { viewModel.setPurchaseSearchQuery(it) },
+                            onOpenAddPurchaseItemDialog = { viewModel.openAddPurchaseItemDialog() },
+                            onOpenEditPurchaseItemDialog = { viewModel.openEditPurchaseItemDialog(it) },
+                            onDismissPurchaseItemDialog = { viewModel.closePurchaseItemDialog() },
+                            onSavePurchaseItem = { id, title, note -> viewModel.savePurchaseItem(id, title, note) },
+                            onTogglePurchaseItemComplete = { viewModel.togglePurchaseItemComplete(it) },
+                            onRestorePurchaseItem = { viewModel.restorePurchaseItem(it) },
+                            onRequestDeletePurchaseItem = { viewModel.requestDeletePurchaseItem(it) },
+                            onConfirmDeletePurchaseItem = { viewModel.confirmDeletePurchaseItem() },
+                            onDismissDeletePurchaseItemDialog = { viewModel.dismissDeletePurchaseItemDialog() },
+                            onToggleSmsEnabled = { enabled, ctx -> viewModel.updateSmsImportEnabled(enabled, ctx) },
+                            onToggleSmsAutoPost = { viewModel.updateSmsAutoPost(it) },
+                            onOpenReviewSmsRecord = { viewModel.openSmsRecordReview(it) },
+                            onDismissReviewSmsRecord = { viewModel.dismissSmsRecordReview() },
+                            onApproveSmsRecord = { id, catId, note -> viewModel.approveSmsRecord(id, catId, note) },
+                            onDismissSmsRecord = { viewModel.dismissSmsRecord(it) },
+                            onDeleteSmsRecord = { viewModel.deleteSmsRecord(it) },
+                            onSmsPasteInputChange = { viewModel.setSmsPasteInput(it) },
+                            onTestParseSmsPaste = { sender, body -> viewModel.testParseSmsPaste(sender, body) },
+                            onImportPastedSms = { ctx, sender, body -> viewModel.importPastedSms(ctx, sender, body) },
+                            onDismissSmsOperationMessage = { viewModel.dismissSmsOperationMessage() },
+                            onSearchQueryChange = { viewModel.setSearchQuery(it) },
+                            onTypeSelect = { viewModel.setTypeFilter(it) },
+                            onCategorySelect = { viewModel.setCategoryFilter(it) },
+                            onDateOptionSelect = { viewModel.setDateFilter(it) },
+                            onClearFilters = { viewModel.clearAllFilters() },
+                            onAddIncomeClick = { viewModel.openAddTransactionSheet(TransactionType.INCOME) },
+                            onAddExpenseClick = { viewModel.openAddTransactionSheet(TransactionType.EXPENSE) }
                         )
                     }
                 }

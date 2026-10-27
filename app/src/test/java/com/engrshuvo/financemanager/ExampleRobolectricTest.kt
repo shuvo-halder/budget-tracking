@@ -9,6 +9,7 @@ import com.engrshuvo.financemanager.data.model.LoanType
 import com.engrshuvo.financemanager.data.model.TransactionType
 import com.engrshuvo.financemanager.ui.util.CurrencyUtils
 import com.engrshuvo.financemanager.ui.util.DateUtils
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -109,14 +110,14 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `bottom navigation tab order has dashboard in exact center and calendar at position four`() {
+    fun `bottom navigation tab order has dashboard in exact center and follows Phase 20 structure`() {
         val tabs = com.engrshuvo.financemanager.ui.state.FinanceTab.values()
         assertEquals(5, tabs.size)
-        assertEquals(com.engrshuvo.financemanager.ui.state.FinanceTab.TRANSACTIONS, tabs[0])
+        assertEquals(com.engrshuvo.financemanager.ui.state.FinanceTab.REPORTS, tabs[0])
         assertEquals(com.engrshuvo.financemanager.ui.state.FinanceTab.BUDGET, tabs[1])
         assertEquals(com.engrshuvo.financemanager.ui.state.FinanceTab.DASHBOARD, tabs[2])
-        assertEquals(com.engrshuvo.financemanager.ui.state.FinanceTab.CALENDAR, tabs[3])
-        assertEquals(com.engrshuvo.financemanager.ui.state.FinanceTab.LOANS, tabs[4])
+        assertEquals(com.engrshuvo.financemanager.ui.state.FinanceTab.LOANS, tabs[3])
+        assertEquals(com.engrshuvo.financemanager.ui.state.FinanceTab.MORE, tabs[4])
     }
 
     @Test

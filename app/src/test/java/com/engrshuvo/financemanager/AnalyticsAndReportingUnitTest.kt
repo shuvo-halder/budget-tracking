@@ -413,7 +413,7 @@ class AnalyticsAndReportingUnitTest {
         )
         advanceUntilIdle()
 
-        waitUntil { viewModel.uiState.value.monthAllocations.isNotEmpty() }
+        waitUntil { viewModel.uiState.value.monthAllocations.any { it.category.id == "food" && it.actualSpent >= 6000.0 } }
 
         val allocations = viewModel.uiState.value.monthAllocations
         val foodAlloc = allocations.find { it.category.id == "food" }

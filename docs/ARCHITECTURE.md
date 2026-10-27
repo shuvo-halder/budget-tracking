@@ -106,3 +106,34 @@ To eliminate Google Play Protect warnings regarding high-risk SMS permissions (`
 - **Isolation:** Release keystores are kept strictly outside version control.
 - **Credential Injection:** Credentials must be supplied via environment variables (`RELEASE_KEYSTORE_PATH`, `RELEASE_STORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`).
 - **Distribution Guard:** A dedicated `verifyReleaseSigning` task fails closed if release credentials or keystores are missing, preventing unsigned APKs from being labeled or distributed as installable releases.
+
+---
+
+## 7. Modern Finance UI Redesign & Bottom Navigation Architecture (Phase 20)
+
+### A. 5-Item Modern Bottom Navigation Bar
+- **Tab Structure & Exact Order:**
+  1. `REPORTS` (`FinanceTab.REPORTS`): Monthly financial trends, expense charts, and analytics.
+  2. `BUDGET` (`FinanceTab.BUDGET`): Monthly envelope planning, allocation categories, and daily limits.
+  3. `DASHBOARD` (`FinanceTab.DASHBOARD`): Exact center default landing screen with prominent circular badge.
+  4. `LOANS` (`FinanceTab.LOANS`): Debt tracker (lent/borrowed, settlements, and repayment history).
+  5. `MORE` (`FinanceTab.MORE`): Unified hub for Transactions Ledger, Calendar, SMS Import, Goals, Purchase Planner, PDF Export, and Settings.
+- **Visual Styling:**
+  - Floating, wide rounded dark-charcoal container (`0xFF18181B`) with 24.dp corner radii and subtle hairline border (`0x1FFFFFFF`).
+  - Active selection highlighted in vibrant green accent (`#10B981` / `IncomeGreen`).
+  - Prominent elevated center Dashboard badge (`#10B981` container with on-primary `#FFFFFF` icon).
+  - Explicit test tags on all navigation items (`nav_tab_reports`, `nav_tab_budget`, `nav_tab_dashboard`, `nav_tab_loans`, `nav_tab_more`).
+
+### B. Dashboard Section Hierarchy
+1. **Section A (Header):** Current date formatted, financial dashboard title, and full calendar shortcut icon.
+2. **Section B (Hero & Summary Cards):** Available cash balance, monthly income/expense flow, net operating cash, planned allocations, and loan summaries.
+3. **Section C (Today's Spending):** Daily limit progress bar, remaining living budget, and configure limit button.
+4. **Section D (Compact Monthly Calendar Preview):** Inline `InteractiveCalendarView` allowing quick date inspection directly from the dashboard.
+5. **Section E (Selected-Day Activity):** Selected date summary, day income/expense/loan breakdown, and up to 5 day transactions with direct "Ledger →" navigation.
+6. **Section F (Quick Actions):** 4 responsive action buttons (`+ Income`, `- Expense`, `+ Loan`, `SMS Import`).
+
+### C. Ledger & Calendar Access Continuity
+- **Transactions Ledger:** Relocated from bottom navigation to `MoreSubDestination.TRANSACTIONS`, fully accessible directly from the Reports header banner, Dashboard Ledger shortcuts, and More Hub.
+- **Calendar:** Embedded as an interactive compact preview on Dashboard and full-screen view in `MoreSubDestination.CALENDAR`.
+- **BackHandler:** Pressing system back from any secondary bottom tab seamlessly returns to Dashboard before exiting.
+

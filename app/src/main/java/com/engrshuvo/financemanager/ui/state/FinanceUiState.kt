@@ -17,11 +17,11 @@ import com.engrshuvo.financemanager.ui.model.DaySummaryStats
 import java.util.Calendar
 
 enum class FinanceTab(val label: String) {
-    TRANSACTIONS("Transactions"),
+    REPORTS("Reports"),
     BUDGET("Budget"),
     DASHBOARD("Dashboard"),
-    CALENDAR("Calendar"),
-    LOANS("Loans")
+    LOANS("Loans"),
+    MORE("More")
 }
 
 enum class MoreSubDestination {
@@ -34,7 +34,8 @@ enum class MoreSubDestination {
     GOALS,
     PDF_EXPORT,
     PURCHASE_PLANNER,
-    SMS_IMPORT
+    SMS_IMPORT,
+    TRANSACTIONS
 }
 
 enum class PurchaseItemFilter(val label: String) {

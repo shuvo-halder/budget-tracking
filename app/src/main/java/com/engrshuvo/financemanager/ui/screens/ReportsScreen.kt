@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.Speed
@@ -90,10 +91,12 @@ import kotlin.math.max
 @Composable
 fun ReportsScreen(
     uiState: FinanceUiState,
-    onNavigateBack: () -> Unit,
+    onNavigateBack: () -> Unit = {},
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
     onResetToToday: () -> Unit,
+    onViewTransactions: () -> Unit = {},
+    showBackButton: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val monthName = remember(uiState.displayedMonth) {
@@ -150,17 +153,29 @@ fun ReportsScreen(
                 }
             },
             navigationIcon = {
-                IconButton(
-                    onClick = onNavigateBack,
-                    modifier = Modifier.testTag("reports_back_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back to More"
-                    )
+                if (showBackButton) {
+                    IconButton(
+                        onClick = onNavigateBack,
+                        modifier = Modifier.testTag("reports_back_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back to More"
+                        )
+                    }
                 }
             },
             actions = {
+                IconButton(
+                    onClick = onViewTransactions,
+                    modifier = Modifier.testTag("reports_top_transactions_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Receipt,
+                        contentDescription = "View Transactions",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
                 if (!isCurrentMonthSelected) {
                     IconButton(
                         onClick = onResetToToday,
@@ -195,6 +210,69 @@ fun ReportsScreen(
                     onNextMonth = onNextMonth,
                     onResetToToday = onResetToToday
                 )
+            }
+
+            // Quick Link to Full Transactions Ledger
+            item(key = "report_view_transactions_banner") {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onViewTransactions)
+                        .testTag("reports_view_transactions_card"),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                    ),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Receipt,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = "Detailed Transactions Ledger",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Search, filter & manage individual entries",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = "Open Ledger",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
             }
 
             // 2. Financial Overview Cards (4-metric grid)

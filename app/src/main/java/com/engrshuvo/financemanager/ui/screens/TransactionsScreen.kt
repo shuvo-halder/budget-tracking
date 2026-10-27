@@ -48,6 +48,9 @@ import com.engrshuvo.financemanager.ui.theme.ExpenseRed
 import com.engrshuvo.financemanager.ui.theme.IncomeGreen
 import com.engrshuvo.financemanager.ui.util.CurrencyUtils
 
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.IconButton
+
 @Composable
 fun TransactionsScreen(
     filteredTransactions: List<TransactionEntity>,
@@ -65,6 +68,7 @@ fun TransactionsScreen(
     onAddExpenseClick: () -> Unit,
     onEditTransaction: (TransactionEntity) -> Unit,
     onDeleteTransaction: (TransactionEntity) -> Unit,
+    onNavigateBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -74,6 +78,48 @@ fun TransactionsScreen(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        if (onNavigateBack != null) {
+            item(key = "tx_back_header") {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = onNavigateBack,
+                            modifier = Modifier.testTag("tx_header_back_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Column {
+                            Text(
+                                text = "All Transactions Ledger",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "$allTransactionsCount recorded entries",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
         // Quick Action Buttons
         item(key = "tx_quick_actions") {
             Row(

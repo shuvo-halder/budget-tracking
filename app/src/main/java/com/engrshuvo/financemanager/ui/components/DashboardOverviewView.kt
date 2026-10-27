@@ -31,8 +31,16 @@ import androidx.compose.material.icons.filled.FilterAltOff
 import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Savings
+import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Warning
+import com.engrshuvo.financemanager.ui.model.CalendarDayCell
+import com.engrshuvo.financemanager.ui.model.DaySummaryStats
+import com.engrshuvo.financemanager.ui.util.DateUtils
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -115,6 +123,17 @@ fun DashboardOverviewView(
     totalGoalSaved: Double = 0.0,
     totalGoalTarget: Double = 0.0,
     onOpenGoals: () -> Unit = {},
+    displayedMonth: Calendar? = null,
+    calendarDays: List<CalendarDayCell> = emptyList(),
+    selectedDateTimestamp: Long? = null,
+    selectedDaySummary: DaySummaryStats? = null,
+    selectedDayTransactions: List<TransactionEntity> = emptyList(),
+    onDateClick: (Long) -> Unit = {},
+    onResetToToday: () -> Unit = {},
+    onOpenFullCalendar: () -> Unit = {},
+    onViewTransactions: () -> Unit = {},
+    onAddLoanClick: () -> Unit = {},
+    onOpenSmsImport: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -124,55 +143,89 @@ fun DashboardOverviewView(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 1. Month Selector Header
+        // Section A — Header with title, current date & calendar navigation
         item(key = "month_selector_header", contentType = "month_selector") {
+            val todayFormatted = remember { SimpleDateFormat("EEEE, MMMM d, yyyy", Locale.US).format(Date()) }
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                 )
             ) {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
                 ) {
-                    IconButton(
-                        onClick = onPreviousMonth,
-                        modifier = Modifier.testTag("dashboard_prev_month")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Previous Month"
-                        )
+                        Column {
+                            Text(
+                                text = "Financial Dashboard",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = todayFormatted,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        IconButton(
+                            onClick = onOpenFullCalendar,
+                            modifier = Modifier.testTag("dashboard_header_calendar_shortcut")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CalendarMonth,
+                                contentDescription = "Open Full Calendar",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.CalendarMonth,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.65f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = onPreviousMonth,
+                            modifier = Modifier.testTag("dashboard_prev_month")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Previous Month"
+                            )
+                        }
+
                         Text(
                             text = monthName,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
                         )
-                    }
 
-                    IconButton(
-                        onClick = onNextMonth,
-                        modifier = Modifier.testTag("dashboard_next_month")
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = "Next Month"
-                        )
+                        IconButton(
+                            onClick = onNextMonth,
+                            modifier = Modifier.testTag("dashboard_next_month")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = "Next Month"
+                            )
+                        }
                     }
                 }
             }
@@ -272,11 +325,77 @@ fun DashboardOverviewView(
             )
         }
 
-        // 5. Quick Actions Row (+ Salary/Income, - Expense)
+        // Quick Actions Row (+ Income, - Expense, + Loan, SMS Import)
         item(key = "quick_actions_row", contentType = "quick_actions") {
             QuickActionsRow(
                 onAddIncomeClick = onAddIncomeClick,
-                onAddExpenseClick = onAddExpenseClick
+                onAddExpenseClick = onAddExpenseClick,
+                onAddLoanClick = onAddLoanClick,
+                onOpenSmsImport = onOpenSmsImport
+            )
+        }
+
+        // Section D: Compact Monthly Calendar Preview
+        if (displayedMonth != null && calendarDays.isNotEmpty()) {
+            item(key = "dashboard_calendar_preview", contentType = "calendar_preview") {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CalendarMonth,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "Monthly Activity Calendar",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        TextButton(
+                            onClick = onOpenFullCalendar,
+                            modifier = Modifier.testTag("dashboard_open_full_calendar_btn")
+                        ) {
+                            Text("Full Calendar →", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+
+                    InteractiveCalendarView(
+                        displayedMonth = displayedMonth,
+                        calendarDays = calendarDays,
+                        onPreviousMonth = onPreviousMonth,
+                        onNextMonth = onNextMonth,
+                        onResetToToday = onResetToToday,
+                        onDateClick = onDateClick
+                    )
+                }
+            }
+        }
+
+        // Section E: Selected-Day Activity
+        item(key = "dashboard_selected_day_activity", contentType = "selected_day_activity") {
+            DashboardSelectedDayActivityCard(
+                selectedDateTimestamp = selectedDateTimestamp,
+                daySummary = selectedDaySummary,
+                transactions = selectedDayTransactions,
+                onAddIncomeClick = onAddIncomeClick,
+                onAddExpenseClick = onAddExpenseClick,
+                onEditTransaction = onEditTransaction,
+                onDeleteTransaction = onDeleteTransaction,
+                onViewTransactions = onViewTransactions
             )
         }
 
@@ -914,54 +1033,112 @@ private fun CategoryAllocationRow(model: CategoryAllocationUiModel) {
 @Composable
 private fun QuickActionsRow(
     onAddIncomeClick: () -> Unit,
-    onAddExpenseClick: () -> Unit
+    onAddExpenseClick: () -> Unit,
+    onAddLoanClick: () -> Unit,
+    onOpenSmsImport: () -> Unit
 ) {
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Button(
-            onClick = onAddIncomeClick,
-            modifier = Modifier
-                .weight(1f)
-                .testTag("add_income_button"),
-            colors = ButtonDefaults.buttonColors(containerColor = IncomeGreen),
-            shape = RoundedCornerShape(16.dp),
-            contentPadding = PaddingValues(vertical = 12.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = "+ Salary / Income",
-                fontWeight = FontWeight.Bold,
-                fontSize = 13.sp
-            )
+            Button(
+                onClick = onAddIncomeClick,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("add_income_button"),
+                colors = ButtonDefaults.buttonColors(containerColor = IncomeGreen),
+                shape = RoundedCornerShape(14.dp),
+                contentPadding = PaddingValues(vertical = 11.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "+ Income",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp
+                )
+            }
+
+            Button(
+                onClick = onAddExpenseClick,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("add_expense_button"),
+                colors = ButtonDefaults.buttonColors(containerColor = ExpenseRed),
+                shape = RoundedCornerShape(14.dp),
+                contentPadding = PaddingValues(vertical = 11.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "- Expense",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp
+                )
+            }
         }
 
-        Button(
-            onClick = onAddExpenseClick,
-            modifier = Modifier
-                .weight(1f)
-                .testTag("add_expense_button"),
-            colors = ButtonDefaults.buttonColors(containerColor = ExpenseRed),
-            shape = RoundedCornerShape(16.dp),
-            contentPadding = PaddingValues(vertical = 12.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = "- Expense",
-                fontWeight = FontWeight.Bold,
-                fontSize = 13.sp
-            )
+            OutlinedButton(
+                onClick = onAddLoanClick,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("add_loan_button"),
+                shape = RoundedCornerShape(14.dp),
+                contentPadding = PaddingValues(vertical = 10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Handshake,
+                    contentDescription = null,
+                    tint = LoanBlue,
+                    modifier = Modifier.size(17.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "+ Loan",
+                    fontWeight = FontWeight.Bold,
+                    color = LoanBlue,
+                    fontSize = 13.sp
+                )
+            }
+
+            OutlinedButton(
+                onClick = onOpenSmsImport,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("sms_import_button"),
+                shape = RoundedCornerShape(14.dp),
+                contentPadding = PaddingValues(vertical = 10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Sms,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(17.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "SMS Import",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 13.sp
+                )
+            }
         }
     }
 }
@@ -1139,4 +1316,206 @@ private fun DashboardGoalsSummaryCard(
         }
     }
 }
+
+@Composable
+private fun DashboardSelectedDayActivityCard(
+    selectedDateTimestamp: Long?,
+    daySummary: DaySummaryStats?,
+    transactions: List<TransactionEntity>,
+    onAddIncomeClick: () -> Unit,
+    onAddExpenseClick: () -> Unit,
+    onEditTransaction: (TransactionEntity) -> Unit,
+    onDeleteTransaction: (TransactionEntity) -> Unit,
+    onViewTransactions: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("dashboard_selected_day_activity_card"),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CalendarMonth,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = daySummary?.formattedDate ?: DateUtils.formatHeaderDate(selectedDateTimestamp ?: System.currentTimeMillis()),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = if (transactions.isNotEmpty()) "${transactions.size} records logged" else "No transactions on this date",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                TextButton(
+                    onClick = onViewTransactions,
+                    modifier = Modifier.testTag("dashboard_selected_day_view_ledger_btn")
+                ) {
+                    Text(
+                        text = "Ledger →",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            // Stat pills
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Surface(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    color = IncomeGreen.copy(alpha = 0.12f)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text(
+                            text = "Income",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = CurrencyUtils.formatBDT(daySummary?.totalIncome ?: 0.0),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = IncomeGreen
+                        )
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    color = ExpenseRed.copy(alpha = 0.12f)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text(
+                            text = "Expense",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = CurrencyUtils.formatBDT(daySummary?.totalExpense ?: 0.0),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = ExpenseRed
+                        )
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    color = LoanBlue.copy(alpha = 0.12f)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text(
+                            text = "Loan",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = CurrencyUtils.formatBDT(daySummary?.totalLoan ?: 0.0),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = LoanBlue
+                        )
+                    }
+                }
+            }
+
+            if (transactions.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    transactions.take(5).forEach { tx ->
+                        TransactionItemCard(
+                            transaction = tx,
+                            onClick = { onEditTransaction(tx) },
+                            onEditClick = { onEditTransaction(tx) },
+                            onDeleteClick = { onDeleteTransaction(tx) }
+                        )
+                    }
+                    if (transactions.size > 5) {
+                        TextButton(
+                            onClick = onViewTransactions,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        ) {
+                            Text("View all ${transactions.size} transactions in Ledger →", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            } else {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.65f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "No records for this day",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            TextButton(
+                                onClick = onAddIncomeClick,
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text("+ Income", color = IncomeGreen, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                            TextButton(
+                                onClick = onAddExpenseClick,
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text("- Expense", color = ExpenseRed, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 

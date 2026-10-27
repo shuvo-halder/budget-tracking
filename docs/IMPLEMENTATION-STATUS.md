@@ -48,17 +48,32 @@
 - **Release Signing Guard:** Added `verifyReleaseSigning` task that validates presence of release keystore and environment variables, failing closed if unsigned distribution is attempted.
 - **Reproducible Build Verified:** Debug APK confirmed signed with fixed SHA-256: `C5:C8:B9:74:34:64:45:DD:B3:F1:62:E7:18:90:F6:3F:26:8E:07:7C:05:0B:5E:2D:3D:93:C1:69:83:5A:9F:62`.
 
+### Phase 20: Modern Finance UI Redesign & Bottom Navigation
+- Implemented 5-item custom bottom navigation bar (`Reports`, `Budget`, `Dashboard`, `Loans`, `More`) based on user-provided design reference.
+- Modernized theme with emerald green accents, sleek dark charcoal navigation dock, and elevated active indicator pills.
+- Added compact horizontal weekly calendar preview and selected-day activity breakdown to Dashboard.
+- Relocated full Transaction Ledger to More hub with direct shortcuts from Reports and Dashboard.
+
+### Phase 20.1: Remove Redundant Dashboard Overflow Menu
+- Audited all actions in the Dashboard three-dot overflow menu; confirmed all 8 actions (Goals, Purchase Planner, SMS Import, Backup & Restore, Archive, Reports, PDF Export, Notifications) remain fully accessible in primary destinations and the More hub (`MoreHubView`).
+- Removed redundant three-dot overflow menu (`top_overflow_menu_button`) from `MainFinanceScreen.kt`.
+- Added dedicated TopAppBar Calendar shortcut icon (`top_calendar_shortcut_button`) beside title/date on Dashboard tab, routing directly to `MoreSubDestination.CALENDAR`.
+- Kept budget settings shortcut on Budget tab (`top_budget_settings_button`).
+- Preserved 5-item bottom navigation, Room schema v6, financial accounting invariants, and zero-permission SMS import.
+
 ---
 
 ## Current Signing & Verification Status Matrix
 
 | Component | Status | Details |
 | :--- | :---: | :--- |
+| **Phase 20 Modern UI & Bottom Nav** | **PASS** | 5-item bottom bar [Reports, Budget, Dashboard, Loans, More] with wide dark-charcoal rounded container, green accent, and elevated center Dashboard badge. Compact calendar & selected-day activity added to Dashboard. |
+| **Phase 20.1 Header Simplification** | **PASS** | Removed redundant top-right 3-dot overflow menu. Added top Calendar shortcut; all tools confirmed accessible via More hub. |
 | **Debug APK Signature** | **PASS** | Validated via `apksigner`. Explicitly bound to repository `debug.keystore`. SHA-256: `C5:C8:B9:74...`. |
 | **Debug Build Determinism** | **PASS** | Multiple clean builds verified producing identical signature fingerprints. |
 | **Release Signing Status** | **BLOCKED** | Unconfigured in environment. Production release keystores are kept outside source control. Task `verifyReleaseSigning` fails closed as intended. |
 | **Old/New Upgrade Compatibility** | **FAIL / UNKNOWN** | Old APK on user's device remains uninspected. If signed by an earlier ephemeral container key, Android OS will reject in-place upgrade. User must use SAF JSON backup before reinstalling. |
-| **Automated Test Suite** | **PASS** | 145 unit and Robolectric tests passing. |
+| **Automated Test Suite** | **PASS** | Unit and Robolectric test suite passing cleanly (`:app:testDebugUnitTest`). |
 | **Android 15 Physical Upgrade** | **NOT RUN** | Physical device not connected via ADB in container environment. |
 | **Play Protect Device Test** | **NOT RUN** | Manifest and binary verified free of high-risk permissions; physical device confirmation pending. |
 
