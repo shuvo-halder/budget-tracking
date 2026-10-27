@@ -22,13 +22,52 @@ android {
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
+  signingConfigs {
+    getByName("debug") {
+      val devKeystore = file("${rootDir}/debug.keystore")
+      if (!devKeystore.exists()) {
+        throw GradleException(
+          "Mandatory development keystore missing at ${devKeystore.absolutePath}. " +
+          "Debug builds must be signed with the stable project debug.keystore."
+        )
+      }
+      storeFile = devKeystore
+      storePassword = "android"
+      keyAlias = "androiddebugkey"
+      keyPassword = "android"
+    }
+    create("release") {
+      val releaseKeystorePath = System.getenv("RELEASE_KEYSTORE_PATH")
+      val releaseStorePass = System.getenv("RELEASE_STORE_PASSWORD")
+      val releaseKeyAlias = System.getenv("RELEASE_KEY_ALIAS")
+      val releaseKeyPass = System.getenv("RELEASE_KEY_PASSWORD")
+
+      if (!releaseKeystorePath.isNullOrBlank() &&
+          !releaseStorePass.isNullOrBlank() &&
+          !releaseKeyAlias.isNullOrBlank() &&
+          !releaseKeyPass.isNullOrBlank()) {
+        val releaseFile = file(releaseKeystorePath)
+        if (releaseFile.exists()) {
+          storeFile = releaseFile
+          storePassword = releaseStorePass
+          keyAlias = releaseKeyAlias
+          keyPassword = releaseKeyPass
+        }
+      }
+    }
+  }
+
   buildTypes {
     release {
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+      val releaseConfig = signingConfigs.getByName("release")
+      signingConfig = if (releaseConfig.storeFile?.exists() == true) releaseConfig else null
     }
-    debug { }
+    debug {
+      signingConfig = signingConfigs.getByName("debug")
+    }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
@@ -118,4 +157,32 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
+}
+
+tasks.register("verifyReleaseSigning") {
+  group = "verification"
+  description = "Validates that production release signing credentials are fully configured for distribution."
+  val releaseStoreFile = android.signingConfigs.getByName("release").storeFile
+  val releaseAlias = android.signingConfigs.getByName("release").keyAlias
+  doLast {
+    val missing = mutableListOf<String>()
+    val keystorePath = System.getenv("RELEASE_KEYSTORE_PATH")
+    if (keystorePath.isNullOrBlank()) missing.add("RELEASE_KEYSTORE_PATH")
+    if (System.getenv("RELEASE_STORE_PASSWORD").isNullOrBlank()) missing.add("RELEASE_STORE_PASSWORD")
+    if (System.getenv("RELEASE_KEY_ALIAS").isNullOrBlank()) missing.add("RELEASE_KEY_ALIAS")
+    if (System.getenv("RELEASE_KEY_PASSWORD").isNullOrBlank()) missing.add("RELEASE_KEY_PASSWORD")
+
+    if (releaseStoreFile == null || !releaseStoreFile.exists()) {
+      missing.add("Keystore file not found or inaccessible")
+    }
+
+    if (missing.isNotEmpty()) {
+      throw GradleException(
+        "RELEASE SIGNING IS BLOCKED: Cannot create a distributable release.\n" +
+        "Missing required configuration: ${missing.joinToString(", ")}.\n" +
+        "Unsigned release artifacts must never be labeled or distributed as installable."
+      )
+    }
+    logger.lifecycle("Release signing verification: PASS. Keystore: ${releaseStoreFile?.absolutePath}, Alias: $releaseAlias")
+  }
 }
