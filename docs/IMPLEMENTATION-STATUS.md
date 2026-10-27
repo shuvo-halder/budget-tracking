@@ -61,6 +61,18 @@
 - Kept budget settings shortcut on Budget tab (`top_budget_settings_button`).
 - Preserved 5-item bottom navigation, Room schema v6, financial accounting invariants, and zero-permission SMS import.
 
+### Phase 20.2: More Menu Card Grouping & Adjust Section Reorganization
+- Grouped all 10 More menu destination link cards in `MoreHubView` (`MoreScreen.kt`) into distinct, visual section categories using `MoreSectionHeader`.
+- Created a dedicated **Adjust** section grouping system settings and adjustments: Notifications & Reminders (`more_notifications_card`), Backup & Restore (`more_backup_restore_card`), and Archive & Recovery (`more_archive_card`).
+- Organized remaining items into Daily Activity & Ledger (Calendar, All Transactions Ledger), Financial Planning (Financial Goals, Purchase Planner), Analytics & Reports (Reports, PDF Export), and Automated Imports (Payment SMS Import).
+- Preserved all 10 existing `MoreSubDestination` click handlers, test tags, and navigation routes without breaking any functionality.
+
+### Phase 20.3: Dashboard Refinement — Remove Full Transaction History
+- Removed the full Transaction History list and FilterChipsBar from `DashboardOverviewView.kt` below Monthly Budget Allocations to eliminate visual clutter and duplication.
+- Preserved full transaction access via `MoreSubDestination.TRANSACTIONS` (All Transactions Ledger) and direct "Ledger →" shortcuts from Selected-Day Activity & Reports.
+- Retained Monthly Budget Allocations, Today's Spending Card, Monthly Activity Calendar preview, Selected-Day Activity, Financial Goals Card, and Donut Chart untouched.
+- Adjusted vertical spacing to ensure clean layout balance without empty gaps.
+
 ---
 
 ## Current Signing & Verification Status Matrix
@@ -69,6 +81,8 @@
 | :--- | :---: | :--- |
 | **Phase 20 Modern UI & Bottom Nav** | **PASS** | 5-item bottom bar [Reports, Budget, Dashboard, Loans, More] with wide dark-charcoal rounded container, green accent, and elevated center Dashboard badge. Compact calendar & selected-day activity added to Dashboard. |
 | **Phase 20.1 Header Simplification** | **PASS** | Removed redundant top-right 3-dot overflow menu. Added top Calendar shortcut; all tools confirmed accessible via More hub. |
+| **Phase 20.2 More Menu Adjust Section** | **PASS** | Organized More menu cards into structured categories including a dedicated **Adjust** section (Notifications, Backup, Archive). |
+| **Phase 20.3 Dashboard Refinement** | **PASS** | Removed redundant Transaction History list from Dashboard; full Ledger accessible via More and Reports. |
 | **Debug APK Signature** | **PASS** | Validated via `apksigner`. Explicitly bound to repository `debug.keystore`. SHA-256: `C5:C8:B9:74...`. |
 | **Debug Build Determinism** | **PASS** | Multiple clean builds verified producing identical signature fingerprints. |
 | **Release Signing Status** | **BLOCKED** | Unconfigured in environment. Production release keystores are kept outside source control. Task `verifyReleaseSigning` fails closed as intended. |

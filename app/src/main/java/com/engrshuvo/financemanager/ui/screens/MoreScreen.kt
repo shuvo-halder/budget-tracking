@@ -384,6 +384,13 @@ private fun MoreHubView(
             }
         }
 
+        item(key = "section_header_ledger") {
+            MoreSectionHeader(
+                title = "Daily Activity & Ledger",
+                subtitle = "Day-by-day logs, calendar overview, and full transaction history"
+            )
+        }
+
         item(key = "more_item_calendar") {
             MoreDestinationCard(
                 icon = Icons.Default.CalendarMonth,
@@ -412,59 +419,10 @@ private fun MoreHubView(
             )
         }
 
-        item(key = "more_item_purchase_planner") {
-            MoreDestinationCard(
-                icon = Icons.Default.ShoppingCart,
-                iconColor = Color(0xFFF59E0B),
-                iconBg = Color(0xFFFEF3C7),
-                title = "Purchase Planner",
-                subtitle = "Track shopping notes, needed items, and mark off purchases with pending & completed lists",
-                badgeText = if (pendingPurchasesCount > 0) "$pendingPurchasesCount pending" else "Shopping notes",
-                badgeColor = if (pendingPurchasesCount > 0) Color(0xFFF59E0B) else MaterialTheme.colorScheme.outline,
-                onClick = { onNavigateToSubDestination(MoreSubDestination.PURCHASE_PLANNER) },
-                testTag = "more_purchase_planner_card"
-            )
-        }
-
-        item(key = "more_item_sms_import") {
-            MoreDestinationCard(
-                icon = Icons.Default.Sms,
-                iconColor = Color(0xFF0284C7),
-                iconBg = Color(0xFFE0F2FE),
-                title = "Payment SMS Import",
-                subtitle = "Zero-permission payment import via Android Share & manual paste for bKash, Nagad, Rocket & banks",
-                badgeText = if (pendingSmsReviewCount > 0) "$pendingSmsReviewCount to review" else if (isSmsImportEnabled) "Active" else "Off",
-                badgeColor = if (pendingSmsReviewCount > 0) Color(0xFFF59E0B) else if (isSmsImportEnabled) IncomeGreen else MaterialTheme.colorScheme.outline,
-                onClick = { onNavigateToSubDestination(MoreSubDestination.SMS_IMPORT) },
-                testTag = "more_sms_import_card"
-            )
-        }
-
-        item(key = "more_item_notifications") {
-            MoreDestinationCard(
-                icon = Icons.Default.NotificationsActive,
-                iconColor = Color(0xFF059669),
-                iconBg = Color(0xFFD1FAE5),
-                title = "Notifications & Reminders",
-                subtitle = "Morning daily budget alerts (8:00 AM) and periodic expense recording nudges",
-                badgeText = "Daily Alerts",
-                badgeColor = Color(0xFF059669),
-                onClick = { onNavigateToSubDestination(MoreSubDestination.NOTIFICATION_SETTINGS) },
-                testTag = "more_notifications_card"
-            )
-        }
-
-        item(key = "more_item_archive") {
-            MoreDestinationCard(
-                icon = Icons.Default.Archive,
-                iconColor = Color(0xFFD97706),
-                iconBg = Color(0xFFFEF3C7),
-                title = "Archive & Recovery",
-                subtitle = "Safely restored soft-deleted records, undo protection, and 2-month auto-purge",
-                badgeText = if (archivedCount > 0) "$archivedCount archived" else "Safe trash",
-                badgeColor = if (archivedCount > 0) Color(0xFFD97706) else MaterialTheme.colorScheme.outline,
-                onClick = { onNavigateToSubDestination(MoreSubDestination.ARCHIVE) },
-                testTag = "more_archive_card"
+        item(key = "section_header_planning") {
+            MoreSectionHeader(
+                title = "Financial Planning",
+                subtitle = "Savings targets, deposit contributions, and shopping notes"
             )
         }
 
@@ -479,6 +437,27 @@ private fun MoreHubView(
                 badgeColor = Color(0xFF059669),
                 onClick = { onNavigateToSubDestination(MoreSubDestination.GOALS) },
                 testTag = "more_goals_card"
+            )
+        }
+
+        item(key = "more_item_purchase_planner") {
+            MoreDestinationCard(
+                icon = Icons.Default.ShoppingCart,
+                iconColor = Color(0xFFF59E0B),
+                iconBg = Color(0xFFFEF3C7),
+                title = "Purchase Planner",
+                subtitle = "Track shopping notes, needed items, and mark off purchases with pending & completed lists",
+                badgeText = if (pendingPurchasesCount > 0) "$pendingPurchasesCount pending" else "Shopping notes",
+                badgeColor = if (pendingPurchasesCount > 0) Color(0xFFF59E0B) else MaterialTheme.colorScheme.outline,
+                onClick = { onNavigateToSubDestination(MoreSubDestination.PURCHASE_PLANNER) },
+                testTag = "more_purchase_planner_card"
+            )
+        }
+
+        item(key = "section_header_analytics") {
+            MoreSectionHeader(
+                title = "Analytics & Reports",
+                subtitle = "Expense insights, monthly flow ratios, and downloadable PDF reports"
             )
         }
 
@@ -510,6 +489,48 @@ private fun MoreHubView(
             )
         }
 
+        item(key = "section_header_automation") {
+            MoreSectionHeader(
+                title = "Automated Imports",
+                subtitle = "Payment SMS parsing via Android Share and manual review"
+            )
+        }
+
+        item(key = "more_item_sms_import") {
+            MoreDestinationCard(
+                icon = Icons.Default.Sms,
+                iconColor = Color(0xFF0284C7),
+                iconBg = Color(0xFFE0F2FE),
+                title = "Payment SMS Import",
+                subtitle = "Zero-permission payment import via Android Share & manual paste for bKash, Nagad, Rocket & banks",
+                badgeText = if (pendingSmsReviewCount > 0) "$pendingSmsReviewCount to review" else if (isSmsImportEnabled) "Active" else "Off",
+                badgeColor = if (pendingSmsReviewCount > 0) Color(0xFFF59E0B) else if (isSmsImportEnabled) IncomeGreen else MaterialTheme.colorScheme.outline,
+                onClick = { onNavigateToSubDestination(MoreSubDestination.SMS_IMPORT) },
+                testTag = "more_sms_import_card"
+            )
+        }
+
+        item(key = "section_header_adjust") {
+            MoreSectionHeader(
+                title = "Adjust",
+                subtitle = "System notifications, database backup & restore, and archive management"
+            )
+        }
+
+        item(key = "more_item_notifications") {
+            MoreDestinationCard(
+                icon = Icons.Default.NotificationsActive,
+                iconColor = Color(0xFF059669),
+                iconBg = Color(0xFFD1FAE5),
+                title = "Notifications & Reminders",
+                subtitle = "Morning daily budget alerts (8:00 AM) and periodic expense recording nudges",
+                badgeText = "Daily Alerts",
+                badgeColor = Color(0xFF059669),
+                onClick = { onNavigateToSubDestination(MoreSubDestination.NOTIFICATION_SETTINGS) },
+                testTag = "more_notifications_card"
+            )
+        }
+
         item(key = "more_item_backup") {
             MoreDestinationCard(
                 icon = Icons.Default.Security,
@@ -521,6 +542,20 @@ private fun MoreHubView(
                 badgeColor = Color(0xFF6366F1),
                 onClick = { onNavigateToSubDestination(MoreSubDestination.BACKUP_RESTORE) },
                 testTag = "more_backup_restore_card"
+            )
+        }
+
+        item(key = "more_item_archive") {
+            MoreDestinationCard(
+                icon = Icons.Default.Archive,
+                iconColor = Color(0xFFD97706),
+                iconBg = Color(0xFFFEF3C7),
+                title = "Archive & Recovery",
+                subtitle = "Safely restored soft-deleted records, undo protection, and 2-month auto-purge",
+                badgeText = if (archivedCount > 0) "$archivedCount archived" else "Safe trash",
+                badgeColor = if (archivedCount > 0) Color(0xFFD97706) else MaterialTheme.colorScheme.outline,
+                onClick = { onNavigateToSubDestination(MoreSubDestination.ARCHIVE) },
+                testTag = "more_archive_card"
             )
         }
 
@@ -582,6 +617,34 @@ private fun MoreHubView(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun MoreSectionHeader(
+    title: String,
+    subtitle: String? = null,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp, bottom = 2.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        if (subtitle != null) {
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
