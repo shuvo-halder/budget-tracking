@@ -1,10 +1,6 @@
 package com.engrshuvo.financemanager.ui.screens
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -114,25 +110,15 @@ fun PaymentSmsImportScreen(
 ) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
-    var hasSmsPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
-        )
-    }
 
     var showProvidersDialog by remember { mutableStateOf(false) }
     var showBatteryInfoDialog by remember { mutableStateOf(false) }
-    var showPasteSection by remember { mutableStateOf(false) }
+    var showPasteSection by remember { mutableStateOf(true) }
     var pasteSender by remember { mutableStateOf("bKash") }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        hasSmsPermission = isGranted
-        if (isGranted) {
-            onToggleEnabled(true, context)
-        } else {
-            onToggleEnabled(false, context)
+    LaunchedEffect(uiState.smsPasteInput) {
+        if (uiState.smsPasteInput.isNotBlank()) {
+            showPasteSection = true
         }
     }
 
@@ -154,7 +140,7 @@ fun PaymentSmsImportScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = if (uiState.isSmsImportEnabled && hasSmsPermission) "Listening for new transactions" else "Import disabled",
+                            text = if (uiState.isSmsImportEnabled) "Share & manual import active" else "Import disabled",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -178,7 +164,7 @@ fun PaymentSmsImportScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Speed,
-                            contentDescription = "Battery optimization info",
+                            contentDescription = "Zero battery impact info",
                             tint = IncomeGreen
                         )
                     }
@@ -215,7 +201,7 @@ fun PaymentSmsImportScreen(
                         .testTag("sms_toggle_card"),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (uiState.isSmsImportEnabled && hasSmsPermission) {
+                        containerColor = if (uiState.isSmsImportEnabled) {
                             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
                         } else {
                             MaterialTheme.colorScheme.surface
@@ -237,41 +223,33 @@ fun PaymentSmsImportScreen(
                                     modifier = Modifier
                                         .size(44.dp)
                                         .clip(CircleShape)
-                                        .background(if (uiState.isSmsImportEnabled && hasSmsPermission) IncomeGreen.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant),
+                                        .background(if (uiState.isSmsImportEnabled) IncomeGreen.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Sms,
                                         contentDescription = null,
-                                        tint = if (uiState.isSmsImportEnabled && hasSmsPermission) IncomeGreen else MaterialTheme.colorScheme.outline
+                                        tint = if (uiState.isSmsImportEnabled) IncomeGreen else MaterialTheme.colorScheme.outline
                                     )
                                 }
                                 Column {
                                     Text(
-                                        text = "Automatic SMS Import",
+                                        text = "Manual & Shared SMS Import",
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.titleMedium
                                     )
                                     Text(
-                                        text = if (uiState.isSmsImportEnabled && hasSmsPermission) "Active • New incoming messages only" else "Feature is turned off",
+                                        text = if (uiState.isSmsImportEnabled) "Active • Share via messaging app or paste" else "Feature is turned off",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = if (uiState.isSmsImportEnabled && hasSmsPermission) IncomeGreen else MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = if (uiState.isSmsImportEnabled) IncomeGreen else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
 
                             Switch(
-                                checked = uiState.isSmsImportEnabled && hasSmsPermission,
+                                checked = uiState.isSmsImportEnabled,
                                 onCheckedChange = { checked ->
-                                    if (checked) {
-                                        if (hasSmsPermission) {
-                                            onToggleEnabled(true, context)
-                                        } else {
-                                            permissionLauncher.launch(Manifest.permission.RECEIVE_SMS)
-                                        }
-                                    } else {
-                                        onToggleEnabled(false, context)
-                                    }
+                                    onToggleEnabled(checked, context)
                                 },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = IncomeGreen,
@@ -289,11 +267,11 @@ fun PaymentSmsImportScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             StatusBadge(
-                                label = if (hasSmsPermission) "RECEIVE_SMS: Granted" else "Permission Needed",
-                                color = if (hasSmsPermission) IncomeGreen else ExpenseRed
+                                label = "Zero Permissions Required",
+                                color = IncomeGreen
                             )
                             StatusBadge(
-                                label = "Zero Battery Overhead",
+                                label = "Android Share Supported",
                                 color = Color(0xFF0284C7)
                             )
                             StatusBadge(
@@ -305,7 +283,7 @@ fun PaymentSmsImportScreen(
                 }
             }
 
-            // Strict Policy & Activation Info
+            // Zero-Permission Policy & How-To Info
             item(key = "activation_info") {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -317,13 +295,14 @@ fun PaymentSmsImportScreen(
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                            Text("Strict New-Message Policy", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
+                            Text("Zero-Permission Privacy Guarantee", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
                         }
                         Text(
-                            text = "• Never reads your SMS inbox or past messages.\n" +
-                                    "• Only processes incoming SMS received after activation.\n" +
+                            text = "• 100% Zero-Permission: No SMS permissions needed.\n" +
+                                    "• Share SMS text directly from your messaging app to 'Daily Budget'.\n" +
+                                    "• Or copy and paste payment text into the import box below.\n" +
                                     "• Ignores OTPs, promo alerts, and non-financial texts.\n" +
-                                    "• All parsing happens on-device; no data is uploaded.",
+                                    "• All parsing happens on-device; no data is ever uploaded.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

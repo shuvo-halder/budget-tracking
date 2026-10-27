@@ -82,6 +82,13 @@ A modern, privacy-focused, offline-first personal finance, salary budgeting, and
 - **Top Overflow Menu:** Quick access to Backup & Restore, Archive, Reports & Analytics, and Notification Settings.
 - **Edge-to-Edge & Gesture Navigation:** Fully compliant with Material 3 insets and predictive back handling.
 
+### 📲 Zero-Permission Payment SMS Import (Share & Paste)
+- **100% Zero-Permission:** Completely operates without `RECEIVE_SMS` or `READ_SMS` permissions, ensuring compliance with Google Play Protect and privacy standards.
+- **Android Share Integration (`ACTION_SEND`):** Share payment texts directly from your messaging application to Daily Budget for instant staging.
+- **First-Class Manual Paste:** Test-parse and import transactions directly within the dedicated review screen.
+- **Broad MFS & Bank Support:** Seamlessly parses bKash, Nagad, Rocket, Upay, credit cards, debit cards, and commercial bank alerts.
+- **Safe Staging & Review:** Staged into `sms_imported_records` with provider transaction ID deduplication to prevent double-counting.
+
 ---
 
 ## 🧮 Core Financial Accounting Formulas

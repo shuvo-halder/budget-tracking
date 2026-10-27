@@ -13,7 +13,9 @@ import com.engrshuvo.financemanager.data.repository.FinanceRepository
 import com.engrshuvo.financemanager.sms.PaymentSmsPreferencesRepository
 import com.engrshuvo.financemanager.sms.PaymentSmsProcessor
 import com.engrshuvo.financemanager.sms.parser.PaymentSmsParser
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -42,7 +44,6 @@ class PaymentSmsImportUnitTest {
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
         app = context as Application
-        shadowOf(app).grantPermissions(Manifest.permission.RECEIVE_SMS)
 
         database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
             .allowMainThreadQueries()
@@ -73,7 +74,7 @@ class PaymentSmsImportUnitTest {
         instanceField.set(null, null)
     }
 
-    // 1. Feature disabled — no import
+    // 1. Feature disabled — no import for background pipeline
     @Test
     fun test01_featureDisabled_noImport() = runBlocking {
         prefsRepo.updateEnabled(false)
@@ -92,22 +93,23 @@ class PaymentSmsImportUnitTest {
         assertTrue(transactions.isEmpty())
     }
 
-    // 2. Permission unavailable — no import and no crash
+    // 2. Zero-permission architecture — manual paste & share import work without RECEIVE_SMS
     @Test
-    fun test02_permissionUnavailable_noImportAndNoCrash() = runBlocking {
-        prefsRepo.updateEnabled(true)
-        shadowOf(app).denyPermissions(Manifest.permission.RECEIVE_SMS)
-
-        val processed = PaymentSmsProcessor.processIncomingSms(
+    fun test02_zeroPermission_manualAndSharedImportSuccess() = runBlocking {
+        // Feature operates purely zero-permission with no RECEIVE_SMS permission granted
+        val processed = PaymentSmsProcessor.processManualSms(
             context = context,
             sender = "bKash",
             body = "You have received Tk 1,500.00 from 01711000000. Fee Tk 0.00. Balance Tk 5,000.00. TrxID 9K48X7ABC.",
             messageTimestamp = System.currentTimeMillis()
         )
 
-        assertFalse(processed)
+        assertTrue(processed)
         val records = database.smsImportedRecordDao().getAllRecordsDirect()
-        assertTrue(records.isEmpty())
+        assertEquals(1, records.size)
+        assertEquals("bKash", records[0].provider)
+        assertEquals(1500.0, records[0].amount, 0.001)
+        assertEquals("9K48X7ABC", records[0].trxId)
     }
 
     // 3. Message timestamp before activation — rejected
@@ -444,4 +446,32 @@ class PaymentSmsImportUnitTest {
         // Verify that PaymentSmsProcessor does not have inbox scan methods
         assertFalse(PaymentSmsProcessor::class.java.declaredMethods.any { it.name.contains("scan") || it.name.contains("inbox") })
     }
+
+    // 18. Shared text handling routes to SMS import screen and populates paste input without auto-posting
+    @Test
+    fun test18_sharedTextHandling_populatesInputWithoutAutoPosting() = runBlocking {
+        val viewModel = com.engrshuvo.financemanager.ui.viewmodel.FinanceViewModel(
+            repository = repository,
+            notificationPreferencesRepo = null,
+            paymentSmsPreferencesRepo = prefsRepo
+        )
+
+        val collectJob = launch {
+            viewModel.uiState.collect()
+        }
+
+        val rawSms = "Payment of Tk 350.00 to Pharmacy is successful. Fee Tk 0.00. TrxID 778899AA."
+        viewModel.handleSharedText(rawSms)
+
+        val targetState = viewModel.uiState.first { it.moreSubDestination == com.engrshuvo.financemanager.ui.state.MoreSubDestination.SMS_IMPORT }
+        assertEquals(com.engrshuvo.financemanager.ui.state.MoreSubDestination.SMS_IMPORT, targetState.moreSubDestination)
+        assertEquals(rawSms, targetState.smsPasteInput)
+
+        // Verify zero transactions have been added simply by sharing text
+        val transactions = repository.allTransactions.first()
+        assertTrue(transactions.isEmpty())
+
+        collectJob.cancel()
+    }
 }
+

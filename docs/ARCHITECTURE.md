@@ -23,6 +23,7 @@ This document details the architectural patterns, financial accounting models, d
 | **Background Thread Offloading** | ✅ Completed | `Dispatchers.IO` for database operations, `Dispatchers.Default` for computations |
 | **Robolectric & Unit Tests** | ✅ Completed | Automated verification of financial formulas, allocations, and loan boundaries |
 | **GitHub Actions CI/CD** | ✅ Completed | Automated release compilation, zipalign, and apksigner with keystore secrets |
+| **Zero-Permission Payment SMS Import** | ✅ Completed | Import payment SMS via Android Share (`ACTION_SEND`) & manual paste with zero runtime permissions |
 | **CSV / Excel Data Export** | ⏳ Roadmap / Pending | Export transaction records and loan statements to CSV or Excel files |
 | **Biometric App Lock** | ⏳ Roadmap / Pending | Optional fingerprint / face unlock for privacy protection |
 

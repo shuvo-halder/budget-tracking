@@ -57,6 +57,7 @@ class MainActivity : ComponentActivity() {
         }
 
         handleNotificationIntent(intent)
+        handleSendIntent(intent)
 
         setContent {
             FinanceManagerTheme {
@@ -73,6 +74,20 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleNotificationIntent(intent)
+        handleSendIntent(intent)
+    }
+
+    private fun handleSendIntent(intent: Intent?) {
+        if (intent?.action == Intent.ACTION_SEND && intent.type?.startsWith("text/") == true) {
+            val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)
+                ?: intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
+            if (!sharedText.isNullOrBlank()) {
+                viewModel.handleSharedText(sharedText)
+                // Consume intent so it does not re-trigger on config change/recreation
+                intent.removeExtra(Intent.EXTRA_TEXT)
+                intent.action = null
+            }
+        }
     }
 
     private fun handleNotificationIntent(intent: Intent?) {

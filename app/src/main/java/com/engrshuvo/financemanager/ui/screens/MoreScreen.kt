@@ -383,8 +383,8 @@ private fun MoreHubView(
                 iconColor = Color(0xFF0284C7),
                 iconBg = Color(0xFFE0F2FE),
                 title = "Payment SMS Import",
-                subtitle = "Automatic on-device payment import for bKash, Nagad, Rocket, cards & banks with zero battery overhead",
-                badgeText = if (pendingSmsReviewCount > 0) "$pendingSmsReviewCount to review" else if (isSmsImportEnabled) "Active" else "Disabled",
+                subtitle = "Zero-permission payment import via Android Share & manual paste for bKash, Nagad, Rocket & banks",
+                badgeText = if (pendingSmsReviewCount > 0) "$pendingSmsReviewCount to review" else if (isSmsImportEnabled) "Active" else "Off",
                 badgeColor = if (pendingSmsReviewCount > 0) Color(0xFFF59E0B) else if (isSmsImportEnabled) IncomeGreen else MaterialTheme.colorScheme.outline,
                 onClick = { onNavigateToSubDestination(MoreSubDestination.SMS_IMPORT) },
                 testTag = "more_sms_import_card"

@@ -2068,9 +2068,14 @@ class FinanceViewModel(
         }
     }
 
+    fun handleSharedText(text: String) {
+        setSmsPasteInput(text)
+        navigateToMoreSubDestination(MoreSubDestination.SMS_IMPORT)
+    }
+
     fun importPastedSms(context: Context, sender: String, body: String) {
         viewModelScope.launch {
-            val success = com.engrshuvo.financemanager.sms.PaymentSmsProcessor.processIncomingSms(
+            val success = com.engrshuvo.financemanager.sms.PaymentSmsProcessor.processManualSms(
                 context = context,
                 sender = sender,
                 body = body,
@@ -2081,7 +2086,7 @@ class FinanceViewModel(
                 _smsPasteInput.value = ""
                 _smsPasteTestResult.value = null
             } else {
-                _smsOperationMessage.value = "Import rejected: duplicate TrxID, feature disabled, or invalid payment format."
+                _smsOperationMessage.value = "Import rejected: duplicate TrxID or invalid payment format."
             }
         }
     }

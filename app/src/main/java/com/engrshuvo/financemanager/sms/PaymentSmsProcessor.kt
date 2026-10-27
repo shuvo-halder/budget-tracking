@@ -1,9 +1,6 @@
 package com.engrshuvo.financemanager.sms
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
-import androidx.core.content.ContextCompat
 import androidx.room.withTransaction
 import com.engrshuvo.financemanager.data.local.AppDatabase
 import com.engrshuvo.financemanager.data.model.CategoryCatalog
@@ -16,34 +13,42 @@ import kotlinx.coroutines.withContext
 
 object PaymentSmsProcessor {
 
+    suspend fun processManualSms(
+        context: Context,
+        sender: String,
+        body: String,
+        messageTimestamp: Long = System.currentTimeMillis()
+    ): Boolean {
+        return processIncomingSms(
+            context = context,
+            sender = sender,
+            body = body,
+            messageTimestamp = messageTimestamp,
+            isManualOrShared = true
+        )
+    }
+
     suspend fun processIncomingSms(
         context: Context,
         sender: String,
         body: String,
-        messageTimestamp: Long
+        messageTimestamp: Long = System.currentTimeMillis(),
+        isManualOrShared: Boolean = false
     ): Boolean = withContext(Dispatchers.IO) {
-        // 1. Strict Policy: Permission check (must have RECEIVE_SMS granted)
-        val hasPermission = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.RECEIVE_SMS
-        ) == PackageManager.PERMISSION_GRANTED
-        if (!hasPermission) {
-            return@withContext false
-        }
-
-        // 2. Strict Policy: Feature must be enabled
         val prefsRepo = PaymentSmsPreferencesRepository(context)
         val prefs = prefsRepo.getPreferencesDirect()
-        if (!prefs.isEnabled) {
-            return@withContext false
+
+        // 1. Strict Policy for automated checks: must be enabled and not pre-date activation
+        if (!isManualOrShared) {
+            if (!prefs.isEnabled) {
+                return@withContext false
+            }
+            if (prefs.activatedAt <= 0L || messageTimestamp < prefs.activatedAt) {
+                return@withContext false
+            }
         }
 
-        // 3. Strict Policy: Message timestamp must not be earlier than feature activation timestamp
-        if (prefs.activatedAt <= 0L || messageTimestamp < prefs.activatedAt) {
-            return@withContext false
-        }
-
-        // 4. Parse SMS
+        // 2. Parse SMS
         val parsed = PaymentSmsParser.parse(sender, body, messageTimestamp) ?: return@withContext false
 
         val database = AppDatabase.getDatabase(context)
