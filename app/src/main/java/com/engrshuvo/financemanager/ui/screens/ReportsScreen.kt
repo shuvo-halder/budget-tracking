@@ -6,6 +6,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlin.math.atan2
+import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -882,6 +887,8 @@ private fun IncomeExpenseTrendChartCard(
         label = "trendChartAnim"
     )
 
+    var selectedDayIndex by remember { mutableStateOf<Int?>(null) }
+
     LaunchedEffect(Unit) {
         animationPlayed = true
     }
@@ -926,7 +933,7 @@ private fun IncomeExpenseTrendChartCard(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Daily cash flow across $monthName",
+                            text = "Touch/drag chart to inspect daily totals",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -963,17 +970,102 @@ private fun IncomeExpenseTrendChartCard(
                     max(100.0, currentMonthDays.maxOfOrNull { max(it.dayIncomeTotal, it.dayExpenseTotal) } ?: 100.0)
                 }
 
+                // Selected Day Tooltip Banner
+                val activeDay = selectedDayIndex?.let { currentMonthDays.getOrNull(it) }
+                if (activeDay != null) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        border = CardDefaults.outlinedCardBorder().copy(
+                            brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Day ${activeDay.dayOfMonth} ($monthName)",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                val net = activeDay.dayIncomeTotal - activeDay.dayExpenseTotal
+                                val isNetPos = net >= 0
+                                Text(
+                                    text = "Net: ${CurrencyUtils.formatBDTWithSign(net, isNetPos)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isNetPos) IncomeGreen else ExpenseRed,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = "Income",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 10.sp
+                                    )
+                                    Text(
+                                        text = CurrencyUtils.formatBDT(activeDay.dayIncomeTotal),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = IncomeGreen
+                                    )
+                                }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = "Expense",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 10.sp
+                                    )
+                                    Text(
+                                        text = CurrencyUtils.formatBDT(activeDay.dayExpenseTotal),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ExpenseRed
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                val daysCount = currentMonthDays.size
+
                 Canvas(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(180.dp)
                         .padding(vertical = 8.dp)
+                        .pointerInput(currentMonthDays) {
+                            detectTapGestures { offset ->
+                                val stepX = size.width / (daysCount - 1).coerceAtLeast(1)
+                                val index = (offset.x / stepX).roundToInt().coerceIn(0, daysCount - 1)
+                                selectedDayIndex = if (selectedDayIndex == index) null else index
+                            }
+                        }
+                        .pointerInput(currentMonthDays) {
+                            detectDragGestures { change, _ ->
+                                change.consume()
+                                val stepX = size.width / (daysCount - 1).coerceAtLeast(1)
+                                val index = (change.position.x / stepX).roundToInt().coerceIn(0, daysCount - 1)
+                                selectedDayIndex = index
+                            }
+                        }
                 ) {
                     val width = size.width
                     val height = size.height
                     val bottomPadding = 24.dp.toPx()
                     val chartHeight = height - bottomPadding
-                    val daysCount = currentMonthDays.size
 
                     if (daysCount < 2) return@Canvas
 
@@ -994,9 +1086,9 @@ private fun IncomeExpenseTrendChartCard(
                         )
                     }
 
-                    // Build Income and Expense Path
-                    val incomePath = Path()
-                    val expensePath = Path()
+                    // Build Points for Income and Expense
+                    val incomePoints = ArrayList<Offset>(daysCount)
+                    val expensePoints = ArrayList<Offset>(daysCount)
 
                     currentMonthDays.forEachIndexed { index, day ->
                         val x = index * stepX
@@ -1006,43 +1098,102 @@ private fun IncomeExpenseTrendChartCard(
                         val yIncome = chartHeight - (incomeNormalized * chartHeight)
                         val yExpense = chartHeight - (expenseNormalized * chartHeight)
 
-                        if (index == 0) {
-                            incomePath.moveTo(x, yIncome)
-                            expensePath.moveTo(x, yExpense)
-                        } else {
-                            incomePath.lineTo(x, yIncome)
-                            expensePath.lineTo(x, yExpense)
-                        }
+                        incomePoints.add(Offset(x, yIncome))
+                        expensePoints.add(Offset(x, yExpense))
+                    }
 
-                        // Draw small peak dots for active days
+                    // Smooth Bezier Paths
+                    val incomePath = Path()
+                    val expensePath = Path()
+
+                    buildSmoothPath(incomePoints, incomePath)
+                    buildSmoothPath(expensePoints, expensePath)
+
+                    // Draw Stroke Lines
+                    drawPath(
+                        path = incomePath,
+                        color = IncomeGreen,
+                        style = Stroke(width = 2.8.dp.toPx(), cap = StrokeCap.Round)
+                    )
+
+                    drawPath(
+                        path = expensePath,
+                        color = ExpenseRed,
+                        style = Stroke(width = 2.8.dp.toPx(), cap = StrokeCap.Round)
+                    )
+
+                    // Draw Peak Dots for Active Days
+                    currentMonthDays.forEachIndexed { index, day ->
+                        val pInc = incomePoints[index]
+                        val pExp = expensePoints[index]
+
                         if (day.dayIncomeTotal > 0) {
                             drawCircle(
                                 color = IncomeGreen,
                                 radius = 3.5.dp.toPx(),
-                                center = Offset(x, yIncome)
+                                center = pInc
                             )
                         }
                         if (day.dayExpenseTotal > 0) {
                             drawCircle(
                                 color = ExpenseRed,
                                 radius = 3.5.dp.toPx(),
-                                center = Offset(x, yExpense)
+                                center = pExp
                             )
                         }
                     }
 
-                    // Stroke Lines
-                    drawPath(
-                        path = incomePath,
-                        color = IncomeGreen,
-                        style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
-                    )
+                    // Selected Day Highlight Line & Glowing Double Rings
+                    selectedDayIndex?.let { selIdx ->
+                        if (selIdx in 0 until daysCount) {
+                            val selX = selIdx * stepX
+                            val pInc = incomePoints[selIdx]
+                            val pExp = expensePoints[selIdx]
 
-                    drawPath(
-                        path = expensePath,
-                        color = ExpenseRed,
-                        style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
-                    )
+                            // Vertical dashed guide line
+                            drawLine(
+                                color = Color.Gray.copy(alpha = 0.7f),
+                                start = Offset(selX, 0f),
+                                end = Offset(selX, chartHeight),
+                                strokeWidth = 1.5.dp.toPx(),
+                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f), 0f)
+                            )
+
+                            // Income active point ring
+                            drawCircle(
+                                color = IncomeGreen.copy(alpha = 0.35f),
+                                radius = 9.dp.toPx(),
+                                center = pInc
+                            )
+                            drawCircle(
+                                color = IncomeGreen,
+                                radius = 5.dp.toPx(),
+                                center = pInc
+                            )
+                            drawCircle(
+                                color = Color.White,
+                                radius = 2.5.dp.toPx(),
+                                center = pInc
+                            )
+
+                            // Expense active point ring
+                            drawCircle(
+                                color = ExpenseRed.copy(alpha = 0.35f),
+                                radius = 9.dp.toPx(),
+                                center = pExp
+                            )
+                            drawCircle(
+                                color = ExpenseRed,
+                                radius = 5.dp.toPx(),
+                                center = pExp
+                            )
+                            drawCircle(
+                                color = Color.White,
+                                radius = 2.5.dp.toPx(),
+                                center = pExp
+                            )
+                        }
+                    }
                 }
 
                 // X-Axis day markers
@@ -1057,6 +1208,30 @@ private fun IncomeExpenseTrendChartCard(
                 }
             }
         }
+    }
+}
+
+/**
+ * Builds a smooth cubic Bezier path passing through the given data points.
+ */
+private fun buildSmoothPath(points: List<Offset>, path: Path) {
+    if (points.isEmpty()) return
+    path.reset()
+    path.moveTo(points[0].x, points[0].y)
+    if (points.size == 1) return
+
+    for (i in 0 until points.size - 1) {
+        val p0 = points[(i - 1).coerceAtLeast(0)]
+        val p1 = points[i]
+        val p2 = points[i + 1]
+        val p3 = points[(i + 2).coerceAtMost(points.size - 1)]
+
+        val cp1X = p1.x + (p2.x - p0.x) * 0.18f
+        val cp1Y = p1.y + (p2.y - p0.y) * 0.18f
+        val cp2X = p2.x - (p3.x - p1.x) * 0.18f
+        val cp2Y = p2.y - (p3.y - p1.y) * 0.18f
+
+        path.cubicTo(cp1X, cp1Y, cp2X, cp2Y, p2.x, p2.y)
     }
 }
 
@@ -1080,7 +1255,7 @@ private fun ChartLegendItem(label: String, color: Color) {
 }
 
 // -------------------------------------------------------------------------------------------------
-// 5. Expense Category Breakdown (Donut & Ranked List)
+// 5. Expense Category Breakdown (Donut & Ranked List with Arc Selection)
 // -------------------------------------------------------------------------------------------------
 
 @Composable
@@ -1094,6 +1269,8 @@ private fun ExpenseCategoryBreakdownCard(
         animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
         label = "donutReportAnim"
     )
+
+    var selectedCategoryIndex by remember { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(Unit) {
         animationPlayed = true
@@ -1135,7 +1312,7 @@ private fun ExpenseCategoryBreakdownCard(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Actual spending distribution",
+                            text = "Tap donut segment or category to inspect",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1178,15 +1355,46 @@ private fun ExpenseCategoryBreakdownCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
+                    val activeCategory = selectedCategoryIndex?.let { breakdowns.getOrNull(it) }
+
                     Box(
                         modifier = Modifier
-                            .size(130.dp)
+                            .size(140.dp)
                             .padding(4.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            val strokeWidth = 22.dp.toPx()
-                            val diameter = size.minDimension - strokeWidth
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(breakdowns) {
+                                    detectTapGestures { offset ->
+                                        val centerX = size.width / 2f
+                                        val centerY = size.height / 2f
+                                        val dx = offset.x - centerX
+                                        val dy = offset.y - centerY
+                                        var angle = (atan2(dy, dx) * (180f / Math.PI.toFloat()))
+                                        if (angle < -90f) {
+                                            angle += 360f
+                                        }
+
+                                        var currentStart = -90f
+                                        var tappedIdx: Int? = null
+                                        breakdowns.forEachIndexed { idx, item ->
+                                            val sweep = item.percentage * 360f
+                                            if (angle >= currentStart && angle <= currentStart + sweep) {
+                                                tappedIdx = idx
+                                            }
+                                            currentStart += sweep
+                                        }
+
+                                        selectedCategoryIndex = if (selectedCategoryIndex == tappedIdx) null else tappedIdx
+                                    }
+                                }
+                        ) {
+                            val normalStroke = 20.dp.toPx()
+                            val selectedStroke = 28.dp.toPx()
+
+                            val diameter = size.minDimension - selectedStroke
                             val topLeft = Offset(
                                 (size.width - diameter) / 2,
                                 (size.height - diameter) / 2
@@ -1194,8 +1402,10 @@ private fun ExpenseCategoryBreakdownCard(
                             val arcSize = Size(diameter, diameter)
 
                             var currentAngle = -90f
-                            breakdowns.forEach { item ->
+                            breakdowns.forEachIndexed { index, item ->
                                 val sweep = (item.percentage * 360f) * animateProgress
+                                val isSelected = selectedCategoryIndex == index
+
                                 if (sweep > 0.5f) {
                                     drawArc(
                                         color = item.category.color,
@@ -1204,42 +1414,81 @@ private fun ExpenseCategoryBreakdownCard(
                                         useCenter = false,
                                         topLeft = topLeft,
                                         size = arcSize,
-                                        style = Stroke(width = strokeWidth, cap = StrokeCap.Butt)
+                                        style = Stroke(
+                                            width = if (isSelected) selectedStroke else normalStroke,
+                                            cap = StrokeCap.Butt
+                                        )
                                     )
                                     currentAngle += sweep
                                 }
                             }
                         }
 
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "Total",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 10.sp
-                            )
-                            Text(
-                                text = CurrencyUtils.formatBDT(totalExpense),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                fontSize = 13.sp
-                            )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        ) {
+                            if (activeCategory != null) {
+                                Text(
+                                    text = activeCategory.category.name,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = activeCategory.category.color,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = CurrencyUtils.formatBDT(activeCategory.totalAmount),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    fontSize = 12.sp
+                                )
+                                Text(
+                                    text = "${(activeCategory.percentage * 100).toInt()}%",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 10.sp
+                                )
+                            } else {
+                                Text(
+                                    text = "Total Expense",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 10.sp
+                                )
+                                Text(
+                                    text = CurrencyUtils.formatBDT(totalExpense),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    fontSize = 12.sp
+                                )
+                            }
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(16.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
 
-                    // Top 4 preview legend
+                    // Top 4 preview legend (clickable)
                     Column(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        breakdowns.take(4).forEach { item ->
+                        breakdowns.take(4).forEachIndexed { idx, item ->
                             val percent = (item.percentage * 100).toInt()
+                            val isSelected = selectedCategoryIndex == idx
+
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) item.category.color.copy(alpha = 0.15f) else Color.Transparent)
+                                    .clickable { selectedCategoryIndex = if (isSelected) null else idx }
+                                    .padding(horizontal = 4.dp, vertical = 3.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
@@ -1257,6 +1506,7 @@ private fun ExpenseCategoryBreakdownCard(
                                     Text(
                                         text = item.category.name,
                                         style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -1265,7 +1515,7 @@ private fun ExpenseCategoryBreakdownCard(
                                     text = "$percent%",
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = if (isSelected) item.category.color else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -1274,17 +1524,22 @@ private fun ExpenseCategoryBreakdownCard(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Full Ranked List
+                // Full Ranked List with tap selection
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    breakdowns.forEach { item ->
+                    breakdowns.forEachIndexed { idx, item ->
                         val percent = (item.percentage * 100).toInt()
+                        val isSelected = selectedCategoryIndex == idx
+
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                            modifier = Modifier.fillMaxWidth()
+                            color = if (isSelected) item.category.color.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, item.category.color) else null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { selectedCategoryIndex = if (isSelected) null else idx }
                         ) {
                             Row(
                                 modifier = Modifier
@@ -1596,6 +1851,8 @@ private fun DailySpendingAnalysisCard(
     dailyLimit: Double,
     totalExpense: Double
 ) {
+    var selectedDayIndex by remember { mutableStateOf<Int?>(null) }
+
     val spendingDays = remember(currentMonthDays) {
         currentMonthDays.filter { it.dayExpenseTotal > 0 }
     }
@@ -1642,7 +1899,7 @@ private fun DailySpendingAnalysisCard(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Compared against ${CurrencyUtils.formatBDT(dailyLimit)} limit",
+                            text = "Tap bar to inspect day details",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1718,9 +1975,64 @@ private fun DailySpendingAnalysisCard(
                     }
                 }
             } else {
+                val activeBarDay = selectedDayIndex?.let { currentMonthDays.getOrNull(it) }
+
+                // Interactive Bar Selection Summary Banner
+                if (activeBarDay != null) {
+                    val isOver = activeBarDay.dayExpenseTotal > dailyLimit
+                    val diff = abs(activeBarDay.dayExpenseTotal - dailyLimit)
+                    val statusText = if (isOver) "Exceeded limit by ${CurrencyUtils.formatBDT(diff)}" else "${CurrencyUtils.formatBDT(diff)} within limit"
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isOver) ExpenseRed.copy(alpha = 0.12f) else IncomeGreen.copy(alpha = 0.12f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, if (isOver) ExpenseRed.copy(alpha = 0.4f) else IncomeGreen.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Day ${activeBarDay.dayOfMonth}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = statusText,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isOver) ExpenseRed else IncomeGreen,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = "Spent Amount",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 10.sp
+                                )
+                                Text(
+                                    text = CurrencyUtils.formatBDT(activeBarDay.dayExpenseTotal),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isOver) ExpenseRed else IncomeGreen
+                                )
+                            }
+                        }
+                    }
+                }
+
                 val maxExpenseInMonth = remember(currentMonthDays, dailyLimit) {
                     max(dailyLimit * 1.2, currentMonthDays.maxOfOrNull { it.dayExpenseTotal } ?: dailyLimit)
                 }
+
+                val daysCount = currentMonthDays.size
 
                 // Daily Bar Chart Canvas
                 Canvas(
@@ -1728,12 +2040,26 @@ private fun DailySpendingAnalysisCard(
                         .fillMaxWidth()
                         .height(140.dp)
                         .padding(vertical = 4.dp)
+                        .pointerInput(currentMonthDays) {
+                            detectTapGestures { offset ->
+                                val slotWidth = size.width / daysCount
+                                val index = (offset.x / slotWidth).toInt().coerceIn(0, daysCount - 1)
+                                selectedDayIndex = if (selectedDayIndex == index) null else index
+                            }
+                        }
+                        .pointerInput(currentMonthDays) {
+                            detectDragGestures { change, _ ->
+                                change.consume()
+                                val slotWidth = size.width / daysCount
+                                val index = (change.position.x / slotWidth).toInt().coerceIn(0, daysCount - 1)
+                                selectedDayIndex = index
+                            }
+                        }
                 ) {
                     val width = size.width
                     val height = size.height
                     val bottomPadding = 18.dp.toPx()
                     val chartHeight = height - bottomPadding
-                    val daysCount = currentMonthDays.size
 
                     val slotWidth = width / daysCount
                     val barWidth = (slotWidth * 0.7f).coerceAtLeast(3.dp.toPx())
@@ -1758,6 +2084,8 @@ private fun DailySpendingAnalysisCard(
                         val yTop = chartHeight - barHeight
 
                         val isOver = day.dayExpenseTotal > dailyLimit
+                        val isSelected = selectedDayIndex == index
+
                         val barColor = if (isOver) ExpenseRed else IncomeGreen.copy(alpha = 0.75f)
 
                         if (barHeight > 0f) {
@@ -1766,6 +2094,25 @@ private fun DailySpendingAnalysisCard(
                                 topLeft = Offset(xLeft, yTop),
                                 size = Size(barWidth, barHeight),
                                 cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx())
+                            )
+                        }
+
+                        if (isSelected) {
+                            // Highlight border around selected bar
+                            drawRoundRect(
+                                color = Color.White,
+                                topLeft = Offset(xLeft - 1.dp.toPx(), yTop - 1.dp.toPx()),
+                                size = Size(barWidth + 2.dp.toPx(), barHeight + 2.dp.toPx()),
+                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx()),
+                                style = Stroke(width = 2.dp.toPx())
+                            )
+                            // Vertical dashed guide line
+                            drawLine(
+                                color = Color.Gray.copy(alpha = 0.5f),
+                                start = Offset(xCenter, 0f),
+                                end = Offset(xCenter, chartHeight),
+                                strokeWidth = 1.dp.toPx(),
+                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f), 0f)
                             )
                         }
                     }

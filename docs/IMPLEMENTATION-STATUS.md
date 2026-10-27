@@ -73,6 +73,13 @@
 - Retained Monthly Budget Allocations, Today's Spending Card, Monthly Activity Calendar preview, Selected-Day Activity, Financial Goals Card, and Donut Chart untouched.
 - Adjusted vertical spacing to ensure clean layout balance without empty gaps.
 
+### Phase 20.4: Reports UI Polish & Interactive Financial Charts
+- **Smooth Bezier Line Charts:** Enhanced `IncomeExpenseTrendChartCard` using cubic Bezier curve generation (`buildSmoothPath`), dashed horizontal grid lines, glowing double-ring data point markers, and interactive touch/drag gesture handling (`detectTapGestures` & `detectDragGestures`).
+- **Interactive Monetary Tooltip Banners:** Added exact Bangladeshi Taka (`৳`) formatted tooltips for line, donut, and bar charts showing day dates, daily income, daily expenses, net cash surplus/deficit, and limit adherence.
+- **Interactive Donut Chart:** Enhanced `ExpenseCategoryBreakdownCard` with angle-based tap detection (`atan2`), arc expansion on selected segment (28.dp stroke width), dynamic center text (category name, exact BDT expense, percentage), and tap-to-select interaction on category legend items.
+- **Interactive Daily Spending Bar Chart:** Upgraded `DailySpendingAnalysisCard` with tap/drag bar selection, vertical guide line, active bar border highlight, and an interactive daily limit comparison summary banner (`Exceeded limit by ৳X` / `Within limit`).
+- **Calculations & Architecture Intact:** All underlying financial aggregations, ViewModel flow states, Room schema v6, and zero-permission SMS import mechanisms preserved 100%.
+
 ---
 
 ## Current Signing & Verification Status Matrix
@@ -83,6 +90,7 @@
 | **Phase 20.1 Header Simplification** | **PASS** | Removed redundant top-right 3-dot overflow menu. Added top Calendar shortcut; all tools confirmed accessible via More hub. |
 | **Phase 20.2 More Menu Adjust Section** | **PASS** | Organized More menu cards into structured categories including a dedicated **Adjust** section (Notifications, Backup, Archive). |
 | **Phase 20.3 Dashboard Refinement** | **PASS** | Removed redundant Transaction History list from Dashboard; full Ledger accessible via More and Reports. |
+| **Phase 20.4 Interactive Reports & Charts** | **PASS** | Touch/drag interactive Bezier trend line chart, angle-based donut arc selection, and daily bar chart tooltips formatted in BDT (৳). |
 | **Debug APK Signature** | **PASS** | Validated via `apksigner`. Explicitly bound to repository `debug.keystore`. SHA-256: `C5:C8:B9:74...`. |
 | **Debug Build Determinism** | **PASS** | Multiple clean builds verified producing identical signature fingerprints. |
 | **Release Signing Status** | **BLOCKED** | Unconfigured in environment. Production release keystores are kept outside source control. Task `verifyReleaseSigning` fails closed as intended. |
