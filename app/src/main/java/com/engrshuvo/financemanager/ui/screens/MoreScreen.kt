@@ -796,6 +796,7 @@ private fun MoreCalendarView(
             .testTag("more_calendar_view")
     ) {
         TopAppBar(
+            windowInsets = androidx.compose.foundation.layout.WindowInsets(0.dp),
             title = {
                 Text(
                     text = "Calendar & Daily Log",

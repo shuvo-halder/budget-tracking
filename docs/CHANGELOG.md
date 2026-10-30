@@ -7,6 +7,14 @@ All notable changes to the **Budget & Loan Manager** application are documented 
 ## [Unreleased] - 2026-10-30
 
 ### Fixed
+* **App-Wide UI Audit — Excessive Top Blank Space Remediation & Financial Goals UI Overhaul (Phase 20.8):**
+  * **Systematic Inset Audit & Top Blank Space Remediation:** Resolved double/triple status bar padding across all secondary sub-destinations (`FinancialGoalsScreen`, `ArchiveScreen`, `BackupRestoreScreen`, `NotificationSettingsScreen`, `PaymentSmsImportScreen`, `MobileBankingSmsHistoryScreen`, `PurchasePlannerScreen`, `PdfExportScreen`, `MoreCalendarView`, `ReportsScreen`) by enforcing `contentWindowInsets = WindowInsets(0.dp)` on nested `Scaffold`s and `windowInsets = WindowInsets(0.dp)` on sub-destination `TopAppBar`s.
+  * **Main Tab Dual App Bar Fix:** Corrected `MainFinanceScreen.kt` topBar condition so root TopAppBar is omitted when `FinanceTab.REPORTS` is active, preventing stacked duplicate app bars.
+  * **Target Savings Pool Overhaul (Financial Goals):** Redesigned `GoalsSummaryAnalyticsCard` with softly rounded card corners (`18.dp`), assigned `weight(1f)` to title/subtitle so long names never displace the percentage badge, formatted BDT figures cleanly, and restructured Monthly Goal Required & Available Saving Capacity into responsive weighted rows.
+  * **Financial Goals Item Card Polish:** Upgraded `GoalItemCard` subtitle badges using `FlowRow` with `10.dp` rounded shapes, flexible amount rows, `12.dp` rounded metric cards for Remaining and Monthly Need, and `bottom = 120.dp` list `contentPadding` for complete FAB clearance.
+  * **M3 Visual Standardization:** Standardized container radii (`12.dp`–`18.dp` cards, `10.dp` badges) and internal padding across Dashboard, Budget, Transactions, Loans, Reports, and Financial Goals.
+
+### Fixed
 * **Dashboard UI Layout & Typography Audit (Phase 20.7):**
   * **Today's Records Layout (Section A):** Eliminated vertical text splitting of `Ledger →` in `DashboardSelectedDayActivityCard`. Left date and record count column assigned `Modifier.weight(1f)` with ellipsis protection. Replaced brittle text button with a dedicated pill `Surface` (`softWrap = false, maxLines = 1`) with an arrow icon. Added single-line safety to Income, Expense, and Loan stat pills.
   * **Adaptive Budget Allocations Header (Section B):** Added `BoxWithConstraints` to `MonthlyBudgetCategorySection`. On narrow screens (< 340dp), the "Plan Budget" button cleanly wraps to a second row instead of colliding with "Monthly Budget Allocations". Extracted Planned Savings into a dedicated `Surface` banner card wrapping naturally without truncation.

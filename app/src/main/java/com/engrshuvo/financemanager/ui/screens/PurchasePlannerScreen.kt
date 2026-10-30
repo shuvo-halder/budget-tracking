@@ -107,8 +107,11 @@ fun PurchasePlannerScreen(
     val totalCount = uiState.purchaseItems.size
 
     Scaffold(
+        modifier = modifier.fillMaxSize(),
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0.dp),
         topBar = {
             TopAppBar(
+                windowInsets = androidx.compose.foundation.layout.WindowInsets(0.dp),
                 title = {
                     Column {
                         Text(
@@ -165,8 +168,7 @@ fun PurchasePlannerScreen(
                     )
                 }
             }
-        },
-        modifier = modifier.fillMaxSize()
+        }
     ) { innerPadding ->
         Column(
             modifier = Modifier

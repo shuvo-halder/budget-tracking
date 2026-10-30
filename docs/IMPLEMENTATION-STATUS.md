@@ -103,6 +103,15 @@
 - **Bottom Navigation Baseline & Spacing (Section E):** Unified icon container heights to 32dp across all 5 navigation tabs (Reports, Budget, Dashboard, Loans, More), aligning icon centers and label baselines. Distributed tabs evenly with `Modifier.weight(1f)` and reduced outer horizontal padding from 12dp to 6dp.
 - **Invariants Preserved:** Zero changes to Room schema v6, ledger calculations, or navigation routes. All tests passing cleanly.
 
+### Phase 20.8: App-Wide UI Audit — Excessive Top Blank Space Remediation & Financial Goals UI Overhaul
+- **Systematic Inset Audit & Root Cause:** Identified double/triple status bar padding across all secondary sub-destinations (`FinancialGoalsScreen`, `ArchiveScreen`, `BackupRestoreScreen`, `NotificationSettingsScreen`, `PaymentSmsImportScreen`, `MobileBankingSmsHistoryScreen`, `PurchasePlannerScreen`, `PdfExportScreen`, `MoreCalendarView`, `ReportsScreen`) caused by nested `Scaffold`s and `TopAppBar`s re-applying status bar insets on top of outer `Scaffold` padding.
+- **Zero-Inset TopAppBar Fix:** Enforced `contentWindowInsets = WindowInsets(0.dp)` on all nested `Scaffold` instances and `windowInsets = WindowInsets(0.dp)` on all sub-destination `TopAppBar` instances across all 10 secondary screens, restoring crisp, consistent top alignment with zero excessive blank gaps.
+- **Main Tab Dual TopBar Fix:** Corrected `MainFinanceScreen.kt` `topBar` condition so the root top app bar is suppressed when `FinanceTab.REPORTS` is active, eliminating stacked duplicate app bars.
+- **Target Savings Pool Overhaul (Financial Goals):** Redesigned `GoalsSummaryAnalyticsCard` with softly rounded card corners (`18.dp`), assigned `Modifier.weight(1f)` to the header title/subtitle so long names never push the percentage badge off-screen, formatted BDT amounts cleanly, and moved Monthly Goal Required & Available Saving Capacity into responsive weighted rows.
+- **Financial Goals Card Polish:** Upgraded `GoalItemCard` header with `FlowRow` badges (`10.dp` rounded shapes), flexible amount rows, `12.dp` rounded metric containers for Remaining and Monthly Need, and full FAB clearance (`bottom = 120.dp` `contentPadding`).
+- **M3 Visual Standardization:** Updated container radii across cards, badges, and search inputs to modern M3 standards (`12.dp`–`18.dp` cards, `10.dp` badges), ensuring consistent visual polish across Dashboard, Budget, Transactions, Loans, Reports, and Financial Goals.
+- **100% Invariants & Tests:** Room schema v6, all financial accounting formulas, zero-permission SMS logic, and user persistence preserved 100%. All unit tests passing (`BUILD SUCCESSFUL in 25s`).
+
 ---
 
 ## Current Signing & Verification Status Matrix
@@ -117,6 +126,7 @@
 | **Phase 20.5 SMS Approval Decoupling** | **PASS** | Decoupled SMS approval from financial ledger (zero balance/budget/report bleed). Created Mobile Banking SMS History screen with provider filter and TrxID copy. |
 | **Phase 20.6 Category Consistency & Text Polish** | **PASS** | All 16 expense categories synchronized to budget planning with zero-allocation defaults. Text clipping and overflow resolved across all screens. |
 | **Phase 20.7 Dashboard Layout & Typography Audit** | **PASS** | Fixed "Ledger →" vertical text fragmentation, adaptive budget allocations header, 3-tier budget category cards, 120dp FAB scroll clearance, and 32dp bottom nav baseline alignment. |
+| **Phase 20.8 App-Wide Top Space & Goals UI Fix** | **PASS** | Eliminated double status bar insets across all 11 sub-screens with `WindowInsets(0.dp)`. Redesigned Financial Goals Target Savings Pool card and goal items. Standardized M3 rounded containers. |
 | **Debug APK Signature** | **PASS** | Validated via `apksigner`. Explicitly bound to repository `debug.keystore`. SHA-256: `C5:C8:B9:74...`. |
 | **Debug Build Determinism** | **PASS** | Multiple clean builds verified producing identical signature fingerprints. |
 | **Release Signing Status** | **BLOCKED** | Unconfigured in environment. Production release keystores are kept outside source control. Task `verifyReleaseSigning` fails closed as intended. |

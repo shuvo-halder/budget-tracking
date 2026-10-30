@@ -135,8 +135,13 @@ fun MobileBankingSmsHistoryScreen(
     }
 
     Scaffold(
+        modifier = modifier
+            .fillMaxSize()
+            .testTag("sms_history_screen"),
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0.dp),
         topBar = {
             TopAppBar(
+                windowInsets = androidx.compose.foundation.layout.WindowInsets(0.dp),
                 title = {
                     Column {
                         Text(
@@ -164,17 +169,14 @@ fun MobileBankingSmsHistoryScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
-        },
-        modifier = modifier
-            .fillMaxSize()
-            .testTag("sms_history_screen")
+        }
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .background(MaterialTheme.colorScheme.background),
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // Summary Header Card

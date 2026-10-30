@@ -75,7 +75,7 @@ fun TransactionsScreen(
         modifier = modifier
             .fillMaxSize()
             .testTag("transactions_screen_list"),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         if (onNavigateBack != null) {

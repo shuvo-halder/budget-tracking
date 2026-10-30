@@ -124,8 +124,11 @@ fun ArchiveScreen(
     }
 
     Scaffold(
+        modifier = modifier.fillMaxSize(),
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0.dp),
         topBar = {
             TopAppBar(
+                windowInsets = androidx.compose.foundation.layout.WindowInsets(0.dp),
                 title = {
                     Column {
                         Text(
@@ -155,8 +158,7 @@ fun ArchiveScreen(
                     containerColor = MaterialTheme.colorScheme.background
                 )
             )
-        },
-        modifier = modifier.fillMaxSize()
+        }
     ) { innerPadding ->
         Column(
             modifier = Modifier

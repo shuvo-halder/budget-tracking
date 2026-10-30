@@ -17,6 +17,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -141,8 +143,10 @@ fun FinancialGoalsScreen(
         modifier = modifier
             .fillMaxSize()
             .testTag("financial_goals_screen"),
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0.dp),
         topBar = {
             TopAppBar(
+                windowInsets = androidx.compose.foundation.layout.WindowInsets(0.dp),
                 title = {
                     Column {
                         Text(
@@ -189,7 +193,7 @@ fun FinancialGoalsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Summary Analytics Card
@@ -346,11 +350,12 @@ private fun GoalsSummaryAnalyticsCard(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.weight(1f)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(40.dp)
                             .clip(CircleShape)
                             .background(IncomeGreen.copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center
@@ -359,23 +364,29 @@ private fun GoalsSummaryAnalyticsCard(
                             imageVector = Icons.Default.Savings,
                             contentDescription = null,
                             tint = IncomeGreen,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(22.dp)
                         )
                     }
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Target Savings Pool",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "Dedicated goal accumulation",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.width(8.dp))
 
                 Surface(
                     shape = RoundedCornerShape(12.dp),
@@ -383,7 +394,7 @@ private fun GoalsSummaryAnalyticsCard(
                 ) {
                     Text(
                         text = "${String.format("%.1f", overallProgressPercent)}%",
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.ExtraBold,
                         color = IncomeGreen
@@ -412,7 +423,7 @@ private fun GoalsSummaryAnalyticsCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Total Accumulated",
                         style = MaterialTheme.typography.labelMedium,
@@ -422,10 +433,13 @@ private fun GoalsSummaryAnalyticsCard(
                         text = CurrencyUtils.formatBDT(totalSaved),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.ExtraBold,
-                        color = IncomeGreen
+                        color = IncomeGreen,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
-                Column(horizontalAlignment = Alignment.End) {
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Total Active Target",
                         style = MaterialTheme.typography.labelMedium,
@@ -435,7 +449,9 @@ private fun GoalsSummaryAnalyticsCard(
                         text = CurrencyUtils.formatBDT(totalTarget),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -455,13 +471,16 @@ private fun GoalsSummaryAnalyticsCard(
                     Text(
                         text = "Monthly Goal Required",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                        softWrap = true
                     )
                     Text(
                         text = CurrencyUtils.formatBDT(totalMonthlyRequired) + "/mo",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        softWrap = false
                     )
                 }
 
@@ -473,32 +492,35 @@ private fun GoalsSummaryAnalyticsCard(
                     Text(
                         text = "Available Saving Capacity",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                        softWrap = true
                     )
                     Text(
                         text = CurrencyUtils.formatBDT(savingCapacity) + "/mo",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        color = if (isDeficit) ExpenseRed else IncomeGreen
+                        color = if (isDeficit) ExpenseRed else IncomeGreen,
+                        softWrap = false
                     )
                 }
 
                 // Capacity status badge
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(12.dp),
                     color = if (isDeficit) ExpenseRed.copy(alpha = 0.12f) else IncomeGreen.copy(alpha = 0.12f),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
                             imageVector = if (isDeficit) Icons.AutoMirrored.Filled.TrendingDown else Icons.AutoMirrored.Filled.TrendingUp,
                             contentDescription = null,
                             tint = if (isDeficit) ExpenseRed else IncomeGreen,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                         Text(
                             text = if (isDeficit) {
@@ -509,7 +531,9 @@ private fun GoalsSummaryAnalyticsCard(
                             style = MaterialTheme.typography.bodySmall,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
-                            color = if (isDeficit) ExpenseRed else IncomeGreen
+                            color = if (isDeficit) ExpenseRed else IncomeGreen,
+                            softWrap = true,
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
@@ -638,33 +662,28 @@ private fun GoalItemCard(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = goal.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                    Text(
+                        text = goal.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                    @OptIn(ExperimentalLayoutApi::class)
+                    FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.padding(top = 2.dp)
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(top = 4.dp)
                     ) {
                         Text(
                             text = goal.category.displayName,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Text(text = "•", color = MaterialTheme.colorScheme.outline)
                         // Priority Badge
                         Surface(
-                            shape = RoundedCornerShape(6.dp),
+                            shape = RoundedCornerShape(10.dp),
                             color = goal.priority.color.copy(alpha = 0.12f)
                         ) {
                             Text(
@@ -672,7 +691,7 @@ private fun GoalItemCard(
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = goal.priority.color,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                             )
                         }
                         // Status Badge
@@ -689,7 +708,7 @@ private fun GoalItemCard(
                             GoalStatus.ARCHIVED -> Color.Gray
                         }
                         Surface(
-                            shape = RoundedCornerShape(6.dp),
+                            shape = RoundedCornerShape(10.dp),
                             color = statusBg
                         ) {
                             Text(
@@ -697,7 +716,7 @@ private fun GoalItemCard(
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = statusColor,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                             )
                         }
                     }

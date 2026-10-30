@@ -103,8 +103,11 @@ fun NotificationSettingsScreen(
     }
 
     Scaffold(
+        modifier = modifier.fillMaxSize(),
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0.dp),
         topBar = {
             TopAppBar(
+                windowInsets = androidx.compose.foundation.layout.WindowInsets(0.dp),
                 title = {
                     Text(
                         text = "Notifications & Reminders",
@@ -127,15 +130,14 @@ fun NotificationSettingsScreen(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             )
-        },
-        modifier = modifier
+        }
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .testTag("notification_settings_list"),
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // 1. Permission status card

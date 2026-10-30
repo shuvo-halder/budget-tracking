@@ -211,8 +211,8 @@ fun MainFinanceScreen(
         contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            // Show main top bar when not in sub-screens with their own top bars
-            if (uiState.moreSubDestination == MoreSubDestination.NONE) {
+            // Show main top bar when not in sub-screens or tabs with their own top bars
+            if (uiState.moreSubDestination == MoreSubDestination.NONE && uiState.activeTab != FinanceTab.REPORTS) {
                 TopAppBar(
                     title = {
                         Row(

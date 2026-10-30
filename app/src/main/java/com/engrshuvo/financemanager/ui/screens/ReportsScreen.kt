@@ -124,6 +124,7 @@ fun ReportsScreen(
             .testTag("reports_screen_container")
     ) {
         TopAppBar(
+            windowInsets = androidx.compose.foundation.layout.WindowInsets(0.dp),
             title = {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
