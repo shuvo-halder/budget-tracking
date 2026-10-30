@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -84,7 +85,7 @@ fun ModernBottomNavigationBar(
         modifier = modifier
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.navigationBars)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 6.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center
     ) {
         Surface(
@@ -98,7 +99,7 @@ fun ModernBottomNavigationBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 6.dp),
+                    .padding(horizontal = 2.dp, vertical = 5.dp),
                 horizontalArrangement = Arrangement.SpaceAround,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -141,7 +142,7 @@ private fun ModernNavItem(
     }
 
     val iconScale by animateFloatAsState(
-        targetValue = if (isSelected) 1.08f else 1.0f,
+        targetValue = if (isSelected) 1.05f else 1.0f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "navIconScale"
     )
@@ -160,7 +161,7 @@ private fun ModernNavItem(
                 indication = null,
                 onClick = onClick
             )
-            .padding(horizontal = 2.dp, vertical = 4.dp)
+            .padding(horizontal = 2.dp, vertical = 3.dp)
             .testTag("nav_tab_${tab.name.lowercase()}")
             .semantics {
                 role = Role.Tab
@@ -171,62 +172,66 @@ private fun ModernNavItem(
         verticalArrangement = Arrangement.Center
     ) {
         if (isCenter) {
-            // Prominent center Dashboard container
+            // Prominent center Dashboard container with matching 32dp baseline height
             Box(
                 modifier = Modifier
-                    .size(42.dp)
+                    .height(32.dp)
                     .scale(iconScale)
                     .clip(CircleShape)
                     .background(
                         if (isSelected) {
-                            activeAccent.copy(alpha = 0.18f)
+                            activeAccent.copy(alpha = 0.22f)
                         } else if (isDark) {
                             Color(0xFF27272A)
                         } else {
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
                         }
-                    ),
+                    )
+                    .padding(horizontal = 14.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
                     tint = animatedIconColor,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
         } else {
-            // Standard item icon with subtle active pill highlight
+            // Standard item icon with subtle active pill highlight and matching 32dp baseline height
             Box(
                 modifier = Modifier
+                    .height(32.dp)
                     .scale(iconScale)
                     .clip(RoundedCornerShape(12.dp))
                     .background(
-                        if (isSelected) activeAccent.copy(alpha = 0.12f) else Color.Transparent
+                        if (isSelected) activeAccent.copy(alpha = 0.14f) else Color.Transparent
                     )
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                    .padding(horizontal = 10.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
                     tint = animatedIconColor,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
 
+        Spacer(modifier = Modifier.height(3.dp))
+
         Text(
             text = tab.label,
             style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = if (isSelected) 10.5.sp else 10.sp,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                fontSize = 10.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                letterSpacing = 0.sp
             ),
             color = if (isSelected) activeAccent else unselectedColor,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            softWrap = false,
-            modifier = Modifier.padding(top = 2.dp)
+            overflow = TextOverflow.Clip,
+            softWrap = false
         )
     }
 }

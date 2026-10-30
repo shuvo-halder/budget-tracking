@@ -43,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -82,7 +83,7 @@ fun BudgetScreen(
         modifier = modifier
             .fillMaxSize()
             .testTag("budget_screen"),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         // Month Switcher Header
@@ -453,13 +454,14 @@ fun BudgetScreen(
                 tonalElevation = 1.dp
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
+                    // Tier 1: Header Row (Icon + Category Name & Badge on Left | Remaining / Overspent on Right)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(34.dp)
                                 .clip(CircleShape)
                                 .background(cat.color.copy(alpha = 0.15f)),
                             contentAlignment = Alignment.Center
@@ -467,30 +469,32 @@ fun BudgetScreen(
                             Icon(imageVector = cat.icon, contentDescription = null, tint = cat.color, modifier = Modifier.size(18.dp))
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
-                            FlowRow(
-                                verticalArrangement = Arrangement.spacedBy(2.dp),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(cat.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, softWrap = true)
-                                if (isOver) {
-                                    Surface(shape = RoundedCornerShape(4.dp), color = ExpenseRed.copy(alpha = 0.15f)) {
-                                        Text("Over Budget", color = ExpenseRed, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp))
-                                    }
+                            Text(
+                                text = cat.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (isOver) {
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = ExpenseRed.copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        text = "Over Budget",
+                                        color = ExpenseRed,
+                                        fontSize = 9.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
+                                    )
                                 }
                             }
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = if (isAllocated) "${CurrencyUtils.formatBDT(model.actualSpent)} spent of ${CurrencyUtils.formatBDT(model.allocatedAmount)}" else "${CurrencyUtils.formatBDT(model.actualSpent)} spent (unallocated)",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 11.5.sp,
-                                softWrap = true,
-                                lineHeight = 15.sp
-                            )
                         }
 
                         Spacer(modifier = Modifier.width(8.dp))
@@ -498,22 +502,29 @@ fun BudgetScreen(
                         Column(horizontalAlignment = Alignment.End) {
                             Text(
                                 text = if (isAllocated) {
-                                    if (isOver) "-${CurrencyUtils.formatBDT(Math.abs(model.remainingAmount))}" else CurrencyUtils.formatBDT(model.remainingAmount)
-                                } else "৳0",
-                                style = MaterialTheme.typography.titleSmall,
+                                    if (isOver) "-${CurrencyUtils.formatBDT(Math.abs(model.remainingAmount))}"
+                                    else CurrencyUtils.formatBDT(model.remainingAmount)
+                                } else {
+                                    "৳0"
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isOver) ExpenseRed else MaterialTheme.colorScheme.onSurface,
-                                softWrap = true
+                                softWrap = false
                             )
                             Text(
-                                text = if (isAllocated) "${(model.usagePercentage * 100).toInt()}% used" else "No target",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 10.sp
+                                text = if (isAllocated) {
+                                    if (isOver) "over budget" else "remaining"
+                                } else {
+                                    "unallocated"
+                                },
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = if (isOver) ExpenseRed else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
 
+                    // Tier 2: Progress Bar
                     if (isAllocated) {
                         Spacer(modifier = Modifier.height(10.dp))
                         LinearProgressIndicator(
@@ -522,8 +533,34 @@ fun BudgetScreen(
                                 .fillMaxWidth()
                                 .height(6.dp)
                                 .clip(RoundedCornerShape(3.dp)),
-                            color = if (isOver) ExpenseRed else cat.color,
+                            color = if (isOver) ExpenseRed else if (progressClamped >= 0.8f) Color(0xFFF59E0B) else cat.color,
                             trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                        )
+                    }
+
+                    // Tier 3: Spending Details Row
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isAllocated) {
+                                "${CurrencyUtils.formatBDT(model.actualSpent)} spent of ${CurrencyUtils.formatBDT(model.allocatedAmount)}"
+                            } else {
+                                "${CurrencyUtils.formatBDT(model.actualSpent)} spent"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        Text(
+                            text = if (isAllocated) "${(model.usagePercentage * 100).toInt()}% used" else "No target",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isOver) ExpenseRed else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

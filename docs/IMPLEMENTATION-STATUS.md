@@ -95,6 +95,14 @@
 - **Mobile Viewport Overflow Remediation:** Replaced rigid horizontal rows with `FlowRow` and dynamic line-wrapping (`softWrap = true`, `maxLines = 2`, `TextOverflow.Ellipsis`) across `MoreScreen.kt`, `BudgetScreen.kt`, `DashboardOverviewView.kt`, `BudgetPlanningDialog.kt`, `ReportsScreen.kt`, and `ModernBottomNavigationBar.kt`.
 - **Automated Test Coverage:** Created `CategoryBudgetConsistencyUnitTest.kt` with 5 unit tests validating 16-category consistency, isolation, and unallocated calculations.
 
+### Phase 20.7: Fix Dashboard UI Layout and Typography — Screenshot-Based Audit
+- **Today's Records Layout (Section A):** Eliminated character-by-character vertical text breaking on `Ledger →` by giving the date and record count column `Modifier.weight(1f)` and refactoring the ledger action into a compact `Surface` pill with `softWrap = false` and `maxLines = 1`. Added single-line clipping to Income, Expense, and Loan stat pills.
+- **Adaptive Budget Allocations Header (Section B):** Handled narrow screen widths via `BoxWithConstraints`: on viewports < 340dp, the "Plan Budget" button wraps cleanly to a second row instead of colliding with the title. Extracted the Planned Savings notice into a dedicated `Surface` banner wrapping naturally at word boundaries without clipping.
+- **3-Tier Budget Category Cards (Section C):** Completely eliminated 1-row horizontal crowding in `CategoryAllocationRow` and `BudgetItemCard` by adopting a clean 3-tier card structure: Tier 1 (Icon, category name, over-budget badge below name, remaining amount on right), Tier 2 (LinearProgressIndicator), Tier 3 (Spent of allocated on left, percentage used on right).
+- **Dashboard Bottom Padding & FAB Clearance (Section D):** Increased bottom `contentPadding` on Dashboard LazyColumn (and Budget LazyColumn) from 88dp to 120dp, enabling the last budget card to scroll completely above the elevated center FAB and bottom navigation dock.
+- **Bottom Navigation Baseline & Spacing (Section E):** Unified icon container heights to 32dp across all 5 navigation tabs (Reports, Budget, Dashboard, Loans, More), aligning icon centers and label baselines. Distributed tabs evenly with `Modifier.weight(1f)` and reduced outer horizontal padding from 12dp to 6dp.
+- **Invariants Preserved:** Zero changes to Room schema v6, ledger calculations, or navigation routes. All tests passing cleanly.
+
 ---
 
 ## Current Signing & Verification Status Matrix
@@ -108,6 +116,7 @@
 | **Phase 20.4 Interactive Reports & Charts** | **PASS** | Touch/drag interactive Bezier trend line chart, angle-based donut arc selection, and daily bar chart tooltips formatted in BDT (৳). |
 | **Phase 20.5 SMS Approval Decoupling** | **PASS** | Decoupled SMS approval from financial ledger (zero balance/budget/report bleed). Created Mobile Banking SMS History screen with provider filter and TrxID copy. |
 | **Phase 20.6 Category Consistency & Text Polish** | **PASS** | All 16 expense categories synchronized to budget planning with zero-allocation defaults. Text clipping and overflow resolved across all screens. |
+| **Phase 20.7 Dashboard Layout & Typography Audit** | **PASS** | Fixed "Ledger →" vertical text fragmentation, adaptive budget allocations header, 3-tier budget category cards, 120dp FAB scroll clearance, and 32dp bottom nav baseline alignment. |
 | **Debug APK Signature** | **PASS** | Validated via `apksigner`. Explicitly bound to repository `debug.keystore`. SHA-256: `C5:C8:B9:74...`. |
 | **Debug Build Determinism** | **PASS** | Multiple clean builds verified producing identical signature fingerprints. |
 | **Release Signing Status** | **BLOCKED** | Unconfigured in environment. Production release keystores are kept outside source control. Task `verifyReleaseSigning` fails closed as intended. |

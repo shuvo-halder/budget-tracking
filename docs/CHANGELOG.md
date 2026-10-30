@@ -6,6 +6,17 @@ All notable changes to the **Budget & Loan Manager** application are documented 
 
 ## [Unreleased] - 2026-10-30
 
+### Fixed
+* **Dashboard UI Layout & Typography Audit (Phase 20.7):**
+  * **Today's Records Layout (Section A):** Eliminated vertical text splitting of `Ledger →` in `DashboardSelectedDayActivityCard`. Left date and record count column assigned `Modifier.weight(1f)` with ellipsis protection. Replaced brittle text button with a dedicated pill `Surface` (`softWrap = false, maxLines = 1`) with an arrow icon. Added single-line safety to Income, Expense, and Loan stat pills.
+  * **Adaptive Budget Allocations Header (Section B):** Added `BoxWithConstraints` to `MonthlyBudgetCategorySection`. On narrow screens (< 340dp), the "Plan Budget" button cleanly wraps to a second row instead of colliding with "Monthly Budget Allocations". Extracted Planned Savings into a dedicated `Surface` banner card wrapping naturally without truncation.
+  * **3-Tier Budget Category Cards (Section C):** Completely redesigned `CategoryAllocationRow` (Dashboard) and `BudgetItemCard` (Budget screen) into a clean 3-tier hierarchy:
+    * Tier 1: Category icon, category name, Over Budget badge below name, remaining amount on right.
+    * Tier 2: Progress indicator (`LinearProgressIndicator`).
+    * Tier 3: Spent of allocated text on left, percentage used on right.
+  * **Dashboard & Budget Scrolling Clearance (Section D):** Increased bottom `contentPadding` on Dashboard LazyColumn and Budget LazyColumn from 88dp to 120dp, guaranteeing the final cards can be scrolled completely above the FAB and bottom navigation dock without clipping.
+  * **Bottom Navigation Baseline & Spacing (Section E):** Standardized icon container heights to 32dp across all 5 navigation tabs (`ModernBottomNavigationBar.kt`) to ensure aligned icon centers and text label baselines. Distributed tabs evenly with `Modifier.weight(1f)` and reclaimed 12dp horizontal space by reducing outer padding from 12dp to 6dp.
+
 ### Added
 * **Expense–Budget Category Consistency & Mobile UI Text Overflow Polish (Phase 20.6):**
   * Synchronized all 16 canonical expense categories (`housing`, `family`, `daily_expenses`, `food`, `grocery`, `bills`, `transport`, `savings`, `emergency`, `shopping`, `health`, `education`, `entertainment`, `fitness`, `personal_refreshments`, `other_expense`) across CategoryCatalog, Budget screen, Monthly Budget Allocation, and Budget Planning Dialog.

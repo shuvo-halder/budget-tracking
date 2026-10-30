@@ -70,3 +70,6 @@ Key system capabilities:
 * **Mobile Viewport Standards:**
   * Multi-column text layouts, card title badges, and summary chips must use `FlowRow` or `Modifier.weight(1f)` with `softWrap = true`.
   * Monetary figures and metric labels must not use rigid single-line constraints (`maxLines = 1`) without `TextOverflow.Ellipsis` or multi-line wrap (`maxLines = 2`) to support narrow viewports (320dp/360dp) and high system font scales.
+  * **3-Tier Budget Card Pattern:** Category allocation cards use a 3-tier structure: Tier 1 (Icon, Name, Badge, Remaining amount), Tier 2 (LinearProgressIndicator), Tier 3 (Spent of allocated, Percentage). This prevents horizontal cramming on mobile viewports.
+  * **Bottom Navigation Baseline:** All navigation tab icon containers maintain a uniform 32dp height so icon centers and text label baselines stay aligned across all tabs. LazyColumn `contentPadding` bottom must be at least 120dp to guarantee complete scrolling clearance above the FAB and navigation dock.
+
