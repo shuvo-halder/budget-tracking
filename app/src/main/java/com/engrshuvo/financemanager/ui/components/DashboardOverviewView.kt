@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -66,6 +68,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.engrshuvo.financemanager.data.model.TransactionEntity
@@ -272,8 +275,10 @@ fun DashboardOverviewView(
                                 text = if (isDraft) "Draft Budget Shortfall Notice" else "Planned Budget Shortfall",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = ExpenseRed
+                                color = ExpenseRed,
+                                softWrap = true
                             )
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = if (isDraft) {
                                     "Draft targets pre-filled from last month (${CurrencyUtils.formatBDT(totalAllocated)}) exceed received income (${CurrencyUtils.formatBDT(totalIncome)}) by ${CurrencyUtils.formatBDT(plannedShortfall)}. Adjust or confirm in Plan / Edit."
@@ -282,12 +287,17 @@ fun DashboardOverviewView(
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface,
-                                fontSize = 12.sp
+                                fontSize = 12.sp,
+                                softWrap = true,
+                                lineHeight = 16.sp
                             )
                         }
 
+                        Spacer(modifier = Modifier.width(6.dp))
+
                         TextButton(
                             onClick = onPlanBudgetClick,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                             modifier = Modifier.testTag("adjust_budget_banner_button")
                         ) {
                             Text("Adjust", color = ExpenseRed, fontWeight = FontWeight.Bold)
@@ -518,7 +528,8 @@ private fun SalaryFinancialHeroCard(
                         fontWeight = FontWeight.ExtraBold,
                         letterSpacing = (-0.5).sp
                     ),
-                    color = if (balance >= 0) MaterialTheme.colorScheme.onSurface else ExpenseRed
+                    color = if (balance >= 0) MaterialTheme.colorScheme.onSurface else ExpenseRed,
+                    softWrap = true
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -619,6 +630,7 @@ private fun SalaryFinancialHeroCard(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TodaysSpendingCard(
     todayExpenses: Double,
@@ -651,15 +663,19 @@ private fun TodaysSpendingCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    FlowRow(
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Text(
                             text = "Today's Living Expenses",
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            softWrap = true
                         )
                         if (isOverBudget) {
-                            Spacer(modifier = Modifier.width(8.dp))
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
                                 color = ExpenseRed.copy(alpha = 0.15f)
@@ -674,6 +690,7 @@ private fun TodaysSpendingCard(
                             }
                         }
                     }
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = if (dailyLimit > 0) {
                             "${CurrencyUtils.formatBDT(todayExpenses)} of ${CurrencyUtils.formatBDT(dailyLimit)} spent"
@@ -681,7 +698,8 @@ private fun TodaysSpendingCard(
                             "${CurrencyUtils.formatBDT(todayExpenses)} spent (no limit set)"
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        softWrap = true
                     )
                 }
 
@@ -714,18 +732,23 @@ private fun TodaysSpendingCard(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = if (isOverBudget) "Overspent Today:" else "Remaining Today:",
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (isOverBudget) ExpenseRed else MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (isOverBudget) ExpenseRed else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f, fill = false),
+                        softWrap = true
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = CurrencyUtils.formatBDT(Math.abs(dailyRemaining)),
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Bold,
-                        color = if (isOverBudget) ExpenseRed else IncomeGreen
+                        color = if (isOverBudget) ExpenseRed else IncomeGreen,
+                        softWrap = true
                     )
                 }
             }
@@ -817,6 +840,7 @@ private fun MonthlyBudgetCategorySection(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CategoryAllocationRow(model: CategoryAllocationUiModel) {
     val cat = model.category
@@ -852,14 +876,17 @@ private fun CategoryAllocationRow(model: CategoryAllocationUiModel) {
                 Spacer(modifier = Modifier.width(10.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
                         Text(
                             text = cat.name,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold
                         )
                         if (isOver) {
-                            Spacer(modifier = Modifier.width(6.dp))
                             Surface(
                                 shape = RoundedCornerShape(4.dp),
                                 color = ExpenseRed.copy(alpha = 0.15f)
@@ -882,11 +909,17 @@ private fun CategoryAllocationRow(model: CategoryAllocationUiModel) {
                             "${CurrencyUtils.formatBDT(model.actualSpent)} spent (unallocated)"
                         },
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        softWrap = true
                     )
                 }
 
-                Column(horizontalAlignment = Alignment.End) {
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Column(
+                    modifier = Modifier.weight(1f, fill = false),
+                    horizontalAlignment = Alignment.End
+                ) {
                     Text(
                         text = if (isAllocated) {
                             if (isOver) "-${CurrencyUtils.formatBDT(Math.abs(model.remainingAmount))}" else CurrencyUtils.formatBDT(model.remainingAmount)
@@ -895,13 +928,17 @@ private fun CategoryAllocationRow(model: CategoryAllocationUiModel) {
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        color = if (isOver) ExpenseRed else MaterialTheme.colorScheme.onSurface
+                        color = if (isOver) ExpenseRed else MaterialTheme.colorScheme.onSurface,
+                        softWrap = true,
+                        textAlign = TextAlign.End
                     )
                     Text(
                         text = if (isAllocated) "${(model.usagePercentage * 100).toInt()}% used" else "No target",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 10.sp
+                        fontSize = 10.sp,
+                        softWrap = true,
+                        textAlign = TextAlign.End
                     )
                 }
             }
@@ -1071,18 +1108,21 @@ private fun MiniStatPill(
                 )
             }
             Spacer(modifier = Modifier.width(8.dp))
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = formattedAmount,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = color
+                    color = color,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }

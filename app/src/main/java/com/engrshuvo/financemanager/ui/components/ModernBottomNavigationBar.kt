@@ -111,6 +111,7 @@ fun ModernBottomNavigationBar(
                         isSelected = isSelected,
                         isCenter = isCenter,
                         isDark = isDark,
+                        modifier = Modifier.weight(1f),
                         onClick = { onTabSelected(tab) }
                     )
                 }
@@ -125,7 +126,8 @@ private fun ModernNavItem(
     isSelected: Boolean,
     isCenter: Boolean,
     isDark: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val activeAccent = IncomeGreen
     val unselectedColor = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
@@ -150,7 +152,7 @@ private fun ModernNavItem(
     )
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .minimumInteractiveComponentSize()
             .clip(RoundedCornerShape(16.dp))
             .clickable(
@@ -158,7 +160,7 @@ private fun ModernNavItem(
                 indication = null,
                 onClick = onClick
             )
-            .padding(horizontal = 6.dp, vertical = 4.dp)
+            .padding(horizontal = 2.dp, vertical = 4.dp)
             .testTag("nav_tab_${tab.name.lowercase()}")
             .semantics {
                 role = Role.Tab
@@ -217,12 +219,13 @@ private fun ModernNavItem(
         Text(
             text = tab.label,
             style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = if (isSelected) 11.sp else 10.5.sp,
+                fontSize = if (isSelected) 10.5.sp else 10.sp,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
             ),
             color = if (isSelected) activeAccent else unselectedColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            softWrap = false,
             modifier = Modifier.padding(top = 2.dp)
         )
     }

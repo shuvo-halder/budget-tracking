@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -52,6 +54,7 @@ import com.engrshuvo.financemanager.ui.theme.ExpenseRed
 import com.engrshuvo.financemanager.ui.theme.IncomeGreen
 import com.engrshuvo.financemanager.ui.util.CurrencyUtils
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun BudgetScreen(
     monthName: String,
@@ -171,8 +174,10 @@ fun BudgetScreen(
                                 text = if (isDraft) "Draft Budget Shortfall Notice" else "Budget Shortfall Alert",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = ExpenseRed
+                                color = ExpenseRed,
+                                softWrap = true
                             )
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = if (isDraft) {
                                     "Draft targets copied from last month (${CurrencyUtils.formatBDT(totalAllocated)}) exceed current income (${CurrencyUtils.formatBDT(totalMonthlyIncome)}) by ${CurrencyUtils.formatBDT(plannedShortfall)}. These are unsaved draft targets; adjust or confirm them in Plan / Edit."
@@ -180,11 +185,18 @@ fun BudgetScreen(
                                     "Allocations (${CurrencyUtils.formatBDT(totalAllocated)}) exceed monthly income (${CurrencyUtils.formatBDT(totalMonthlyIncome)}) by ${CurrencyUtils.formatBDT(plannedShortfall)}."
                                 },
                                 style = MaterialTheme.typography.bodySmall,
-                                fontSize = 12.sp
+                                fontSize = 12.sp,
+                                softWrap = true,
+                                lineHeight = 16.sp
                             )
                         }
 
-                        TextButton(onClick = onPlanBudgetClick) {
+                        Spacer(modifier = Modifier.width(6.dp))
+
+                        TextButton(
+                            onClick = onPlanBudgetClick,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
                             Text("Adjust", color = ExpenseRed, fontWeight = FontWeight.Bold)
                         }
                     }
@@ -239,16 +251,17 @@ fun BudgetScreen(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Surface(
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp),
                             color = IncomeGreen.copy(alpha = 0.1f)
                         ) {
-                            Column(modifier = Modifier.padding(10.dp)) {
-                                Text("Monthly Income", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(CurrencyUtils.formatBDT(totalMonthlyIncome), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = IncomeGreen)
+                            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp)) {
+                                Text("Monthly Income", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, softWrap = true)
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(CurrencyUtils.formatBDT(totalMonthlyIncome), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = IncomeGreen, fontSize = 13.sp, softWrap = true)
                             }
                         }
 
@@ -257,9 +270,10 @@ fun BudgetScreen(
                             shape = RoundedCornerShape(12.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                         ) {
-                            Column(modifier = Modifier.padding(10.dp)) {
-                                Text("Total Allocated", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(CurrencyUtils.formatBDT(totalAllocated), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp)) {
+                                Text("Total Allocated", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, softWrap = true)
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(CurrencyUtils.formatBDT(totalAllocated), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, softWrap = true)
                             }
                         }
 
@@ -268,13 +282,16 @@ fun BudgetScreen(
                             shape = RoundedCornerShape(12.dp),
                             color = if (isShortfall) ExpenseRed.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                         ) {
-                            Column(modifier = Modifier.padding(10.dp)) {
-                                Text(if (isShortfall) "Shortfall" else "Unallocated", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp)) {
+                                Text(if (isShortfall) "Shortfall" else "Unallocated", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, softWrap = true)
+                                Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     if (isShortfall) "-${CurrencyUtils.formatBDT(plannedShortfall)}" else CurrencyUtils.formatBDT(unallocatedIncome),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (isShortfall) ExpenseRed else MaterialTheme.colorScheme.onSurface
+                                    color = if (isShortfall) ExpenseRed else MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 13.sp,
+                                    softWrap = true
                                 )
                             }
                         }
@@ -310,20 +327,25 @@ fun BudgetScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("Daily Living Limit", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Column(modifier = Modifier.weight(1f)) {
+                            FlowRow(
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Daily Living Limit", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, softWrap = true)
                                 if (isDailyOverBudget) {
-                                    Spacer(modifier = Modifier.width(8.dp))
                                     Surface(shape = RoundedCornerShape(4.dp), color = ExpenseRed.copy(alpha = 0.15f)) {
                                         Text("Over Limit", color = ExpenseRed, fontWeight = FontWeight.Bold, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                                     }
                                 }
                             }
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = if (dailyLimit > 0) "${CurrencyUtils.formatBDT(todayExpenses)} of ${CurrencyUtils.formatBDT(dailyLimit)} spent today" else "No daily ceiling set",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                softWrap = true
                             )
                         }
 
@@ -344,9 +366,26 @@ fun BudgetScreen(
                             trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
                         )
                         Spacer(modifier = Modifier.height(6.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(if (isDailyOverBudget) "Overspent Today:" else "Remaining Today:", style = MaterialTheme.typography.bodySmall, color = if (isDailyOverBudget) ExpenseRed else MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(CurrencyUtils.formatBDT(Math.abs(dailyRemaining)), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = if (isDailyOverBudget) ExpenseRed else IncomeGreen)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (isDailyOverBudget) "Overspent Today:" else "Remaining Today:",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isDailyOverBudget) ExpenseRed else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f, fill = false),
+                                softWrap = true
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = CurrencyUtils.formatBDT(Math.abs(dailyRemaining)),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDailyOverBudget) ExpenseRed else IncomeGreen,
+                                softWrap = true
+                            )
                         }
                     }
                 }
@@ -431,22 +470,30 @@ fun BudgetScreen(
                         Spacer(modifier = Modifier.width(12.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(cat.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            FlowRow(
+                                verticalArrangement = Arrangement.spacedBy(2.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(cat.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, softWrap = true)
                                 if (isOver) {
-                                    Spacer(modifier = Modifier.width(6.dp))
                                     Surface(shape = RoundedCornerShape(4.dp), color = ExpenseRed.copy(alpha = 0.15f)) {
                                         Text("Over Budget", color = ExpenseRed, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp))
                                     }
                                 }
                             }
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = if (isAllocated) "${CurrencyUtils.formatBDT(model.actualSpent)} spent of ${CurrencyUtils.formatBDT(model.allocatedAmount)}" else "${CurrencyUtils.formatBDT(model.actualSpent)} spent (unallocated)",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 12.sp
+                                fontSize = 11.5.sp,
+                                softWrap = true,
+                                lineHeight = 15.sp
                             )
                         }
+
+                        Spacer(modifier = Modifier.width(8.dp))
 
                         Column(horizontalAlignment = Alignment.End) {
                             Text(
@@ -455,7 +502,8 @@ fun BudgetScreen(
                                 } else "৳0",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isOver) ExpenseRed else MaterialTheme.colorScheme.onSurface
+                                color = if (isOver) ExpenseRed else MaterialTheme.colorScheme.onSurface,
+                                softWrap = true
                             )
                             Text(
                                 text = if (isAllocated) "${(model.usagePercentage * 100).toInt()}% used" else "No target",

@@ -88,6 +88,13 @@
 - **Navigation Integration:** Added `MoreSubDestination.SMS_HISTORY` wired to `MoreHubView` ("Automated Imports" section) and `PaymentSmsImportScreen.kt` (top-bar history icon and quick navigation banner card).
 - **Automated Verification:** Added unit tests verifying zero ledger bleed upon approval, status transition rules, and ViewModel filtering.
 
+### Phase 20.6: Expense–Budget Category Consistency & Mobile UI Text Overflow Polish
+- **Category Alignment:** Synchronized all 16 canonical expense categories (`housing`, `family`, `daily_expenses`, `food`, `grocery`, `bills`, `transport`, `savings`, `emergency`, `shopping`, `health`, `education`, `entertainment`, `fitness`, `personal_refreshments`, `other_expense`) into `CategoryCatalog.defaultBudgetCategories` and `FinanceViewModel.categoryIds`.
+- **Financial Invariants Intact:** Unallocated categories default to `allocatedAmount = 0.0`. Existing financial calculations (`totalAllocated`, `unallocatedIncome`, `plannedShortfall`, Main Balance, Daily Living Limit) remain mathematically pure and unchanged.
+- **Non-Expense Category Isolation:** Income categories (`salary`, `business`, etc.) and debt categories (`loan_given`, `loan_taken`, etc.) are explicitly excluded from budget planning envelopes.
+- **Mobile Viewport Overflow Remediation:** Replaced rigid horizontal rows with `FlowRow` and dynamic line-wrapping (`softWrap = true`, `maxLines = 2`, `TextOverflow.Ellipsis`) across `MoreScreen.kt`, `BudgetScreen.kt`, `DashboardOverviewView.kt`, `BudgetPlanningDialog.kt`, `ReportsScreen.kt`, and `ModernBottomNavigationBar.kt`.
+- **Automated Test Coverage:** Created `CategoryBudgetConsistencyUnitTest.kt` with 5 unit tests validating 16-category consistency, isolation, and unallocated calculations.
+
 ---
 
 ## Current Signing & Verification Status Matrix
@@ -100,6 +107,7 @@
 | **Phase 20.3 Dashboard Refinement** | **PASS** | Removed redundant Transaction History list from Dashboard; full Ledger accessible via More and Reports. |
 | **Phase 20.4 Interactive Reports & Charts** | **PASS** | Touch/drag interactive Bezier trend line chart, angle-based donut arc selection, and daily bar chart tooltips formatted in BDT (৳). |
 | **Phase 20.5 SMS Approval Decoupling** | **PASS** | Decoupled SMS approval from financial ledger (zero balance/budget/report bleed). Created Mobile Banking SMS History screen with provider filter and TrxID copy. |
+| **Phase 20.6 Category Consistency & Text Polish** | **PASS** | All 16 expense categories synchronized to budget planning with zero-allocation defaults. Text clipping and overflow resolved across all screens. |
 | **Debug APK Signature** | **PASS** | Validated via `apksigner`. Explicitly bound to repository `debug.keystore`. SHA-256: `C5:C8:B9:74...`. |
 | **Debug Build Determinism** | **PASS** | Multiple clean builds verified producing identical signature fingerprints. |
 | **Release Signing Status** | **BLOCKED** | Unconfigured in environment. Production release keystores are kept outside source control. Task `verifyReleaseSigning` fails closed as intended. |

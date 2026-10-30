@@ -526,8 +526,17 @@ class FinanceViewModel(
         }
 
         val categoryIds = LinkedHashSet<String>().apply {
-            addAll(CategoryCatalog.defaultBudgetCategories)
-            addAll(allocationsSourceMap.keys)
+            addAll(CategoryCatalog.expenseCategories.map { it.id })
+            addAll(
+                allocationsSourceMap.keys.filter { catId ->
+                    CategoryCatalog.getCategoryById(catId).type == TransactionType.EXPENSE
+                }
+            )
+            addAll(
+                monthTransactions
+                    .filter { it.type == TransactionType.EXPENSE && it.categoryId != "loan_repaid" && it.categoryId != "loan_lent" }
+                    .map { it.categoryId }
+            )
         }
 
         val monthCategoryAllocations = categoryIds.map { catId ->

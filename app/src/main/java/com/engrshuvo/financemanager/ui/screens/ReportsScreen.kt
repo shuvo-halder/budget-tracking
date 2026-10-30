@@ -532,14 +532,16 @@ private fun FinancialOverviewSection(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = netColor,
-                        maxLines = 1,
+                        maxLines = 2,
+                        softWrap = true,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = "Income minus expenses",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 10.sp
+                        fontSize = 10.sp,
+                        softWrap = true
                     )
                 }
             }
@@ -581,14 +583,16 @@ private fun FinancialOverviewSection(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
+                        maxLines = 2,
+                        softWrap = true,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = "All-time ledger balance",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 10.sp
+                        fontSize = 10.sp,
+                        softWrap = true
                     )
                 }
             }
@@ -650,7 +654,8 @@ private fun ReportMetricCard(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = color,
-                maxLines = 1,
+                maxLines = 2,
+                softWrap = true,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
@@ -658,7 +663,8 @@ private fun ReportMetricCard(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 10.sp,
-                maxLines = 1,
+                maxLines = 2,
+                softWrap = true,
                 overflow = TextOverflow.Ellipsis
             )
         }
@@ -1764,8 +1770,8 @@ private fun BudgetItemReportRow(item: CategoryAllocationUiModel) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
@@ -1786,10 +1792,11 @@ private fun BudgetItemReportRow(item: CategoryAllocationUiModel) {
                         text = item.category.name,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        softWrap = true
                     )
                 }
+
+                Spacer(modifier = Modifier.width(6.dp))
 
                 Surface(
                     shape = RoundedCornerShape(6.dp),
@@ -1801,7 +1808,8 @@ private fun BudgetItemReportRow(item: CategoryAllocationUiModel) {
                         fontWeight = FontWeight.Bold,
                         color = statusColor,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        fontSize = 11.sp
+                        fontSize = 11.sp,
+                        softWrap = false
                     )
                 }
             }
@@ -1822,19 +1830,25 @@ private fun BudgetItemReportRow(item: CategoryAllocationUiModel) {
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "Spent: ${CurrencyUtils.formatBDT(item.actualSpent)} of ${CurrencyUtils.formatBDT(item.allocatedAmount)}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 11.sp
+                    fontSize = 11.sp,
+                    modifier = Modifier.weight(1f),
+                    softWrap = true
                 )
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = if (item.isOverBudget) "-${CurrencyUtils.formatBDT(abs(item.remainingAmount))}" else "${CurrencyUtils.formatBDT(item.remainingAmount)} left",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = if (item.isOverBudget) ExpenseRed else MaterialTheme.colorScheme.onSurface
+                    color = if (item.isOverBudget) ExpenseRed else MaterialTheme.colorScheme.onSurface,
+                    softWrap = true,
+                    textAlign = TextAlign.End
                 )
             }
         }

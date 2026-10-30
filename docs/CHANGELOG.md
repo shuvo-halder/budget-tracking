@@ -4,7 +4,22 @@ All notable changes to the **Budget & Loan Manager** application are documented 
 
 ---
 
-## [Unreleased] - 2026-10-04
+## [Unreleased] - 2026-10-30
+
+### Added
+* **Expense–Budget Category Consistency & Mobile UI Text Overflow Polish (Phase 20.6):**
+  * Synchronized all 16 canonical expense categories (`housing`, `family`, `daily_expenses`, `food`, `grocery`, `bills`, `transport`, `savings`, `emergency`, `shopping`, `health`, `education`, `entertainment`, `fitness`, `personal_refreshments`, `other_expense`) across CategoryCatalog, Budget screen, Monthly Budget Allocation, and Budget Planning Dialog.
+  * Resolved category inconsistency where 7 expense categories were omitted from budget planning unless manually allocated.
+  * Preserved unallocated category invariant: unallocated categories start with `allocatedAmount = 0.0`, reflecting actual spending without distorting `totalAllocated`, `unallocatedIncome`, or `plannedShortfall`.
+  * Preserved non-expense category isolation: Income and Loan categories remain strictly excluded from budget planning envelopes.
+  * Eliminated text clipping and overflow across mobile viewports:
+    * `MoreScreen.kt`: Utilized `FlowRow` for title and badge, added `lineHeight = 18.sp` and `softWrap = true` to subtitle text.
+    * `BudgetScreen.kt`: Added `FlowRow` and responsive padding to Shortfall Alert, Summary cards (Monthly Income, Total Allocated, Shortfall/Unallocated), Daily Living Limit card, and Category Allocation cards.
+    * `DashboardOverviewView.kt`: Added `FlowRow` for category title and over-budget badge, responsive weight and wrapping to `MiniStatPill`, and `softWrap = true` on hero balance and shortfall alerts.
+    * `BudgetPlanningDialog.kt`: Added `softWrap = true` and vertical alignments across header summary, shortfall banner, copy button, and category rows.
+    * `ReportsScreen.kt`: Updated `ReportMetricCard`, cash flow/balance summary cards, and `BudgetItemReportRow` with `softWrap = true`, `maxLines = 2`, and responsive column spacing.
+    * `ModernBottomNavigationBar.kt`: Distributed 5 navigation tabs evenly with `Modifier.weight(1f)` and compact padding, preventing tab squeeze and text truncation.
+  * Added `CategoryBudgetConsistencyUnitTest.kt` with 5 unit tests validating 16-category coverage, non-expense isolation, and zero-allocation calculation invariants.
 
 ### Added
 * **Mobile Banking SMS Approval Decoupling & SMS History Screen (Phase 20.5):**

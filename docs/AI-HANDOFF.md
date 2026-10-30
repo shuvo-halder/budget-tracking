@@ -57,5 +57,16 @@ Key system capabilities:
 * **Atomic Restore & Rollback:** `FinanceRepository.restoreBackupData` runs inside `database.withTransaction { ... }` ensuring all-or-nothing data replacement with zero partial corruption.
 * **Backup Validation:** Strict schema and relational integrity validation in `FinanceBackupData.fromJsonString` parses loans first, enforces positive IDs, detects duplicate keys, rejects missing foreign key targets, and prevents orphan repayments even if the loans list is empty.
 * **Concurrency Guards:** `FinanceViewModel` prevents overlapping concurrent backup export, file reading, and restoration executions.
-* **Automated Test Coverage:** Verified with 68 automated unit and Robolectric tests in `app/src/test/`, including `BackupRestoreDataIntegrityTest.kt` verifying full database round-trip and fault-injected transaction rollback.
+* **Automated Test Coverage:** Verified with comprehensive automated unit and Robolectric tests in `app/src/test/`, including `BackupRestoreDataIntegrityTest.kt` verifying full database round-trip and fault-injected transaction rollback, and `CategoryBudgetConsistencyUnitTest.kt` verifying category consistency and isolation.
 
+---
+
+## 4. Category Consistency & Envelope Budgeting Rules
+
+* **16 Canonical Expense Categories:** `housing`, `family`, `daily_expenses`, `food`, `grocery`, `bills`, `transport`, `savings`, `emergency`, `shopping`, `health`, `education`, `entertainment`, `fitness`, `personal_refreshments`, `other_expense`.
+* **Budget Planning Coverage:** All 16 categories are present by default in `CategoryCatalog.defaultBudgetCategories`, `FinanceViewModel.categoryIds`, and `BudgetPlanningDialog`.
+* **Zero-Allocation Invariant:** Unallocated categories in any selected month default to `allocatedAmount = 0.0`. They display an unallocated state without inflating `totalAllocated` or distorting `unallocatedIncome` / `plannedShortfall`.
+* **Non-Expense Isolation:** Income categories (`salary`, `business`, `bonus`, `other_income`) and Loan transactions (`loan_given`, `loan_taken`, `loan_repaid`, `loan_collected`) are strictly excluded from budget planning envelopes.
+* **Mobile Viewport Standards:**
+  * Multi-column text layouts, card title badges, and summary chips must use `FlowRow` or `Modifier.weight(1f)` with `softWrap = true`.
+  * Monetary figures and metric labels must not use rigid single-line constraints (`maxLines = 1`) without `TextOverflow.Ellipsis` or multi-line wrap (`maxLines = 2`) to support narrow viewports (320dp/360dp) and high system font scales.

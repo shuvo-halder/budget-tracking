@@ -61,17 +61,7 @@ object CategoryCatalog {
         TransactionCategory("other_income", "Other Income", TransactionType.INCOME, Icons.Default.Payments, Color(0xFF64748B))
     )
 
-    val defaultBudgetCategories = listOf(
-        "housing",
-        "family",
-        "daily_expenses",
-        "food",
-        "grocery",
-        "bills",
-        "transport",
-        "savings",
-        "emergency"
-    )
+    val defaultBudgetCategories = expenseCategories.map { it.id }
 
     fun getAllCategories(): List<TransactionCategory> = expenseCategories + incomeCategories
 

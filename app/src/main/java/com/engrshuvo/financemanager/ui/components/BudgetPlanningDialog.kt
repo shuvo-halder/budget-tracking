@@ -102,7 +102,8 @@ fun BudgetPlanningDialog(
                 Text(
                     text = if (isDraft) "For $monthName • Pre-filled draft from last month (unsaved)" else "For $monthName • Allocations do not deduct cash directly",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    softWrap = true
                 )
             }
         },
@@ -123,32 +124,38 @@ fun BudgetPlanningDialog(
                     Column(modifier = Modifier.padding(12.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = "Monthly Income:",
-                                style = MaterialTheme.typography.bodySmall
+                                style = MaterialTheme.typography.bodySmall,
+                                softWrap = true
                             )
                             Text(
                                 text = CurrencyUtils.formatBDT(totalMonthlyIncome),
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.SemiBold,
-                                color = IncomeGreen
+                                color = IncomeGreen,
+                                softWrap = true
                             )
                         }
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = "Total Allocated:",
-                                style = MaterialTheme.typography.bodySmall
+                                style = MaterialTheme.typography.bodySmall,
+                                softWrap = true
                             )
                             Text(
                                 text = CurrencyUtils.formatBDT(liveTotalAllocated),
                                 style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.SemiBold,
+                                softWrap = true
                             )
                         }
 
@@ -160,7 +167,10 @@ fun BudgetPlanningDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                ) {
                                     Icon(
                                         imageVector = Icons.Default.Warning,
                                         contentDescription = "Shortfall",
@@ -172,31 +182,36 @@ fun BudgetPlanningDialog(
                                         text = "Planned Shortfall:",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = ExpenseRed,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
+                                        softWrap = true
                                     )
                                 }
                                 Text(
                                     text = "-${CurrencyUtils.formatBDT(liveShortfall)}",
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = ExpenseRed
+                                    color = ExpenseRed,
+                                    softWrap = true
                                 )
                             }
                         } else {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
                                     text = "Unallocated Income:",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    softWrap = true
                                 )
                                 Text(
                                     text = CurrencyUtils.formatBDT(liveUnallocated),
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.primary
+                                    color = MaterialTheme.colorScheme.primary,
+                                    softWrap = true
                                 )
                             }
                         }
@@ -225,7 +240,8 @@ fun BudgetPlanningDialog(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "Copy Last Month's Budget Plans",
-                        fontSize = 13.sp
+                        fontSize = 13.sp,
+                        softWrap = true
                     )
                 }
 
@@ -274,14 +290,16 @@ fun BudgetPlanningDialog(
                                 Text(
                                     text = cat.name,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Medium,
+                                    softWrap = true
                                 )
                                 if (cat.id == "savings" || cat.id == "emergency") {
                                     Text(
                                         text = "Planned reserve • not an expense",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = IncomeGreen,
-                                        fontSize = 10.sp
+                                        fontSize = 10.sp,
+                                        softWrap = true
                                     )
                                 }
                             }
