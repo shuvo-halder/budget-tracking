@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PictureAsPdf
@@ -180,6 +181,7 @@ fun MoreScreen(
                     activeGoalsCount = uiState.activeGoals.size,
                     pendingPurchasesCount = uiState.pendingPurchaseCount,
                     pendingSmsReviewCount = uiState.pendingReviewSmsRecords.size,
+                    approvedSmsCount = uiState.approvedSmsRecords.size,
                     isSmsImportEnabled = uiState.isSmsImportEnabled,
                     allTransactionsCount = uiState.allTransactions.size,
                     onNavigateToSubDestination = onNavigateToSubDestination
@@ -321,7 +323,17 @@ fun MoreScreen(
                     onPasteInputChange = onSmsPasteInputChange,
                     onTestParsePaste = onTestParseSmsPaste,
                     onImportPastedSms = onImportPastedSms,
-                    onDismissOperationMessage = onDismissSmsOperationMessage
+                    onDismissOperationMessage = onDismissSmsOperationMessage,
+                    onNavigateToHistory = { onNavigateToSubDestination(MoreSubDestination.SMS_HISTORY) }
+                )
+            }
+
+            MoreSubDestination.SMS_HISTORY -> {
+                BackHandler { onNavigateBack() }
+                MobileBankingSmsHistoryScreen(
+                    records = uiState.approvedSmsRecords,
+                    onNavigateBack = onNavigateBack,
+                    onDeleteRecord = onDeleteSmsRecord
                 )
             }
 
@@ -356,6 +368,7 @@ private fun MoreHubView(
     activeGoalsCount: Int,
     pendingPurchasesCount: Int,
     pendingSmsReviewCount: Int = 0,
+    approvedSmsCount: Int = 0,
     isSmsImportEnabled: Boolean = false,
     allTransactionsCount: Int = 0,
     onNavigateToSubDestination: (MoreSubDestination) -> Unit,
@@ -507,6 +520,20 @@ private fun MoreHubView(
                 badgeColor = if (pendingSmsReviewCount > 0) Color(0xFFF59E0B) else if (isSmsImportEnabled) IncomeGreen else MaterialTheme.colorScheme.outline,
                 onClick = { onNavigateToSubDestination(MoreSubDestination.SMS_IMPORT) },
                 testTag = "more_sms_import_card"
+            )
+        }
+
+        item(key = "more_item_sms_history") {
+            MoreDestinationCard(
+                icon = Icons.Default.History,
+                iconColor = Color(0xFF0284C7),
+                iconBg = Color(0xFFE0F2FE),
+                title = "Mobile Banking SMS History",
+                subtitle = "Saved history of approved bKash, Nagad, Rocket, DBBL, and bank transactions (isolated from ledger)",
+                badgeText = if (approvedSmsCount > 0) "$approvedSmsCount approved" else "History",
+                badgeColor = Color(0xFF0284C7),
+                onClick = { onNavigateToSubDestination(MoreSubDestination.SMS_HISTORY) },
+                testTag = "more_sms_history_card"
             )
         }
 

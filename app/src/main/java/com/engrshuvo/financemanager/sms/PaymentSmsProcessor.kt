@@ -53,7 +53,6 @@ object PaymentSmsProcessor {
 
         val database = AppDatabase.getDatabase(context)
         val smsDao = database.smsImportedRecordDao()
-        val txDao = database.transactionDao()
 
         // 5. Deduplication Fingerprint
         val fallbackFingerprint = if (!parsed.trxId.isNullOrBlank()) {
@@ -78,11 +77,7 @@ object PaymentSmsProcessor {
                 }
             }
 
-            // Candidate vs Auto-Post Determination
-            val canAutoPost = prefs.autoPostUnambiguous && parsed.isConfident && !parsed.isCardBillPayment
-            val initialStatus = if (canAutoPost) SmsImportStatus.POSTED else SmsImportStatus.PENDING_REVIEW
-
-            // Insert into sms_imported_records FIRST
+            // Insert into sms_imported_records as PENDING_REVIEW (isolated from financial ledger)
             val record = SmsImportedRecordEntity(
                 sender = parsed.sender,
                 provider = parsed.provider,
@@ -93,7 +88,7 @@ object PaymentSmsProcessor {
                 counterparty = parsed.counterparty,
                 suggestedCategory = parsed.suggestedCategory,
                 timestamp = messageTimestamp,
-                status = initialStatus,
+                status = SmsImportStatus.PENDING_REVIEW,
                 linkedTransactionId = null,
                 fallbackFingerprint = fallbackFingerprint,
                 note = parsed.note
@@ -103,25 +98,6 @@ object PaymentSmsProcessor {
             if (insertedId <= 0) {
                 // Duplicate caught by SQLite UNIQUE index or failure
                 return@withTransaction false
-            }
-
-            // Only create financial transaction if auto-post is eligible
-            if (canAutoPost) {
-                val category = CategoryCatalog.getCategoryById(parsed.suggestedCategory)
-                val newTx = TransactionEntity(
-                    type = parsed.type,
-                    amount = parsed.amount,
-                    categoryId = category.id,
-                    categoryName = category.name,
-                    note = "${parsed.note}${if (parsed.trxId != null) " (TrxID: ${parsed.trxId})" else ""}",
-                    timestamp = messageTimestamp
-                )
-                val createdTxId = txDao.insertTransaction(newTx)
-                if (createdTxId > 0) {
-                    smsDao.updateStatus(insertedId, SmsImportStatus.POSTED, createdTxId)
-                } else {
-                    throw IllegalStateException("Failed to insert linked transaction for SMS $insertedId")
-                }
             }
 
             true

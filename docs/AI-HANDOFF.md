@@ -29,20 +29,27 @@ Key system capabilities:
   3. `Dashboard` (Center - Default): Financial overview, balance, cash flows, daily spending summary, and recent activities.
   4. `Calendar`: Interactive monthly calendar, day expense inspection, and selected day ledger.
   5. `Loans`: Counterparty debt tracker with installment repayments and full settlement.
-* **Top-Right Overflow Menu (`More`):**
+* **More Hub Destinations (`MoreSubDestination`):**
+  * Calendar (`MoreSubDestination.CALENDAR`)
+  * All Transactions Ledger (`MoreSubDestination.TRANSACTIONS`)
+  * Financial Goals (`MoreSubDestination.GOALS`)
+  * Purchase Planner (`MoreSubDestination.PURCHASE_PLANNER`)
+  * Reports & Analytics (`MoreSubDestination.REPORTS`)
+  * PDF Export Center (`MoreSubDestination.PDF_EXPORT`)
+  * Payment SMS Import (`MoreSubDestination.SMS_IMPORT`)
+  * Mobile Banking SMS History (`MoreSubDestination.SMS_HISTORY`) — *Isolated from core ledger*
+  * Notifications & Reminders (`MoreSubDestination.NOTIFICATION_SETTINGS`)
   * Backup & Restore (`MoreSubDestination.BACKUP_RESTORE`)
   * Archive & Recovery (`MoreSubDestination.ARCHIVE`)
-  * Reports & Analytics (`MoreSubDestination.REPORTS`)
-  * Notifications & Reminders (`MoreSubDestination.NOTIFICATION_SETTINGS`)
-  * Daily Spending Target (`DailyLimitDialog`)
   * Tools & Services Hub (`MoreSubDestination.NONE`)
 
 ---
 
 ## 3. Database & Concurrency Rules
 
-* **Room Version:** 3 (No destructive migrations allowed).
-* **Entities:** `TransactionEntity`, `LoanEntity`, `LoanRepaymentEntity`, `BudgetSettingEntity`, `BudgetAllocationEntity`.
+* **Room Version:** 6 (No destructive migrations allowed).
+* **Entities:** `TransactionEntity`, `LoanEntity`, `LoanRepaymentEntity`, `BudgetSettingEntity`, `BudgetAllocationEntity`, `FinancialGoalEntity`, `GoalContributionEntity`, `PurchaseItemEntity`, `SmsImportedRecordEntity`.
+* **SMS Isolation Guard:** SMS parsing and approval operate strictly inside `sms_imported_records`. Approving an SMS record updates `status` to `APPROVED` and NEVER writes to `TransactionEntity`, preserving 100% isolation from Main Balance, Budgets, and Reports.
 * **Dispatchers:**
   * All database operations MUST use `Dispatchers.IO`.
   * All list transformations, aggregation math, and calendar matrices MUST run on `Dispatchers.Default`.

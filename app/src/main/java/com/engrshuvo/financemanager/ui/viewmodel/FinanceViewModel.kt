@@ -1061,6 +1061,7 @@ class FinanceViewModel(
             smsAutoPostUnambiguous = smsParams.prefs.autoPostUnambiguous,
             importedSmsRecords = smsParams.records,
             pendingReviewSmsRecords = smsParams.records.filter { it.status == com.engrshuvo.financemanager.data.model.SmsImportStatus.PENDING_REVIEW },
+            approvedSmsRecords = smsParams.records.filter { it.status.isApproved },
             smsRecordToReview = smsParams.recordToReview,
             smsPasteInput = smsParams.pasteInput,
             smsPasteTestResult = smsParams.pasteTestResult,
@@ -2033,7 +2034,7 @@ class FinanceViewModel(
         viewModelScope.launch {
             val success = repository.approveSmsRecord(recordId, categoryId, note)
             if (success) {
-                _smsOperationMessage.value = "Payment record approved and added to transactions!"
+                _smsOperationMessage.value = "Payment SMS approved and saved to SMS History."
             }
             _smsRecordToReview.value = null
         }

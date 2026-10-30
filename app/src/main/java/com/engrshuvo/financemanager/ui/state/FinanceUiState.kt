@@ -35,6 +35,7 @@ enum class MoreSubDestination {
     PDF_EXPORT,
     PURCHASE_PLANNER,
     SMS_IMPORT,
+    SMS_HISTORY,
     TRANSACTIONS
 }
 
@@ -276,6 +277,7 @@ data class FinanceUiState(
     val smsAutoPostUnambiguous: Boolean = false,
     val importedSmsRecords: List<SmsImportedRecordEntity> = emptyList(),
     val pendingReviewSmsRecords: List<SmsImportedRecordEntity> = emptyList(),
+    val approvedSmsRecords: List<SmsImportedRecordEntity> = emptyList(),
     val smsRecordToReview: SmsImportedRecordEntity? = null,
     val smsPasteInput: String = "",
     val smsPasteTestResult: String? = null,

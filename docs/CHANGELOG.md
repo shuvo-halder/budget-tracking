@@ -7,6 +7,11 @@ All notable changes to the **Budget & Loan Manager** application are documented 
 ## [Unreleased] - 2026-10-04
 
 ### Added
+* **Mobile Banking SMS Approval Decoupling & SMS History Screen (Phase 20.5):**
+  * Decoupled mobile banking SMS approval from the financial ledger: approving an SMS message updates its status to `APPROVED` and strictly avoids modifying Main Balance, Income, Expense, Budgets, Dashboard, or Reports.
+  * Created dedicated `MobileBankingSmsHistoryScreen.kt` featuring provider filter chips (bKash, Nagad, Rocket, DBBL, Banks), search input, summary inflow/outflow metrics, BDT formatted amounts (`৳`), click-to-copy TrxID, and single-record deletion.
+  * Added `MoreSubDestination.SMS_HISTORY` accessible via the More hub ("Automated Imports" section) and directly from `PaymentSmsImportScreen` via top-bar action and quick link card.
+  * Added comprehensive unit test coverage verifying zero ledger bleed, balance invariance, and backward compatibility with legacy records.
 * **Bottom Navigation & Calendar Promotion:**
   * Added `FinanceTab.CALENDAR` as a primary bottom navigation destination.
   * Reordered bottom navigation bar: 1. Transactions, 2. Budget, 3. Dashboard (center default), 4. Calendar, 5. Loans.

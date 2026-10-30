@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -106,6 +107,7 @@ fun PaymentSmsImportScreen(
     onTestParsePaste: (sender: String, body: String) -> Unit,
     onImportPastedSms: (Context, sender: String, body: String) -> Unit,
     onDismissOperationMessage: () -> Unit,
+    onNavigateToHistory: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -158,6 +160,18 @@ fun PaymentSmsImportScreen(
                     }
                 },
                 actions = {
+                    if (onNavigateToHistory != null) {
+                        IconButton(
+                            onClick = onNavigateToHistory,
+                            modifier = Modifier.testTag("sms_history_top_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.History,
+                                contentDescription = "SMS History",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                     IconButton(
                         onClick = { showBatteryInfoDialog = true },
                         modifier = Modifier.testTag("sms_battery_info_button")
@@ -364,6 +378,75 @@ fun PaymentSmsImportScreen(
                             onCheckedChange = onToggleAutoPost,
                             modifier = Modifier.testTag("sms_auto_post_switch")
                         )
+                    }
+                }
+            }
+
+            // SMS History Link Card
+            if (onNavigateToHistory != null) {
+                item(key = "sms_history_shortcut_card") {
+                    Card(
+                        onClick = onNavigateToHistory,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("sms_history_shortcut_card"),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primaryContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.History,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Column {
+                                    Text(
+                                        text = "Mobile Banking SMS History",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleSmall
+                                    )
+                                    Text(
+                                        text = "View all approved bKash, Nagad, Rocket & bank records",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primary
+                            ) {
+                                Text(
+                                    text = "${uiState.approvedSmsRecords.size} Saved",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -656,7 +739,7 @@ private fun SmsRecordCard(
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Review & Add")
+                    Text("Review & Approve")
                 }
             }
         }

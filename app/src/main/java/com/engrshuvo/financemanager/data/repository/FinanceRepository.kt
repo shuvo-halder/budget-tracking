@@ -572,46 +572,27 @@ class FinanceRepository(
         smsImportedRecordDao?.insertRecord(record) ?: -1L
     }
 
-    suspend fun approveSmsRecord(recordId: Long, categoryId: String, note: String = ""): Boolean = withContext(Dispatchers.IO) {
+    suspend fun approveSmsRecord(recordId: Long, categoryId: String = "", note: String = ""): Boolean = withContext(Dispatchers.IO) {
         val record = smsImportedRecordDao?.getRecordById(recordId) ?: return@withContext false
-        // Strictly prevent approving an already posted or non-pending record (idempotency guard)
-        if (record.status != com.engrshuvo.financemanager.data.model.SmsImportStatus.PENDING_REVIEW || record.linkedTransactionId != null) {
+        // Strictly prevent approving an already approved or non-pending record (idempotency guard)
+        if (record.status != com.engrshuvo.financemanager.data.model.SmsImportStatus.PENDING_REVIEW) {
             return@withContext false
         }
-        val cat = CategoryCatalog.getCategoryById(categoryId)
-        val tx = TransactionEntity(
-            type = record.type,
-            amount = record.amount,
-            categoryId = cat.id,
-            categoryName = cat.name,
-            note = if (note.isNotBlank()) note else "${record.note}${if (record.trxId != null) " (TrxID: ${record.trxId})" else ""}",
-            timestamp = record.timestamp
+        val updatedNote = if (note.isNotBlank()) note else record.note
+        val updatedCategory = if (categoryId.isNotBlank()) categoryId else record.suggestedCategory
+        val updatedRecord = record.copy(
+            status = com.engrshuvo.financemanager.data.model.SmsImportStatus.APPROVED,
+            suggestedCategory = updatedCategory,
+            note = updatedNote
         )
-        if (database != null) {
-            database.withTransaction {
-                val createdTxId = transactionDao.insertTransaction(tx)
-                if (createdTxId > 0) {
-                    val updated = smsImportedRecordDao.updateStatus(recordId, com.engrshuvo.financemanager.data.model.SmsImportStatus.POSTED, createdTxId)
-                    updated > 0
-                } else {
-                    false
-                }
-            }
-        } else {
-            val createdTxId = transactionDao.insertTransaction(tx)
-            if (createdTxId > 0) {
-                val updated = smsImportedRecordDao.updateStatus(recordId, com.engrshuvo.financemanager.data.model.SmsImportStatus.POSTED, createdTxId)
-                updated > 0
-            } else {
-                false
-            }
-        }
+        val updated = smsImportedRecordDao.updateRecord(updatedRecord)
+        updated > 0
     }
 
     suspend fun dismissSmsRecord(recordId: Long): Boolean = withContext(Dispatchers.IO) {
         val record = smsImportedRecordDao?.getRecordById(recordId) ?: return@withContext false
-        // Already posted transactions cannot be dismissed to avoid ledger desync
-        if (record.status == com.engrshuvo.financemanager.data.model.SmsImportStatus.POSTED) {
+        // Already approved transactions cannot be dismissed to avoid history desync
+        if (record.status.isApproved) {
             return@withContext false
         }
         val count = smsImportedRecordDao.updateStatus(recordId, com.engrshuvo.financemanager.data.model.SmsImportStatus.DISMISSED)

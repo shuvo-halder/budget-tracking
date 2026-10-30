@@ -158,7 +158,11 @@ data class PurchaseItemEntity(
 enum class SmsImportStatus {
     PENDING_REVIEW,
     POSTED,
-    DISMISSED
+    APPROVED,
+    DISMISSED;
+
+    val isApproved: Boolean
+        get() = this == APPROVED || this == POSTED
 }
 
 @Immutable

@@ -276,11 +276,11 @@ class PaymentSmsImportUnitTest {
         val second = PaymentSmsProcessor.processIncomingSms(context, "bKash", smsBody, now + 100L)
         assertFalse(second)
 
-        // Verify only 1 SMS record and 1 transaction exist
+        // Verify only 1 SMS record exists and 0 transactions exist (zero ledger bleed)
         val records = database.smsImportedRecordDao().getAllRecordsDirect()
         assertEquals(1, records.size)
         val transactions = database.transactionDao().getAllTransactionsDirect()
-        assertEquals(1, transactions.size)
+        assertEquals(0, transactions.size)
     }
 
     // 11. Duplicate SMS delivery — no duplicate balance effect
@@ -304,11 +304,13 @@ class PaymentSmsImportUnitTest {
         PaymentSmsProcessor.processIncomingSms(context, "bKash", smsBody, now + 100L)
 
         val finalTransactions = database.transactionDao().getAllTransactionsDirect()
-        assertEquals(1, finalTransactions.size)
+        assertEquals(0, finalTransactions.size)
         val newBalance = finalTransactions.sumOf {
             if (it.type == TransactionType.INCOME) it.amount else -it.amount
         }
-        assertEquals(initialBalance + 2000.0, newBalance, 0.001)
+        assertEquals(initialBalance, newBalance, 0.001)
+        val records = database.smsImportedRecordDao().getAllRecordsDirect()
+        assertEquals(1, records.size)
     }
 
     // 12. Similar legitimate transactions — both preserved
@@ -331,7 +333,7 @@ class PaymentSmsImportUnitTest {
         val records = database.smsImportedRecordDao().getAllRecordsDirect()
         assertEquals(2, records.size)
         val transactions = database.transactionDao().getAllTransactionsDirect()
-        assertEquals(2, transactions.size)
+        assertEquals(0, transactions.size)
     }
 
     // 13. Credit-card purchase vs bill payment — correctly distinguished
@@ -431,7 +433,8 @@ class PaymentSmsImportUnitTest {
         )
 
         val allTx = repository.allTransactions.first()
-        assertEquals(2, allTx.size)
+        // SMS import never creates transactions; only manual transaction exists
+        assertEquals(1, allTx.size)
         // Ensure manual transaction remains completely intact
         val retrievedSalary = allTx.first { it.id == txId }
         assertEquals(50000.0, retrievedSalary.amount, 0.001)
@@ -470,6 +473,153 @@ class PaymentSmsImportUnitTest {
         // Verify zero transactions have been added simply by sharing text
         val transactions = repository.allTransactions.first()
         assertTrue(transactions.isEmpty())
+
+        collectJob.cancel()
+    }
+
+    // 19. Approving an SMS record NEVER inserts into transactions and never affects financial balance
+    @Test
+    fun test19_approvalDoesNotAffectFinancialLedgerOrBalance() = runBlocking {
+        // Initial state with manual transaction
+        val manualTx = TransactionEntity(
+            type = TransactionType.INCOME,
+            amount = 10000.0,
+            categoryId = "salary",
+            categoryName = "Salary",
+            note = "Initial balance",
+            timestamp = System.currentTimeMillis()
+        )
+        repository.insertTransaction(manualTx)
+
+        val balanceBefore = repository.allTransactions.first().sumOf {
+            if (it.type == TransactionType.INCOME) it.amount else -it.amount
+        }
+        assertEquals(10000.0, balanceBefore, 0.001)
+
+        // Receive an SMS record
+        prefsRepo.updateEnabled(true)
+        val now = System.currentTimeMillis() + 1000L
+        PaymentSmsProcessor.processIncomingSms(
+            context = context,
+            sender = "bKash",
+            body = "Payment of Tk 1,200.00 to Merchant is successful. Fee Tk 0.00. TrxID APPROVE_TEST_1.",
+            messageTimestamp = now
+        )
+
+        val records = database.smsImportedRecordDao().getAllRecordsDirect()
+        assertEquals(1, records.size)
+        val recordId = records[0].id
+        assertEquals(SmsImportStatus.PENDING_REVIEW, records[0].status)
+
+        // Approve the SMS record
+        val approved = repository.approveSmsRecord(recordId, categoryId = "shopping", note = "Approved in test")
+        assertTrue(approved)
+
+        // Check SMS record status is now APPROVED
+        val updatedRecord = database.smsImportedRecordDao().getRecordById(recordId)
+        assertNotNull(updatedRecord)
+        assertEquals(SmsImportStatus.APPROVED, updatedRecord!!.status)
+        assertEquals("shopping", updatedRecord.suggestedCategory)
+        assertEquals("Approved in test", updatedRecord.note)
+        assertTrue(updatedRecord.status.isApproved)
+
+        // Verify transactions table still only has the 1 initial manual transaction
+        val allTxAfter = repository.allTransactions.first()
+        assertEquals(1, allTxAfter.size)
+        assertEquals(manualTx.amount, allTxAfter[0].amount, 0.001)
+
+        // Verify balance is completely unchanged
+        val balanceAfter = allTxAfter.sumOf {
+            if (it.type == TransactionType.INCOME) it.amount else -it.amount
+        }
+        assertEquals(balanceBefore, balanceAfter, 0.001)
+    }
+
+    // 20. FinanceUiState approvedSmsRecords includes APPROVED and legacy POSTED, excludes PENDING and DISMISSED
+    @Test
+    fun test20_approvedSmsRecords_inViewModel_includesApprovedAndLegacyPosted() = runBlocking {
+        val now = System.currentTimeMillis()
+        val dao = database.smsImportedRecordDao()
+
+        // 1. Pending record
+        dao.insertRecord(
+            com.engrshuvo.financemanager.data.model.SmsImportedRecordEntity(
+                sender = "bKash",
+                provider = "bKash",
+                trxId = "TX_PENDING",
+                type = TransactionType.EXPENSE,
+                amount = 100.0,
+                timestamp = now,
+                status = SmsImportStatus.PENDING_REVIEW,
+                fallbackFingerprint = "fp1"
+            )
+        )
+
+        // 2. Approved record
+        dao.insertRecord(
+            com.engrshuvo.financemanager.data.model.SmsImportedRecordEntity(
+                sender = "Nagad",
+                provider = "Nagad",
+                trxId = "TX_APPROVED",
+                type = TransactionType.EXPENSE,
+                amount = 250.0,
+                timestamp = now + 1,
+                status = SmsImportStatus.APPROVED,
+                fallbackFingerprint = "fp2"
+            )
+        )
+
+        // 3. Legacy Posted record
+        dao.insertRecord(
+            com.engrshuvo.financemanager.data.model.SmsImportedRecordEntity(
+                sender = "Rocket",
+                provider = "Rocket",
+                trxId = "TX_POSTED_LEGACY",
+                type = TransactionType.INCOME,
+                amount = 500.0,
+                timestamp = now + 2,
+                status = SmsImportStatus.POSTED,
+                fallbackFingerprint = "fp3"
+            )
+        )
+
+        // 4. Dismissed record
+        dao.insertRecord(
+            com.engrshuvo.financemanager.data.model.SmsImportedRecordEntity(
+                sender = "bKash",
+                provider = "bKash",
+                trxId = "TX_DISMISSED",
+                type = TransactionType.EXPENSE,
+                amount = 75.0,
+                timestamp = now + 3,
+                status = SmsImportStatus.DISMISSED,
+                fallbackFingerprint = "fp4"
+            )
+        )
+
+        val viewModel = com.engrshuvo.financemanager.ui.viewmodel.FinanceViewModel(
+            repository = repository,
+            notificationPreferencesRepo = null,
+            paymentSmsPreferencesRepo = prefsRepo
+        )
+
+        val collectJob = launch {
+            viewModel.uiState.collect()
+        }
+
+        val state = viewModel.uiState.first { it.importedSmsRecords.size == 4 }
+
+        // Pending review contains ONLY PENDING_REVIEW
+        assertEquals(1, state.pendingReviewSmsRecords.size)
+        assertEquals("TX_PENDING", state.pendingReviewSmsRecords[0].trxId)
+
+        // Approved SMS records contains APPROVED and POSTED, but NOT PENDING or DISMISSED
+        assertEquals(2, state.approvedSmsRecords.size)
+        val approvedTrxIds = state.approvedSmsRecords.map { it.trxId }.toSet()
+        assertTrue(approvedTrxIds.contains("TX_APPROVED"))
+        assertTrue(approvedTrxIds.contains("TX_POSTED_LEGACY"))
+        assertFalse(approvedTrxIds.contains("TX_PENDING"))
+        assertFalse(approvedTrxIds.contains("TX_DISMISSED"))
 
         collectJob.cancel()
     }

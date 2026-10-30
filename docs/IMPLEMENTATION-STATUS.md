@@ -80,6 +80,14 @@
 - **Interactive Daily Spending Bar Chart:** Upgraded `DailySpendingAnalysisCard` with tap/drag bar selection, vertical guide line, active bar border highlight, and an interactive daily limit comparison summary banner (`Exceeded limit by ৳X` / `Within limit`).
 - **Calculations & Architecture Intact:** All underlying financial aggregations, ViewModel flow states, Room schema v6, and zero-permission SMS import mechanisms preserved 100%.
 
+### Phase 20.5: Mobile Banking SMS Approval Decoupling & SMS History Screen
+- **Ledger Decoupling:** Fully decoupled mobile banking SMS approvals (bKash, Nagad, Rocket, DBBL, and commercial banks) from the core financial ledger. Approving an SMS record updates `status` to `APPROVED` and strictly avoids inserting a `TransactionEntity` or modifying Main Balance, Income, Expense, Budgets, Dashboard, or Reports.
+- **Zero-Permission Staging:** Incoming SMS parsing (via manual paste and Android `ACTION_SEND` intent) strictly populates `sms_imported_records` as `PENDING_REVIEW` with zero ledger creation.
+- **Backward-Compatible Schema:** Preserved Room schema v6; added `APPROVED` to `SmsImportStatus` and defined `isApproved` (`APPROVED || POSTED`) ensuring legacy records are fully supported without schema migration.
+- **Dedicated SMS History Screen:** Created `MobileBankingSmsHistoryScreen.kt` featuring provider filter chips (All, bKash, Nagad, Rocket, DBBL, Banks), search input, total inflow/outflow metrics, BDT formatting (`৳`), click-to-copy TrxID with clipboard toast, and single-record deletion.
+- **Navigation Integration:** Added `MoreSubDestination.SMS_HISTORY` wired to `MoreHubView` ("Automated Imports" section) and `PaymentSmsImportScreen.kt` (top-bar history icon and quick navigation banner card).
+- **Automated Verification:** Added unit tests verifying zero ledger bleed upon approval, status transition rules, and ViewModel filtering.
+
 ---
 
 ## Current Signing & Verification Status Matrix
@@ -91,6 +99,7 @@
 | **Phase 20.2 More Menu Adjust Section** | **PASS** | Organized More menu cards into structured categories including a dedicated **Adjust** section (Notifications, Backup, Archive). |
 | **Phase 20.3 Dashboard Refinement** | **PASS** | Removed redundant Transaction History list from Dashboard; full Ledger accessible via More and Reports. |
 | **Phase 20.4 Interactive Reports & Charts** | **PASS** | Touch/drag interactive Bezier trend line chart, angle-based donut arc selection, and daily bar chart tooltips formatted in BDT (৳). |
+| **Phase 20.5 SMS Approval Decoupling** | **PASS** | Decoupled SMS approval from financial ledger (zero balance/budget/report bleed). Created Mobile Banking SMS History screen with provider filter and TrxID copy. |
 | **Debug APK Signature** | **PASS** | Validated via `apksigner`. Explicitly bound to repository `debug.keystore`. SHA-256: `C5:C8:B9:74...`. |
 | **Debug Build Determinism** | **PASS** | Multiple clean builds verified producing identical signature fingerprints. |
 | **Release Signing Status** | **BLOCKED** | Unconfigured in environment. Production release keystores are kept outside source control. Task `verifyReleaseSigning` fails closed as intended. |
